@@ -22,12 +22,12 @@ export const avatarColors = (hue: number) =>
     ? { bg: `hsl(${hue} 70% 88%)`, fg: `hsl(${hue} 55% 28%)` }
     : { bg: `hsl(${hue} 45% 30%)`, fg: `hsl(${hue} 90% 88%)` }
 
-export const ROW_HEIGHT = 30
-export const LANE_WIDTH = 16
-export const GRAPH_PADDING = 12
+export const ROW_HEIGHT = 34
+export const LANE_WIDTH = 19
+export const GRAPH_PADDING = 14
 
 export const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH
 
 export function graphWidth(maxLanes: number): number {
-  return Math.min(Math.max(maxLanes * LANE_WIDTH + GRAPH_PADDING * 2, 72), 280)
+  return Math.min(Math.max(maxLanes * LANE_WIDTH + GRAPH_PADDING * 2, 84), 320)
 }

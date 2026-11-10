@@ -28,14 +28,14 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 ## Features
 
 **History**
-- Commit graph with colored lanes, curved merges, author avatars and branch/tag pills
+- Commit graph with colored lanes, curved merges, author profile pictures and branch/tag pills
 - Opens 50,000-commit repositories in well under a second; every list is virtualized
 - Search by message or hash, filter by author, walk commits with ↑ / ↓
 - Commit details with full message, parents and changed files
 
 **Changes**
 - Stage / unstage whole files, single hunks or **selected lines**; discard just as precisely
-- Unified and side-by-side diffs with syntax highlighting
+- Unified and side-by-side diffs with syntax highlighting; before/after previews for images (PNG, JPEG, GIF, WebP, …)
 - Commit, amend (pre-filled with the last message), per-repo message drafts
 
 **Branches & remotes**
@@ -52,7 +52,9 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 **Workflow**
 - Multiple repositories as tabs, with named, colored, collapsible **tab groups** and drag-to-reorder
 - **⌘K command palette** for every action, branch and tab, plus keyboard shortcuts throughout
-- Dark and light themes (or follow the system), zoom, open in your terminal or editor
+- Dark and light themes (or follow the system), zoom, resizable panels, a welcome screen with recent repositories, open in your terminal or editor
+
+**Profile pictures** are looked up by author email: GitHub no-reply addresses directly, other authors through the GitHub API (repositories hosted on GitHub) and Gravatar. Results are cached; authors without a picture keep their initials. Turn it off in **Settings → General** and no lookups are made.
 
 ### AI (optional)
 

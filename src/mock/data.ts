@@ -174,6 +174,7 @@ export function createMockRepo(name: string, path: string, commitCount = 5000): 
         { path: 'src/components/graph/GraphCell.vue', status: 'M', additions: 24, deletions: 6 },
         { path: 'src/lib/graph-layout.ts', status: 'M', additions: 12, deletions: 3 },
         { path: 'src/stores/ui.ts', status: 'M', additions: 4, deletions: 1 },
+        { path: 'public/hero.webp', status: 'M', additions: 0, deletions: 0 },
         { path: 'src/components/graph/LaneLegend.vue', status: '?', additions: 48, deletions: 0 },
         { path: 'docs/old-notes.md', status: 'D', additions: 0, deletions: 31 },
       ],

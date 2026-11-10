@@ -21,6 +21,14 @@ const POOL = [
 ]
 const STATUSES: FileStatus[] = ['M', 'M', 'M', 'A', 'D']
 
+function mockImage(path: string) {
+  if (!/\.(png|jpe?g|gif|webp|bmp|ico|avif|svg)$/i.test(path)) return { before: null, after: null, tooLarge: false }
+  const art = (a: string, b: string, r: number) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="480" height="300" rx="24" fill="url(#g)"/><circle cx="240" cy="150" r="${r}" fill="#fff" fill-opacity=".85"/></svg>`
+  const side = (svg: string) => ({ dataUrl: `data:image/svg+xml;base64,${btoa(svg)}`, bytes: svg.length * 9 })
+  return { before: side(art('#3b82f6', '#8b5cf6', 60)), after: side(art('#14b8a6', '#6366f1', 84)), tooLarge: false }
+}
+
 export const mockApi: GitApi = {
   openRepo: (path) => delay({ root: path, name: path.split('/').pop() || path }),
   getCommits: (path, limit) => {
@@ -55,6 +63,7 @@ export const mockApi: GitApi = {
     return delay(details)
   },
   getFileDiff: (_path, target) => delay({ ...mockDiff(target.path), path: target.path }),
+  getFileImage: (_path, target) => delay(mockImage(target.path)),
   runAction: (path, action) => delay(mockAction(path, action), 150),
   openInTerminal: () => delay(undefined),
   openInEditor: () => delay(undefined),

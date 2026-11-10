@@ -83,12 +83,20 @@ impl Default for AppearanceSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GeneralSettings {
     /// app name (macOS) or command line; empty = system default
     pub terminal_app: String,
     pub editor_app: String,
+    /// fetch author pictures from GitHub / Gravatar (initials otherwise)
+    pub show_avatars: bool,
+}
+
+impl Default for GeneralSettings {
+    fn default() -> Self {
+        Self { terminal_app: String::new(), editor_app: String::new(), show_avatars: true }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -136,6 +144,7 @@ mod tests {
         assert_eq!(s.ai.provider, "none");
         assert_eq!(s.ai.models["anthropic"], "claude-opus-5-5");
         assert_eq!(s.cleanup.stale_days, 90);
+        assert!(s.general.show_avatars, "profile pictures are on by default");
 
         let mut changed = s.clone();
         changed.ai.provider = "ollama".into();

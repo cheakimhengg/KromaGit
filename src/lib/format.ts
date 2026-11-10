@@ -66,3 +66,12 @@ export function languageFromPath(path: string): string {
   }
   return map[ext] ?? 'plaintext'
 }
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|ico|avif)$/i
+export const isImagePath = (path: string) => IMAGE_EXT.test(path)

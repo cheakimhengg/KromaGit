@@ -117,12 +117,12 @@ watch(() => ui.generateRequest, () => void generate())
       <input
         ref="summaryInput"
         v-model="draft.summary"
-        class="gw-input h-8 pr-16 text-[13px]"
+        class="gw-input h-9 pr-16 text-[14px]"
         :placeholder="operation ? 'Finish or abort the operation first' : 'Summary (required)'"
         spellcheck="false"
       />
       <span
-        class="pointer-events-none absolute top-1/2 right-9 -translate-y-1/2 font-mono text-[10px]"
+        class="pointer-events-none absolute top-1/2 right-9 -translate-y-1/2 font-mono text-[11px]"
         :class="summaryLen > SOFT_LIMIT ? 'text-danger' : summaryLen > 50 ? 'text-warning' : 'text-faint'"
         :title="`${SOFT_LIMIT} characters is the conventional limit`"
       >{{ summaryLen }}</span>
@@ -133,8 +133,8 @@ watch(() => ui.generateRequest, () => void generate())
         :disabled="generating || !stagedCount"
         @click="generate"
       >
-        <Loader2 v-if="generating" :size="15" class="animate-spin" />
-        <Sparkles v-else :size="15" />
+        <Loader2 v-if="generating" :size="17" class="animate-spin" />
+        <Sparkles v-else :size="17" />
       </button>
     </div>
     <textarea
@@ -145,29 +145,29 @@ watch(() => ui.generateRequest, () => void generate())
       spellcheck="false"
     />
     <div class="mt-2 flex items-center gap-2">
-      <label class="flex cursor-pointer items-center gap-1.5 text-[12px] text-muted select-none" :class="{ 'opacity-40': !hasHead }" :title="hasHead ? 'Rewrite the last commit' : 'No commit to amend yet'">
+      <label class="flex cursor-pointer items-center gap-1.5 text-[13px] text-muted select-none" :class="{ 'opacity-40': !hasHead }" :title="hasHead ? 'Rewrite the last commit' : 'No commit to amend yet'">
         <input v-model="draft.amend" type="checkbox" :disabled="!hasHead" class="h-3 w-3 accent-[var(--gw-accent)]" />Amend
-        <Loader2 v-if="loadingAmend" :size="11" class="animate-spin" />
+        <Loader2 v-if="loadingAmend" :size="12" class="animate-spin" />
       </label>
       <div class="flex-1" />
       <button
         type="button"
-        class="flex h-7 items-center gap-1 rounded-md border border-line-strong px-2.5 text-[12px] text-fg hover:bg-hover disabled:opacity-40"
+        class="flex h-8 shrink-0 items-center whitespace-nowrap gap-1 rounded-md border border-line-strong px-2.5 text-[13px] text-fg hover:bg-hover disabled:opacity-40"
         :title="stagedCount ? 'AI review of the staged changes' : 'Stage changes first'"
         :disabled="!stagedCount || ai.review.status === 'running'"
         @click="ai.runReview()"
       >
-        <ScanSearch :size="13" />Review
+        <ScanSearch :size="15" />Review
       </button>
       <button
         type="button"
         :disabled="!canCommit"
         :title="canCommit ? `${draft.amend ? 'Amend' : 'Commit'} (⌘/Ctrl+Enter)` : stagedCount === 0 && !draft.amend ? 'Stage some changes first' : 'Write a summary'"
-        class="flex h-7 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+        class="flex h-8 shrink-0 items-center whitespace-nowrap gap-1 rounded-md bg-accent px-3 text-[13px] font-semibold text-on-accent hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         @click="submit"
       >
-        <Loader2 v-if="ops.running === 'Commit' || ops.running === 'Amend commit'" :size="13" class="animate-spin" />
-        <Check v-else :size="13" />{{ draft.amend ? 'Amend' : 'Commit' }}
+        <Loader2 v-if="ops.running === 'Commit' || ops.running === 'Amend commit'" :size="15" class="animate-spin" />
+        <Check v-else :size="15" />{{ draft.amend ? 'Amend' : 'Commit' }}
       </button>
     </div>
   </div>

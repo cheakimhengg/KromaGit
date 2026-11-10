@@ -35,44 +35,44 @@ function open(c: ReviewComment) {
     <template #actions>
       <button
         type="button" :disabled="r.status === 'running'"
-        class="flex h-6 items-center gap-1 rounded-md border border-line-strong px-2 text-[11px] hover:bg-hover disabled:opacity-40"
+        class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1 rounded-md border border-line-strong px-2 text-[12px] hover:bg-hover disabled:opacity-40"
         @click="ai.runReview()"
-      ><RotateCw :size="11" />Review again</button>
+      ><RotateCw :size="12" />Review again</button>
     </template>
 
-    <div v-if="r.status === 'running'" class="flex flex-col items-center gap-2 p-12 text-[12px] text-muted">
-      <Loader2 :size="20" class="animate-spin text-accent-2" />{{ ai.progress ?? 'Reviewing…' }}
+    <div v-if="r.status === 'running'" class="flex flex-col items-center gap-2 p-12 text-[13px] text-muted">
+      <Loader2 :size="22" class="animate-spin text-accent-2" />{{ ai.progress ?? 'Reviewing…' }}
     </div>
 
-    <div v-else-if="r.status === 'error'" class="m-4 flex gap-2 rounded-md border border-danger/30 bg-danger/10 p-3 text-[12px] text-danger select-text">
-      <AlertOctagon :size="15" class="shrink-0" />{{ r.error }}
+    <div v-else-if="r.status === 'error'" class="m-4 flex gap-2 rounded-md border border-danger/30 bg-danger/10 p-3 text-[13px] text-danger select-text">
+      <AlertOctagon :size="17" class="shrink-0" />{{ r.error }}
     </div>
 
     <div v-else-if="r.status === 'done'" class="space-y-4 p-4">
-      <div class="rounded-lg border border-line bg-surface p-3 text-[12px] leading-relaxed text-fg select-text">{{ r.summary || 'Review complete.' }}</div>
-      <div v-if="!r.comments.length" class="text-center text-[12px] text-success">No problems found in the staged changes.</div>
+      <div class="rounded-lg border border-line bg-surface p-3 text-[13px] leading-relaxed text-fg select-text">{{ r.summary || 'Review complete.' }}</div>
+      <div v-if="!r.comments.length" class="text-center text-[13px] text-success">No problems found in the staged changes.</div>
 
       <div v-for="[file, comments] in byFile" :key="file" class="overflow-hidden rounded-lg border border-line">
-        <div class="border-b border-line bg-surface px-3 py-1.5 font-mono text-[12px] text-fg">{{ file }}</div>
+        <div class="border-b border-line bg-surface px-3 py-1.5 font-mono text-[13px] text-fg">{{ file }}</div>
         <button
           v-for="(c, i) in comments" :key="i" type="button"
-          class="flex w-full items-start gap-2 border-b border-line px-3 py-2 text-left text-[12px] last:border-b-0 hover:bg-surface-2"
+          class="flex w-full items-start gap-2 border-b border-line px-3 py-2 text-left text-[13px] last:border-b-0 hover:bg-surface-2"
           :title="c.line ? `Open the diff at line ${c.line}` : 'Open the diff'"
           @click="open(c)"
         >
-          <span class="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold" :class="meta[c.severity].cls">
-            <component :is="meta[c.severity].icon" :size="10" />{{ meta[c.severity].label }}
+          <span class="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold" :class="meta[c.severity].cls">
+            <component :is="meta[c.severity].icon" :size="11" />{{ meta[c.severity].label }}
           </span>
-          <span class="w-12 shrink-0 pt-0.5 font-mono text-[11px] text-faint">{{ c.line ? `L${c.line}` : '—' }}</span>
+          <span class="w-12 shrink-0 pt-0.5 font-mono text-[12px] text-faint">{{ c.line ? `L${c.line}` : '—' }}</span>
           <span class="flex-1 leading-relaxed text-fg select-text">{{ c.message }}</span>
         </button>
       </div>
 
-      <div v-if="omitted.length" class="text-[11px] text-faint">
+      <div v-if="omitted.length" class="text-[12px] text-faint">
         Not fully reviewed:
         <span v-for="f in omitted" :key="f.path" class="mr-2 font-mono">{{ f.path }} ({{ f.omitted ?? (f.truncated ? 'truncated' : `${f.redactions} redacted`) }})</span>
       </div>
-      <p class="text-[11px] text-faint">AI review can miss things or be wrong — treat it as a second pair of eyes, not a gate.</p>
+      <p class="text-[12px] text-faint">AI review can miss things or be wrong — treat it as a second pair of eyes, not a gate.</p>
     </div>
   </PanelShell>
 </template>

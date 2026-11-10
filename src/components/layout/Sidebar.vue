@@ -95,11 +95,11 @@ function stashMenu(e: MouseEvent, s: Stash) {
   <aside class="flex h-full flex-col border-r border-line bg-surface">
     <div class="flex items-center gap-1 p-2">
       <div class="relative flex-1">
-        <Search :size="12" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
+        <Search :size="14" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
         <input v-model="filter" class="gw-input pl-6" placeholder="Filter refs…" spellcheck="false" />
       </div>
       <button type="button" class="rounded p-1 text-faint hover:bg-hover hover:text-fg" title="Collapse sidebar" @click="ui.sidebarCollapsed = true">
-        <PanelLeftClose :size="14" />
+        <PanelLeftClose :size="16" />
       </button>
     </div>
 
@@ -112,20 +112,20 @@ function stashMenu(e: MouseEvent, s: Stash) {
           @menu="(e: MouseEvent, b: Branch) => branchMenu(e, b)"
         >
           <template #leaf="{ item, label }">
-            <CircleDot v-if="item.current" :size="12" class="shrink-0 text-accent" />
-            <GitBranch v-else :size="12" class="shrink-0 text-faint" />
+            <CircleDot v-if="item.current" :size="14" class="shrink-0 text-accent" />
+            <GitBranch v-else :size="14" class="shrink-0 text-faint" />
             <span class="flex-1 truncate" :class="item.current ? 'font-semibold text-fg' : 'text-fg/85'">{{ label }}</span>
-            <span v-if="item.upstreamGone" class="rounded bg-danger/15 px-1 text-[9px] text-danger" title="Upstream branch was deleted">gone</span>
-            <span v-if="item.ahead" class="font-mono text-[10px] text-success" :title="`${item.ahead} ahead of ${item.upstream ?? 'upstream'}`">↑{{ item.ahead }}</span>
-            <span v-if="item.behind" class="font-mono text-[10px] text-warning" :title="`${item.behind} behind ${item.upstream ?? 'upstream'}`">↓{{ item.behind }}</span>
+            <span v-if="item.upstreamGone" class="rounded bg-danger/15 px-1 text-[10px] text-danger" title="Upstream branch was deleted">gone</span>
+            <span v-if="item.ahead" class="font-mono text-[11px] text-success" :title="`${item.ahead} ahead of ${item.upstream ?? 'upstream'}`">↑{{ item.ahead }}</span>
+            <span v-if="item.behind" class="font-mono text-[11px] text-warning" :title="`${item.behind} behind ${item.upstream ?? 'upstream'}`">↓{{ item.behind }}</span>
           </template>
         </RefTree>
       </SidebarSection>
 
       <SidebarSection title="Remotes" :icon="Cloud" :count="remoteCount">
         <div v-for="r in remotes" :key="r.remote.name">
-          <div class="flex h-6 items-center gap-1.5 px-2 text-[12px] text-muted" :title="r.remote.url">
-            <Globe :size="12" class="text-faint" /><span class="flex-1 truncate">{{ r.remote.name }}</span>
+          <div class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1.5 px-2 text-[13px] text-muted" :title="r.remote.url">
+            <Globe :size="14" class="text-faint" /><span class="flex-1 truncate">{{ r.remote.name }}</span>
           </div>
           <RefTree
             :nodes="r.tree"
@@ -135,7 +135,7 @@ function stashMenu(e: MouseEvent, s: Stash) {
             @menu="(e: MouseEvent, n: string) => remoteMenu(e, r.remote.name, n)"
           >
             <template #leaf="{ label }">
-              <GitBranch :size="12" class="shrink-0 text-faint" /><span class="truncate text-fg/85">{{ label }}</span>
+              <GitBranch :size="14" class="shrink-0 text-faint" /><span class="truncate text-fg/85">{{ label }}</span>
             </template>
           </RefTree>
         </div>
@@ -144,34 +144,34 @@ function stashMenu(e: MouseEvent, s: Stash) {
       <SidebarSection title="Tags" :icon="TagIcon" :count="tags.length" :default-open="false">
         <div
           v-for="t in tags" :key="t.name"
-          class="flex h-6 items-center gap-1.5 rounded pr-2 pl-5 text-[12px] hover:bg-hover"
+          class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover"
           @contextmenu="tagMenu($event, t)"
           @dblclick="git.checkoutCommit(t.hash)"
         >
-          <TagIcon :size="12" class="shrink-0 text-faint" /><span class="flex-1 truncate text-fg/85">{{ t.name }}</span>
-          <span class="font-mono text-[10px] text-faint">{{ t.hash.slice(0, 7) }}</span>
+          <TagIcon :size="14" class="shrink-0 text-faint" /><span class="flex-1 truncate text-fg/85">{{ t.name }}</span>
+          <span class="font-mono text-[11px] text-faint">{{ t.hash.slice(0, 7) }}</span>
         </div>
       </SidebarSection>
 
       <SidebarSection title="Stashes" :icon="Archive" :count="stashes.length">
-        <div v-for="s in stashes" :key="s.index" class="flex h-6 cursor-pointer items-center gap-1.5 rounded pr-2 pl-5 text-[12px] hover:bg-hover" :title="`${s.message} — right-click for actions`" @contextmenu="stashMenu($event, s)">
-          <Archive :size="12" class="shrink-0 text-faint" />
+        <div v-for="s in stashes" :key="s.index" class="flex h-7 cursor-pointer items-center gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover" :title="`${s.message} — right-click for actions`" @contextmenu="stashMenu($event, s)">
+          <Archive :size="14" class="shrink-0 text-faint" />
           <span class="flex-1 truncate text-fg/85">{{ s.message }}</span>
-          <span class="shrink-0 text-[10px] text-faint">{{ relativeTime(s.date) }}</span>
+          <span class="shrink-0 text-[11px] text-faint">{{ relativeTime(s.date) }}</span>
         </div>
       </SidebarSection>
 
       <SidebarSection title="Worktrees" :icon="FolderTree" :count="worktrees.length" :default-open="false">
-        <div v-for="w in worktrees" :key="w.path" class="flex h-6 items-center gap-1.5 rounded pr-2 pl-5 text-[12px] hover:bg-hover" :title="w.path">
-          <FolderTree :size="12" class="shrink-0 text-faint" />
+        <div v-for="w in worktrees" :key="w.path" class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover" :title="w.path">
+          <FolderTree :size="14" class="shrink-0 text-faint" />
           <span class="flex-1 truncate text-fg/85">{{ w.path.split('/').pop() }}</span>
-          <span class="truncate text-[10px] text-faint">{{ w.branch }}</span>
+          <span class="truncate text-[11px] text-faint">{{ w.branch }}</span>
         </div>
       </SidebarSection>
 
       <SidebarSection title="Submodules" :icon="Boxes" :count="submodules.length" :default-open="false">
-        <div v-for="s in submodules" :key="s.path" class="flex h-6 items-center gap-1.5 rounded pr-2 pl-5 text-[12px] hover:bg-hover">
-          <Boxes :size="12" class="shrink-0 text-faint" />
+        <div v-for="s in submodules" :key="s.path" class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover">
+          <Boxes :size="14" class="shrink-0 text-faint" />
           <span class="flex-1 truncate text-fg/85">{{ s.path }}</span>
           <span v-if="s.status === 'modified'" class="h-1.5 w-1.5 rounded-full bg-warning" title="Modified" />
         </div>

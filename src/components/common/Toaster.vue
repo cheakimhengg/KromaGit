@@ -20,12 +20,12 @@ const colors = { info: 'text-accent', success: 'text-success', error: 'text-dang
         :key="t.id"
         class="pointer-events-auto flex items-start gap-2 rounded-lg border border-line-strong bg-surface-2 p-3 shadow-xl shadow-black/40"
       >
-        <component :is="icons[t.kind]" :size="16" class="mt-0.5 shrink-0" :class="colors[t.kind]" />
+        <component :is="icons[t.kind]" :size="18" class="mt-0.5 shrink-0" :class="colors[t.kind]" />
         <div class="min-w-0 flex-1">
-          <div class="text-[12px] font-medium text-fg">{{ t.title }}</div>
-          <div v-if="t.detail" class="mt-0.5 text-[11px] text-muted">{{ t.detail }}</div>
+          <div class="text-[13px] font-medium text-fg">{{ t.title }}</div>
+          <div v-if="t.detail" class="mt-0.5 text-[12px] text-muted">{{ t.detail }}</div>
         </div>
-        <button type="button" class="text-faint hover:text-fg" @click="ui.dismissToast(t.id)"><X :size="14" /></button>
+        <button type="button" class="text-faint hover:text-fg" @click="ui.dismissToast(t.id)"><X :size="16" /></button>
       </div>
     </TransitionGroup>
   </div>

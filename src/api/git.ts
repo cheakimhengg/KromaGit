@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
-  Commit, CommitDetails, DiffTarget, FileDiff, GitAction, OpOutcome, RefLabel, RefsPayload, RepoInfo, StatusPayload,
+  Commit, CommitDetails, DiffTarget, FileDiff, GitAction, ImagePair, OpOutcome, RefLabel, RefsPayload, RepoInfo, StatusPayload,
 } from '@/types/git'
 import { mockApi } from './mock-backend'
 
@@ -11,9 +11,21 @@ export interface GitApi {
   getStatus(repo: string): Promise<StatusPayload>
   getCommitDetails(repo: string, hash: string): Promise<CommitDetails>
   getFileDiff(repo: string, target: DiffTarget): Promise<FileDiff>
+  getFileImage(repo: string, target: DiffTarget): Promise<ImagePair>
   runAction(repo: string, action: GitAction): Promise<OpOutcome>
   openInTerminal(path: string): Promise<void>
   openInEditor(path: string): Promise<void>
+}
+
+function diffRequest(target: DiffTarget) {
+  return {
+    path: target.path,
+    oldPath: target.oldPath ?? null,
+    source: target.source,
+    untracked: !!target.untracked,
+    commit: target.commit ?? null,
+    parent: target.parent ?? null,
+  }
 }
 
 export interface AppError {
@@ -51,18 +63,8 @@ const tauriApi: GitApi = {
   getRefs: (repo) => invoke<RefsPayload>('get_refs', { repo }),
   getStatus: (repo) => invoke<StatusPayload>('get_status', { repo }),
   getCommitDetails: (repo, hash) => invoke<CommitDetails>('get_commit_details', { repo, hash }),
-  getFileDiff: (repo, target) =>
-    invoke<FileDiff>('get_file_diff', {
-      repo,
-      request: {
-        path: target.path,
-        oldPath: target.oldPath ?? null,
-        source: target.source,
-        untracked: !!target.untracked,
-        commit: target.commit ?? null,
-        parent: target.parent ?? null,
-      },
-    }),
+  getFileDiff: (repo, target) => invoke<FileDiff>('get_file_diff', { repo, request: diffRequest(target) }),
+  getFileImage: (repo, target) => invoke<ImagePair>('get_file_image', { repo, request: diffRequest(target) }),
   runAction: (repo, action) => invoke<OpOutcome>('git_action', { repo, action }),
   openInTerminal: (path) => invoke<void>('open_in_terminal', { path }),
   openInEditor: (path) => invoke<void>('open_in_editor', { path }),

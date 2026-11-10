@@ -64,37 +64,37 @@ function onKey(e: KeyboardEvent) {
 
 <template>
   <div v-if="ui.paletteOpen" class="fixed inset-0 z-[58] flex items-start justify-center bg-black/40 pt-[12vh]" @mousedown.self="ui.paletteOpen = false">
-    <div class="w-[600px] max-w-[92vw] overflow-hidden rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/50" role="dialog" aria-label="Command palette">
+    <div class="w-[640px] max-w-[92vw] overflow-hidden rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/50" role="dialog" aria-label="Command palette">
       <div class="flex items-center gap-2 border-b border-line px-4">
-        <Search :size="15" class="text-faint" />
+        <Search :size="17" class="text-faint" />
         <input
           ref="input"
           v-model="query"
-          class="h-11 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-faint"
+          class="h-11 flex-1 bg-transparent text-[15px] text-fg outline-none placeholder:text-faint"
           placeholder="Type a command, branch or repository…"
           spellcheck="false"
           autocomplete="off"
           @keydown="onKey"
         />
-        <kbd class="rounded border border-line px-1.5 font-mono text-[10px] text-faint">Esc</kbd>
+        <kbd class="rounded border border-line px-1.5 font-mono text-[11px] text-faint">Esc</kbd>
       </div>
       <div ref="list" class="max-h-[52vh] overflow-y-auto p-1.5">
-        <div v-if="!results.length" class="px-3 py-6 text-center text-[12px] text-faint">No matching commands</div>
+        <div v-if="!results.length" class="px-3 py-6 text-center text-[13px] text-faint">No matching commands</div>
         <button
           v-for="(c, i) in results" :key="c.id"
           type="button"
           :data-index="i"
-          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px]"
+          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[14px]"
           :class="[i === active ? 'bg-accent/15 text-fg' : 'text-fg/90', c.enabled && !c.enabled() ? 'opacity-40' : '']"
           @mousemove="active = i"
           @click="run(c)"
         >
-          <component :is="c.icon" v-if="c.icon" :size="15" class="shrink-0 text-muted" />
-          <span v-else class="w-[15px]" />
+          <component :is="c.icon" v-if="c.icon" :size="17" class="shrink-0 text-muted" />
+          <span v-else class="w-[17px]" />
           <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
-          <span class="shrink-0 text-[10px] tracking-wide text-faint uppercase">{{ c.group }}</span>
-          <kbd v-if="c.shortcut" class="shrink-0 rounded border border-line bg-surface px-1.5 font-mono text-[11px] text-muted">{{ formatCombo(c.shortcut) }}</kbd>
-          <CornerDownLeft v-if="i === active" :size="13" class="shrink-0 text-faint" />
+          <span class="shrink-0 text-[11px] tracking-wide text-faint uppercase">{{ c.group }}</span>
+          <kbd v-if="c.shortcut" class="shrink-0 rounded border border-line bg-surface px-1.5 font-mono text-[12px] text-muted">{{ formatCombo(c.shortcut) }}</kbd>
+          <CornerDownLeft v-if="i === active" :size="15" class="shrink-0 text-faint" />
         </button>
       </div>
     </div>

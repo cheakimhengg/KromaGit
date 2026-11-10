@@ -14,7 +14,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ open: [FileChange]; toggle: [FileChange]; menu: [MouseEvent, FileChange] }>()
 
-const ROW = 24
+const ROW = 28
 const scrollEl = ref<HTMLElement | null>(null)
 
 interface Row {
@@ -67,15 +67,15 @@ function split(path: string) {
       <template v-for="v in virtualizer.getVirtualItems()" :key="rows[v.index].key">
         <div
           v-if="rows[v.index].folder"
-          class="absolute left-0 flex w-full items-center gap-1 pr-2 text-[11px] text-muted"
+          class="absolute left-0 flex w-full items-center gap-1 pr-2 text-[12px] text-muted"
           :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + 8}px` }"
         >
-          <ChevronRight :size="11" class="rotate-90 text-faint" /><Folder :size="12" class="text-faint" />
+          <ChevronRight :size="12" class="rotate-90 text-faint" /><Folder :size="14" class="text-faint" />
           <span class="truncate">{{ rows[v.index].folder }}</span>
         </div>
         <div
           v-else
-          class="group absolute left-0 flex w-full cursor-pointer items-center gap-1.5 pr-2 text-[12px]"
+          class="group absolute left-0 flex w-full cursor-pointer items-center gap-1.5 pr-2 text-[13px]"
           :class="activePath === rows[v.index].file!.path ? 'bg-select' : 'hover:bg-hover'"
           :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + (mode === 'tree' ? 22 : 8)}px` }"
           @click="emit('open', rows[v.index].file!)"
@@ -94,9 +94,9 @@ function split(path: string) {
             :title="rows[v.index].file!.oldPath ? `${rows[v.index].file!.oldPath} → ${rows[v.index].file!.path}` : rows[v.index].file!.path"
           >
             <span class="truncate text-fg" :class="{ 'line-through opacity-60': rows[v.index].file!.status === 'D' }">{{ split(rows[v.index].file!.path).name }}</span>
-            <span v-if="mode === 'list'" class="truncate text-[10px] text-faint">{{ split(rows[v.index].file!.path).dir }}</span>
+            <span v-if="mode === 'list'" class="truncate text-[11px] text-faint">{{ split(rows[v.index].file!.path).dir }}</span>
           </span>
-          <span class="hidden shrink-0 font-mono text-[10px] group-hover:inline">
+          <span class="hidden shrink-0 font-mono text-[11px] group-hover:inline">
             <span class="text-success">+{{ rows[v.index].file!.additions }}</span>
             <span class="ml-1 text-danger">−{{ rows[v.index].file!.deletions }}</span>
           </span>

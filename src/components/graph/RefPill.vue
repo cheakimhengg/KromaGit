@@ -21,12 +21,12 @@ const style = computed(() =>
 
 <template>
   <span
-    class="inline-flex h-[18px] max-w-full items-center gap-1 rounded-full border px-1.5 text-[11px] leading-none font-medium whitespace-nowrap"
+    class="inline-flex h-[21px] max-w-full items-center gap-1 rounded-full border px-1.5 text-[12px] leading-none font-medium whitespace-nowrap"
     :style="style"
     :title="refLabel.current ? `${refLabel.name} (checked out)` : refLabel.name"
   >
-    <component :is="icon" :size="10" :stroke-width="2.25" class="shrink-0" />
+    <component :is="icon" :size="11" :stroke-width="2.25" class="shrink-0" />
     <span class="truncate">{{ refLabel.name }}</span>
-    <Cloud v-if="hasRemote" :size="10" :stroke-width="2.25" class="shrink-0 opacity-70" />
+    <Cloud v-if="hasRemote" :size="11" :stroke-width="2.25" class="shrink-0 opacity-70" />
   </span>
 </template>

@@ -17,7 +17,7 @@ const titles: Record<FileStatus, string> = {
 </script>
 
 <template>
-  <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold" :class="styles[status]" :title="titles[status]">
+  <span class="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded font-mono text-[11px] font-bold" :class="styles[status]" :title="titles[status]">
     {{ status }}
   </span>
 </template>

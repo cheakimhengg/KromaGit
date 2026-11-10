@@ -149,20 +149,20 @@ function onKey(e: KeyboardEvent) {
 
 <template>
   <div v-if="ui.settingsOpen" class="fixed inset-0 z-[55] flex items-start justify-center bg-black/55 pt-[7vh] backdrop-blur-[2px]" @mousedown.self="ui.settingsOpen = false" @keydown="onKey">
-    <div class="flex max-h-[84vh] w-[720px] max-w-[94vw] flex-col rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/60" role="dialog" aria-modal="true">
+    <div class="flex max-h-[84vh] w-[760px] max-w-[94vw] flex-col rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/60" role="dialog" aria-modal="true">
       <div class="flex items-center gap-2 border-b border-line px-5 py-3">
-        <h2 class="text-[14px] font-semibold">Settings</h2>
+        <h2 class="text-[15px] font-semibold">Settings</h2>
         <div class="ml-4 flex gap-1">
           <button
             v-for="t in ([['general', 'General'], ['ai', 'AI'], ['repo', 'This repository'], ['workflow', 'Standup & cleanup'], ['shortcuts', 'Shortcuts']] as const)" :key="t[0]"
-            type="button" class="rounded-md px-2.5 py-1 text-[12px]" :class="tab === t[0] ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
+            type="button" class="rounded-md px-2.5 py-1 text-[13px]" :class="tab === t[0] ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="tab = t[0]"
           >{{ t[1] }}</button>
         </div>
-        <button type="button" class="ml-auto rounded p-1 text-faint hover:bg-hover hover:text-fg" @click="ui.settingsOpen = false"><X :size="15" /></button>
+        <button type="button" class="ml-auto rounded p-1 text-faint hover:bg-hover hover:text-fg" @click="ui.settingsOpen = false"><X :size="17" /></button>
       </div>
 
-      <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-[12px]">
+      <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-[13px]">
         <template v-if="tab === 'general'">
           <div class="grid grid-cols-[130px_1fr] items-center gap-x-3 gap-y-4">
             <label class="text-muted">Theme</label>
@@ -173,7 +173,7 @@ function onKey(e: KeyboardEvent) {
                 class="flex items-center gap-1.5 rounded-md border px-3 py-1.5"
                 :class="store.settings.appearance.theme === t[0] ? 'border-accent bg-accent/10 text-fg' : 'border-line text-muted hover:text-fg'"
                 @click="store.setTheme(t[0]); draft.appearance.theme = t[0]"
-              ><component :is="t[2]" :size="13" />{{ t[1] }}</button>
+              ><component :is="t[2]" :size="15" />{{ t[1] }}</button>
             </div>
             <label class="text-muted">Zoom</label>
             <div class="flex items-center gap-3">
@@ -183,16 +183,24 @@ function onKey(e: KeyboardEvent) {
                 @change="store.zoomBy(Number(($event.target as HTMLInputElement).value) - store.settings.appearance.zoom); draft.appearance.zoom = Number(($event.target as HTMLInputElement).value)"
               />
               <span class="w-10 font-mono text-fg">{{ store.settings.appearance.zoom }}%</span>
-              <span class="text-[11px] text-faint">{{ formatCombo('Mod+=') }} / {{ formatCombo('Mod+-') }} / {{ formatCombo('Mod+0') }}</span>
+              <span class="text-[12px] text-faint">{{ formatCombo('Mod+=') }} / {{ formatCombo('Mod+-') }} / {{ formatCombo('Mod+0') }}</span>
             </div>
             <label class="text-muted">Terminal app</label>
             <div>
-              <input v-model="draft.general.terminalApp" class="gw-input h-8 font-mono" :placeholder="isMacOS ? 'Terminal (default) — e.g. iTerm, Warp, Ghostty' : 'System default — e.g. wezterm start --cwd {path}'" spellcheck="false" />
+              <input v-model="draft.general.terminalApp" class="gw-input h-9 font-mono" :placeholder="isMacOS ? 'Terminal (default) — e.g. iTerm, Warp, Ghostty' : 'System default — e.g. wezterm start --cwd {path}'" spellcheck="false" />
             </div>
             <label class="text-muted">Editor app</label>
             <div>
-              <input v-model="draft.general.editorApp" class="gw-input h-8 font-mono" :placeholder="isMacOS ? 'VS Code / Cursor if installed — e.g. Zed, Sublime Text' : 'code (default) — e.g. zed {path}'" spellcheck="false" />
-              <p class="mt-1 text-[11px] text-faint">{{ isMacOS ? 'An application name, or a full command line.' : 'A command line;' }} <code>{path}</code> is replaced by the repository folder (appended if omitted).</p>
+              <input v-model="draft.general.editorApp" class="gw-input h-9 font-mono" :placeholder="isMacOS ? 'VS Code / Cursor if installed — e.g. Zed, Sublime Text' : 'code (default) — e.g. zed {path}'" spellcheck="false" />
+              <p class="mt-1 text-[12px] text-faint">{{ isMacOS ? 'An application name, or a full command line.' : 'A command line;' }} <code>{path}</code> is replaced by the repository folder (appended if omitted).</p>
+            </div>
+            <label class="text-muted">Avatars</label>
+            <div>
+              <label class="flex cursor-pointer items-center gap-2 text-fg">
+                <input v-model="draft.general.showAvatars" type="checkbox" class="h-4 w-4 accent-[var(--gw-accent)]" />
+                Show profile pictures
+              </label>
+              <p class="mt-1 text-[12px] text-faint">Looked up on GitHub and Gravatar by author email. Authors without one keep their initials.</p>
             </div>
           </div>
         </template>
@@ -202,10 +210,10 @@ function onKey(e: KeyboardEvent) {
           <div class="grid grid-cols-2 gap-x-6 gap-y-1">
             <div v-for="c in shortcutList" :key="c.id" class="flex items-center justify-between border-b border-line/60 py-1">
               <span class="text-fg/90">{{ c.id === 'tab-1' ? 'Go to tab 1–9' : c.title }}</span>
-              <kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[11px] text-muted">{{ c.id === 'tab-1' ? formatCombo('Mod+1') + '…9' : formatCombo(c.shortcut!) }}</kbd>
+              <kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[12px] text-muted">{{ c.id === 'tab-1' ? formatCombo('Mod+1') + '…9' : formatCombo(c.shortcut!) }}</kbd>
             </div>
-            <div class="flex items-center justify-between border-b border-line/60 py-1"><span class="text-fg/90">Move through commits</span><kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[11px] text-muted">↑ ↓ / j k</kbd></div>
-            <div class="flex items-center justify-between border-b border-line/60 py-1"><span class="text-fg/90">Close diff / panel</span><kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[11px] text-muted">Esc</kbd></div>
+            <div class="flex items-center justify-between border-b border-line/60 py-1"><span class="text-fg/90">Move through commits</span><kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[12px] text-muted">↑ ↓ / j k</kbd></div>
+            <div class="flex items-center justify-between border-b border-line/60 py-1"><span class="text-fg/90">Close diff / panel</span><kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[12px] text-muted">Esc</kbd></div>
           </div>
         </template>
 
@@ -218,8 +226,8 @@ function onKey(e: KeyboardEvent) {
               :class="provider === p.id ? 'border-accent bg-accent/10' : 'border-line hover:border-line-strong hover:bg-hover'"
               @click="pick(p.id)"
             >
-              <span class="flex items-center gap-1 font-semibold text-fg"><Sparkles v-if="p.id !== 'none'" :size="12" class="text-accent-2" />{{ p.name }}</span>
-              <span class="text-[10px] leading-snug text-muted">{{ p.blurb }}</span>
+              <span class="flex items-center gap-1 font-semibold text-fg"><Sparkles v-if="p.id !== 'none'" :size="14" class="text-accent-2" />{{ p.name }}</span>
+              <span class="text-[11px] leading-snug text-muted">{{ p.blurb }}</span>
             </button>
           </div>
 
@@ -227,42 +235,42 @@ function onKey(e: KeyboardEvent) {
             <div v-if="provider === 'ollama'" class="grid grid-cols-[110px_1fr] items-center gap-x-3 gap-y-3">
               <label class="text-muted">Server URL</label>
               <div class="flex gap-2">
-                <input v-model="draft.ai.ollamaUrl" class="gw-input h-8 font-mono" spellcheck="false" />
-                <button type="button" class="flex h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong px-2.5 hover:bg-hover" @click="loadOllama">
-                  <Loader2 v-if="busy === 'ollama'" :size="12" class="animate-spin" /><RefreshCw v-else :size="12" />Load models
+                <input v-model="draft.ai.ollamaUrl" class="gw-input h-9 font-mono" spellcheck="false" />
+                <button type="button" class="flex h-9 shrink-0 items-center gap-1 rounded-md border border-line-strong px-2.5 hover:bg-hover" @click="loadOllama">
+                  <Loader2 v-if="busy === 'ollama'" :size="14" class="animate-spin" /><RefreshCw v-else :size="14" />Load models
                 </button>
               </div>
               <label class="text-muted">Model</label>
               <div>
-                <select v-if="ollamaModels.length" v-model="draft.ai.models.ollama" class="gw-input h-8">
+                <select v-if="ollamaModels.length" v-model="draft.ai.models.ollama" class="gw-input h-9">
                   <option v-for="m in ollamaModels" :key="m" :value="m">{{ m }}</option>
                 </select>
-                <input v-else v-model="draft.ai.models.ollama" class="gw-input h-8 font-mono" placeholder="e.g. qwen2.5-coder:7b" spellcheck="false" />
-                <p class="mt-1 text-[11px] text-faint">Install from ollama.com, then run <code class="text-muted">ollama pull qwen2.5-coder</code>. A coding-tuned model gives the best results.</p>
+                <input v-else v-model="draft.ai.models.ollama" class="gw-input h-9 font-mono" placeholder="e.g. qwen2.5-coder:7b" spellcheck="false" />
+                <p class="mt-1 text-[12px] text-faint">Install from ollama.com, then run <code class="text-muted">ollama pull qwen2.5-coder</code>. A coding-tuned model gives the best results.</p>
               </div>
             </div>
 
             <div v-else class="grid grid-cols-[110px_1fr] items-center gap-x-3 gap-y-3">
               <label class="text-muted">Model</label>
               <div>
-                <input v-model="draft.ai.models[provider]" :list="`models-${provider}`" class="gw-input h-8 font-mono" spellcheck="false" />
+                <input v-model="draft.ai.models[provider]" :list="`models-${provider}`" class="gw-input h-9 font-mono" spellcheck="false" />
                 <datalist :id="`models-${provider}`"><option v-for="m in info.models" :key="m" :value="m" /></datalist>
-                <p class="mt-1 text-[11px] text-faint">Any model id your account can use. Suggestions: {{ info.models.join(', ') }}.</p>
+                <p class="mt-1 text-[12px] text-faint">Any model id your account can use. Suggestions: {{ info.models.join(', ') }}.</p>
               </div>
               <label class="text-muted">API key</label>
               <div>
                 <div v-if="hasKey" class="flex items-center gap-2">
-                  <span class="flex items-center gap-1 text-success"><KeyRound :size="13" />Saved in your system keychain</span>
+                  <span class="flex items-center gap-1 text-success"><KeyRound :size="15" />Saved in your system keychain</span>
                   <button type="button" class="ml-auto rounded-md px-2 py-1 text-danger hover:bg-danger/10" @click="removeKey">Remove</button>
                 </div>
                 <div class="flex gap-2" :class="{ 'mt-2': hasKey }">
-                  <input v-model="keyInput" type="password" class="gw-input h-8 font-mono" :placeholder="hasKey ? 'Replace key…' : 'Paste your API key'" autocomplete="off" spellcheck="false" @keydown.enter="saveKey" />
-                  <button type="button" :disabled="!keyInput.trim() || busy === 'key'" class="h-8 shrink-0 rounded-md bg-accent px-3 font-semibold text-on-accent disabled:opacity-40" @click="saveKey">Save key</button>
+                  <input v-model="keyInput" type="password" class="gw-input h-9 font-mono" :placeholder="hasKey ? 'Replace key…' : 'Paste your API key'" autocomplete="off" spellcheck="false" @keydown.enter="saveKey" />
+                  <button type="button" :disabled="!keyInput.trim() || busy === 'key'" class="h-9 shrink-0 rounded-md bg-accent px-3 font-semibold text-on-accent disabled:opacity-40" @click="saveKey">Save key</button>
                 </div>
               </div>
               <label class="text-muted">Privacy</label>
               <div class="flex items-center gap-2 text-muted">
-                <ShieldCheck :size="13" :class="consented ? 'text-success' : 'text-faint'" />
+                <ShieldCheck :size="15" :class="consented ? 'text-success' : 'text-faint'" />
                 <span v-if="consented">You allowed sending code to {{ info.name }}.</span>
                 <span v-else>Before the first request, KromaGit shows exactly what will be sent and asks.</span>
                 <button v-if="consented" type="button" class="ml-auto rounded-md px-2 py-1 hover:bg-hover hover:text-fg" @click="revokeConsent">Revoke</button>
@@ -270,13 +278,13 @@ function onKey(e: KeyboardEvent) {
             </div>
 
             <div class="flex items-center gap-3 rounded-lg border border-line bg-bg px-3 py-2">
-              <button type="button" :disabled="!!busy" class="flex h-7 shrink-0 items-center gap-1 rounded-md border border-line-strong px-2.5 hover:bg-hover disabled:opacity-40" @click="test">
-                <Loader2 v-if="busy === 'test'" :size="12" class="animate-spin" /><Check v-else :size="12" />Test connection
+              <button type="button" :disabled="!!busy" class="flex h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong px-2.5 hover:bg-hover disabled:opacity-40" @click="test">
+                <Loader2 v-if="busy === 'test'" :size="14" class="animate-spin" /><Check v-else :size="14" />Test connection
               </button>
               <span v-if="testResult" class="min-w-0 truncate" :class="testResult.ok ? 'text-success' : 'text-danger'" :title="testResult.text">{{ testResult.text }}</span>
               <span v-else class="text-faint">Sends a one-line test prompt (no code).</span>
             </div>
-            <p class="text-[11px] text-faint">Before anything is sent: likely secrets are replaced with [REDACTED], .env and key files are skipped, and large diffs are capped or summarised per file.</p>
+            <p class="text-[12px] text-faint">Before anything is sent: likely secrets are replaced with [REDACTED], .env and key files are skipped, and large diffs are capped or summarised per file.</p>
           </div>
         </template>
 
@@ -287,30 +295,30 @@ function onKey(e: KeyboardEvent) {
             <div class="mb-2 flex flex-wrap gap-1.5">
               <button
                 v-for="p in TEMPLATE_PRESETS" :key="p.label" type="button"
-                class="rounded-full border px-2.5 py-1 text-[11px]" :class="template === p.value ? 'border-accent bg-accent/10 text-fg' : 'border-line text-muted hover:text-fg'"
+                class="rounded-full border px-2.5 py-1 text-[12px]" :class="template === p.value ? 'border-accent bg-accent/10 text-fg' : 'border-line text-muted hover:text-fg'"
                 @click="template = p.value"
               >{{ p.label }}</button>
             </div>
-            <input v-model="template" class="gw-input h-8 font-mono" placeholder="Empty = learn the style from the last 20 commits" spellcheck="false" />
-            <p class="mt-2 text-[11px] text-faint">Placeholders: <code>{type}</code>/<code>{Type}</code>, <code>{scope}</code>/<code>{Feature}</code>, <code>{summary}</code>. Example: <code>[{Feature}] {Type}: {summary}</code> → “[Checkout] Fix: handle empty cart”.</p>
+            <input v-model="template" class="gw-input h-9 font-mono" placeholder="Empty = learn the style from the last 20 commits" spellcheck="false" />
+            <p class="mt-2 text-[12px] text-faint">Placeholders: <code>{type}</code>/<code>{Type}</code>, <code>{scope}</code>/<code>{Feature}</code>, <code>{summary}</code>. Example: <code>[{Feature}] {Type}: {summary}</code> → “[Checkout] Fix: handle empty cart”.</p>
           </template>
         </template>
 
         <template v-else>
           <div class="grid grid-cols-[150px_1fr] items-center gap-x-3 gap-y-3">
             <label class="text-muted">Standup author email</label>
-            <input v-model="draft.standup.authorEmail" class="gw-input h-8 font-mono" placeholder="you@example.com" spellcheck="false" />
+            <input v-model="draft.standup.authorEmail" class="gw-input h-9 font-mono" placeholder="you@example.com" spellcheck="false" />
             <label class="text-muted">Cleanup: base branches</label>
-            <input v-model="baseBranches" class="gw-input h-8 font-mono" placeholder="main, staging" spellcheck="false" />
+            <input v-model="baseBranches" class="gw-input h-9 font-mono" placeholder="main, staging" spellcheck="false" />
             <label class="text-muted">Cleanup: stale after</label>
-            <div class="flex items-center gap-2"><input v-model.number="draft.cleanup.staleDays" type="number" min="1" class="gw-input h-8 w-24" /> days without commits</div>
+            <div class="flex items-center gap-2"><input v-model.number="draft.cleanup.staleDays" type="number" min="1" class="gw-input h-9 w-24" /> days without commits</div>
           </div>
         </template>
       </div>
 
       <div class="flex justify-end gap-2 border-t border-line px-5 py-3">
-        <button type="button" class="h-8 rounded-md border border-line-strong px-3 text-[12px] hover:bg-hover" @click="ui.settingsOpen = false">Cancel</button>
-        <button type="button" :disabled="busy === 'save'" class="h-8 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40" @click="save">Save</button>
+        <button type="button" class="h-9 rounded-md border border-line-strong px-3 text-[13px] hover:bg-hover" @click="ui.settingsOpen = false">Cancel</button>
+        <button type="button" :disabled="busy === 'save'" class="h-9 rounded-md bg-accent px-3 text-[13px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40" @click="save">Save</button>
       </div>
     </div>
   </div>

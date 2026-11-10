@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod avatars;
 pub mod commands;
 pub mod error;
 pub mod git;
@@ -19,6 +20,7 @@ pub fn run() {
             commands::get_status,
             commands::get_commit_details,
             commands::get_file_diff,
+            commands::get_file_image,
             commands::git_action,
             commands::open_in_terminal,
             commands::open_in_editor,
@@ -34,6 +36,7 @@ pub fn run() {
             commands::git_user_email,
             commands::standup_commits,
             commands::cleanup_candidates,
+            commands::github_commit_avatar,
         ])
         .run(tauri::generate_context!())
         .expect("error while running KromaGit");

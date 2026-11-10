@@ -4,6 +4,7 @@ import { aiApi, defaultSettings } from '@/api/ai'
 import { errorMessage, inTauri } from '@/api/git'
 import { applyTheme, applyZoom, clampZoom, resolvedTheme } from '@/lib/theme'
 import { clone } from '@/lib/clone'
+import { setAvatarsEnabled } from '@/lib/avatars'
 import type { CloudProvider, ProviderId, Settings, ThemePref } from '@/types/ai'
 import { useUiStore } from './ui'
 
@@ -46,6 +47,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function applyAppearance() {
     applyTheme(settings.value.appearance.theme)
+    setAvatarsEnabled(settings.value.general.showAvatars !== false)
     void applyZoom(settings.value.appearance.zoom, inTauri).catch(() => {})
   }
 

@@ -43,17 +43,17 @@ function toggle(path: string) {
     <button
       v-if="row.node.item === undefined"
       type="button"
-      class="flex h-6 w-full items-center gap-1 rounded pr-2 text-left text-[12px] text-muted hover:bg-hover hover:text-fg"
+      class="flex h-7 w-full items-center gap-1 rounded pr-2 text-left text-[13px] text-muted hover:bg-hover hover:text-fg"
       :style="{ paddingLeft: `${row.depth * 12 + 6}px` }"
       @click="toggle(row.node.path)"
     >
-      <ChevronRight :size="12" class="shrink-0 transition-transform" :class="{ 'rotate-90': row.open }" />
-      <component :is="row.open ? FolderOpen : Folder" :size="13" class="shrink-0 text-faint" />
+      <ChevronRight :size="14" class="shrink-0 transition-transform" :class="{ 'rotate-90': row.open }" />
+      <component :is="row.open ? FolderOpen : Folder" :size="15" class="shrink-0 text-faint" />
       <span class="truncate">{{ row.node.label }}</span>
     </button>
     <div
       v-else
-      class="flex h-6 cursor-pointer items-center gap-1.5 rounded pr-2 text-[12px] hover:bg-hover"
+      class="flex h-7 cursor-pointer items-center gap-1.5 rounded pr-2 text-[13px] hover:bg-hover"
       :style="{ paddingLeft: `${row.depth * 12 + 20}px` }"
       @dblclick="emit('select', row.node.item)"
       @contextmenu="emit('menu', $event, row.node.item)"

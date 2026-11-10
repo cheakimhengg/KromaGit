@@ -1,4 +1,5 @@
 pub mod diff;
+pub mod image;
 pub mod log;
 pub mod model;
 pub mod ops;

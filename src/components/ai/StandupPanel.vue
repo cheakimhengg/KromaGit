@@ -64,54 +64,54 @@ onMounted(async () => {
         <div class="flex rounded-md border border-line p-0.5">
           <button
             v-for="r in ([['today', 'Today'], ['yesterday', 'Yesterday'], ['week', 'This week'], ['custom', 'Custom']] as const)" :key="r[0]"
-            type="button" class="rounded px-2.5 py-1 text-[11px]" :class="range === r[0] ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
+            type="button" class="rounded px-2.5 py-1 text-[12px]" :class="range === r[0] ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="range = r[0]"
           >{{ r[1] }}</button>
         </div>
         <template v-if="range === 'custom'">
-          <input v-model="customFrom" type="date" class="gw-input h-7 w-36" />
+          <input v-model="customFrom" type="date" class="gw-input h-8 w-36" />
           <span class="text-faint">to</span>
-          <input v-model="customTo" type="date" class="gw-input h-7 w-36" />
+          <input v-model="customTo" type="date" class="gw-input h-8 w-36" />
         </template>
-        <input v-model="author" class="gw-input h-7 w-56 font-mono" placeholder="author email" spellcheck="false" title="Only commits by this author" />
+        <input v-model="author" class="gw-input h-8 w-56 font-mono" placeholder="author email" spellcheck="false" title="Only commits by this author" />
         <button
           type="button" :disabled="!author.trim() || s.status === 'running'"
-          class="flex h-7 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent disabled:opacity-40"
+          class="flex h-8 shrink-0 items-center whitespace-nowrap gap-1 rounded-md bg-accent px-3 text-[13px] font-semibold text-on-accent disabled:opacity-40"
           @click="run"
-        ><Loader2 v-if="s.status === 'running'" :size="12" class="animate-spin" /><Search v-else :size="12" />Find commits</button>
+        ><Loader2 v-if="s.status === 'running'" :size="14" class="animate-spin" /><Search v-else :size="14" />Find commits</button>
       </div>
 
       <div v-if="s.status === 'done'" class="space-y-3">
         <div class="flex items-center gap-2">
-          <span class="text-[11px] text-muted">{{ commitCount }} commits in {{ s.groups.length }} {{ s.groups.length === 1 ? 'repository' : 'repositories' }}</span>
+          <span class="text-[12px] text-muted">{{ commitCount }} commits in {{ s.groups.length }} {{ s.groups.length === 1 ? 'repository' : 'repositories' }}</span>
           <div class="flex-1" />
           <button
             type="button" :disabled="!s.groups.length || !!ai.progress"
-            class="flex h-7 items-center gap-1 rounded-md border border-line-strong px-2.5 text-[12px] hover:bg-hover disabled:opacity-40"
+            class="flex h-8 shrink-0 items-center whitespace-nowrap gap-1 rounded-md border border-line-strong px-2.5 text-[13px] hover:bg-hover disabled:opacity-40"
             title="Rewrite as a short standup update with AI (sends commit subjects only)"
             @click="ai.writeStandupWithAi()"
-          ><Loader2 v-if="ai.progress" :size="12" class="animate-spin" /><Sparkles v-else :size="12" class="text-accent-2" />{{ s.aiText ? 'Rewrite' : 'Write with AI' }}</button>
-          <button type="button" class="flex h-7 items-center gap-1 rounded-md border border-line-strong px-2.5 text-[12px] hover:bg-hover" @click="git.copyText(shown, 'Standup copied')">
-            <Copy :size="12" />Copy
+          ><Loader2 v-if="ai.progress" :size="14" class="animate-spin" /><Sparkles v-else :size="14" class="text-accent-2" />{{ s.aiText ? 'Rewrite' : 'Write with AI' }}</button>
+          <button type="button" class="flex h-8 shrink-0 items-center whitespace-nowrap gap-1 rounded-md border border-line-strong px-2.5 text-[13px] hover:bg-hover" @click="git.copyText(shown, 'Standup copied')">
+            <Copy :size="14" />Copy
           </button>
         </div>
         <textarea
           :value="shown"
-          class="gw-input h-auto min-h-[220px] resize-y py-2 font-mono text-[12px] leading-relaxed"
+          class="gw-input h-auto min-h-[220px] resize-y py-2 font-mono text-[13px] leading-relaxed"
           spellcheck="false"
           @input="s.aiText ? (ai.standup.aiText = ($event.target as HTMLTextAreaElement).value) : (ai.standup.text = ($event.target as HTMLTextAreaElement).value)"
         />
-        <details v-if="s.groups.length" class="text-[12px]">
+        <details v-if="s.groups.length" class="text-[13px]">
           <summary class="cursor-pointer text-muted select-none">Commits by repository and feature</summary>
           <div v-for="g in s.groups" :key="g.repo" class="mt-2">
             <div class="font-semibold text-fg">{{ g.repo }}</div>
             <div v-for="f in g.features" :key="f.name" class="ml-3 mt-1">
-              <div class="text-[11px] text-accent">{{ f.name }}</div>
+              <div class="text-[12px] text-accent">{{ f.name }}</div>
               <div v-for="(subj, i) in f.subjects" :key="i" class="ml-3 truncate text-muted">{{ subj }}</div>
             </div>
           </div>
         </details>
-        <div v-for="e in s.errors" :key="e" class="text-[11px] text-warning">{{ e }}</div>
+        <div v-for="e in s.errors" :key="e" class="text-[12px] text-warning">{{ e }}</div>
       </div>
     </div>
   </PanelShell>

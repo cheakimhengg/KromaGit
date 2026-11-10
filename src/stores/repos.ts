@@ -35,6 +35,23 @@ export const GROUP_COLORS = ['#7c9cff', '#5eead4', '#f472b6', '#fbbf24', '#a78bf
 export const FIRST_PAGE = 1500
 export const MAX_COMMITS = 200_000
 const STORAGE_KEY = 'kromagit.workspace.v1'
+const RECENT_KEY = 'kromagit.recent.v1'
+const MAX_RECENT = 12
+
+export interface RecentRepo {
+  name: string
+  path: string
+  openedAt: number
+}
+
+function readRecent(): RecentRepo[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]')
+    return Array.isArray(v) ? v.filter((r) => r && typeof r.path === 'string').slice(0, MAX_RECENT) : []
+  } catch {
+    return []
+  }
+}
 
 const EMPTY_HEAD: HeadInfo = { branch: null, oid: null, detached: false, upstream: null, ahead: 0, behind: 0 }
 
@@ -241,15 +258,34 @@ export const useReposStore = defineStore('repos', () => {
     activeTabId.value = id
   }
 
+  const recent = ref<RecentRepo[]>(readRecent())
+  function saveRecent() {
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(recent.value))
+    } catch {
+      /* ignore */
+    }
+  }
+  function rememberRecent(name: string, path: string) {
+    recent.value = [{ name, path, openedAt: Date.now() }, ...recent.value.filter((r) => r.path !== path)].slice(0, MAX_RECENT)
+    saveRecent()
+  }
+  function forgetRecent(path: string) {
+    recent.value = recent.value.filter((r) => r.path !== path)
+    saveRecent()
+  }
+
   async function openRepoAt(path: string) {
     const ui = useUiStore()
     try {
       const info = await gitApi.openRepo(path)
       const existing = tabs.value.find((t) => t.path === info.root)
       if (existing) {
+        rememberRecent(info.name, info.root)
         activeTabId.value = existing.id
         return
       }
+      rememberRecent(info.name, info.root)
       const tab: RepoTab = { id: newId(), name: info.name, path: info.root }
       tabs.value.push(tab)
       activeTabId.value = tab.id
@@ -371,7 +407,7 @@ export const useReposStore = defineStore('repos', () => {
   }
 
   return {
-    groups, tabs, activeTabId, activeTab, active, busy,
+    groups, tabs, activeTabId, activeTab, active, busy, recent, forgetRecent,
     activate, openRepo, openRepoAt, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh,
     createGroup, promptNewGroup, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, closeOtherTabs,
   }

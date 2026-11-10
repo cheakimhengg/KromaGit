@@ -165,3 +165,66 @@ fn req(path: &str, source: &str, untracked: bool, commit: Option<&str>, parent: 
         parent: parent.map(Into::into),
     }
 }
+
+fn png(tag: u8, len: usize) -> Vec<u8> {
+    let mut v = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
+    v.extend(std::iter::repeat_n(tag, len));
+    v
+}
+
+fn image_req(path: &str, source: &str, untracked: bool, commit: Option<&str>) -> DiffRequest {
+    DiffRequest {
+        path: path.into(),
+        old_path: None,
+        source: source.into(),
+        untracked,
+        commit: commit.map(Into::into),
+        parent: None,
+    }
+}
+
+#[test]
+fn image_preview_reads_each_side_from_the_right_place() {
+    use git::image::{base64, get_file_image};
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    std::fs::write(d.join("logo.png"), png(1, 40)).unwrap();
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "add logo"]);
+    std::fs::write(d.join("logo.png"), png(2, 60)).unwrap();
+    sh(d, &["commit", "-qam", "new logo"]);
+    std::fs::write(d.join("logo.png"), png(3, 80)).unwrap();
+    sh(d, &["add", "logo.png"]);
+    std::fs::write(d.join("logo.png"), png(4, 100)).unwrap();
+    std::fs::write(d.join("new.webp"), png(5, 20)).unwrap();
+    let g = Git::new(d);
+    let url = |b: &[u8], mime: &str| format!("data:{mime};base64,{}", base64(b));
+
+    let unstaged = get_file_image(&g, &image_req("logo.png", "unstaged", false, None)).unwrap();
+    assert_eq!(unstaged.before.unwrap().data_url, url(&png(3, 80), "image/png"), "index");
+    assert_eq!(unstaged.after.unwrap().data_url, url(&png(4, 100), "image/png"), "working tree");
+
+    let staged = get_file_image(&g, &image_req("logo.png", "staged", false, None)).unwrap();
+    assert_eq!(staged.before.unwrap().bytes, png(2, 60).len(), "HEAD");
+    assert_eq!(staged.after.unwrap().bytes, png(3, 80).len(), "index");
+
+    let first = sh_out(d, &["rev-list", "--max-parents=0", "HEAD"]);
+    let root = get_file_image(&g, &image_req("logo.png", "commit", false, Some(&first))).unwrap();
+    assert!(root.before.is_none(), "root commit has no parent");
+    assert_eq!(root.after.unwrap().bytes, png(1, 40).len());
+    let second = get_file_image(&g, &image_req("logo.png", "commit", false, Some("HEAD"))).unwrap();
+    assert_eq!(second.before.unwrap().bytes, png(1, 40).len());
+    assert_eq!(second.after.unwrap().bytes, png(2, 60).len());
+
+    let added = get_file_image(&g, &image_req("new.webp", "unstaged", true, None)).unwrap();
+    assert!(added.before.is_none());
+    assert!(added.after.unwrap().data_url.starts_with("data:image/webp;base64,"));
+
+    std::fs::remove_file(d.join("logo.png")).unwrap();
+    let deleted = get_file_image(&g, &image_req("logo.png", "unstaged", false, None)).unwrap();
+    assert!(deleted.before.is_some() && deleted.after.is_none());
+
+    let escape = get_file_image(&g, &image_req("../outside.png", "unstaged", true, None)).unwrap();
+    assert!(escape.after.is_none(), "never reads outside the repository");
+}

@@ -57,15 +57,15 @@ onBeforeUnmount(() => {
       <button
         v-else
         type="button"
-        class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors"
+        class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors"
         :class="item.danger ? 'text-danger hover:bg-danger/15' : 'text-fg hover:bg-accent/15'"
         @click="run(item)"
       >
         <span v-if="item.swatch" class="h-3 w-3 shrink-0 rounded-full" :style="{ background: item.swatch }" />
-        <component :is="item.icon" v-else-if="item.icon" :size="14" class="shrink-0 opacity-80" />
-        <span v-else class="w-[14px]" />
+        <component :is="item.icon" v-else-if="item.icon" :size="16" class="shrink-0 opacity-80" />
+        <span v-else class="w-[16px]" />
         <span class="flex-1">{{ item.label }}</span>
-        <span v-if="item.shortcut" class="font-mono text-[10px] text-faint">{{ item.shortcut }}</span>
+        <span v-if="item.shortcut" class="font-mono text-[11px] text-faint">{{ item.shortcut }}</span>
       </button>
     </template>
   </div>

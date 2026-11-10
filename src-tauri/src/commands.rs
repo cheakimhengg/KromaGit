@@ -67,6 +67,11 @@ pub async fn get_file_diff(repo: String, request: DiffRequest) -> AppResult<File
 }
 
 #[tauri::command]
+pub async fn get_file_image(repo: String, request: DiffRequest) -> AppResult<git::image::ImagePair> {
+    blocking(move || git::image::get_file_image(&Git::new(repo), &request)).await
+}
+
+#[tauri::command]
 pub async fn git_action(repo: String, action: git::ops::Action) -> AppResult<git::ops::OpOutcome> {
     blocking(move || git::ops::run_action(&Git::new(repo), &action)).await
 }
@@ -155,4 +160,9 @@ pub async fn standup_commits(paths: Vec<String>, since: String, until: String, a
 pub async fn cleanup_candidates(repo: String, bases: Vec<String>, stale_days: u32) -> AppResult<Vec<crate::ai::history::CleanupCandidate>> {
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
     blocking(move || crate::ai::history::cleanup_candidates(&Git::new(repo), &bases, stale_days, now)).await
+}
+
+#[tauri::command]
+pub async fn github_commit_avatar(owner: String, repo: String, sha: String) -> AppResult<Option<String>> {
+    crate::avatars::github_commit_avatar(&owner, &repo, &sha).await
 }

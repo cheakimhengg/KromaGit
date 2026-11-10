@@ -4,7 +4,8 @@ import { Columns2, FileCode2, Loader2, Minus, Plus, Rows3, Undo2, X } from 'luci
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
 import { errorMessage, gitApi } from '@/api/git'
-import { languageFromPath } from '@/lib/format'
+import { isImagePath, languageFromPath } from '@/lib/format'
+import ImageDiff from './ImageDiff.vue'
 import { highlightLine } from '@/lib/highlight'
 import { toSplitRows } from '@/lib/diff-split'
 import type { DiffLine, DiffTarget, FileDiff, HunkSelection } from '@/types/git'
@@ -17,6 +18,7 @@ const repos = useReposStore()
 const ops = useOpsStore()
 
 const diff = shallowRef<FileDiff | null>(null)
+const isImage = computed(() => isImagePath(props.target.path))
 const loading = ref(false)
 const error = ref<string | null>(null)
 const selected = ref(new Set<string>())
@@ -143,97 +145,103 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
 
 <template>
   <div class="flex h-full min-w-0 flex-col bg-bg">
-    <div class="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
-      <FileCode2 :size="14" class="shrink-0 text-accent" />
-      <span class="truncate font-mono text-[12px] text-fg" :title="target.oldPath ? `${target.oldPath} → ${target.path}` : target.path">
+    <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
+      <FileCode2 :size="16" class="shrink-0 text-accent" />
+      <span class="truncate font-mono text-[13px] text-fg" :title="target.oldPath ? `${target.oldPath} → ${target.path}` : target.path">
         <template v-if="target.oldPath"><span class="text-faint">{{ target.oldPath }} → </span></template>{{ target.path }}
       </span>
-      <span class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">{{ sourceLabel }}</span>
-      <span v-if="diff && !loading" class="shrink-0 font-mono text-[11px]">
+      <span class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-[11px] text-muted">{{ sourceLabel }}</span>
+      <span v-if="diff && !loading && !isImage" class="shrink-0 font-mono text-[12px]">
         <span class="text-success">+{{ stats.add }}</span> <span class="text-danger">−{{ stats.del }}</span>
       </span>
-      <Loader2 v-if="loading" :size="13" class="animate-spin text-faint" />
+      <Loader2 v-if="loading" :size="15" class="animate-spin text-faint" />
       <div class="flex-1" />
       <template v-if="selected.size > 0">
         <button
           v-if="canDiscard"
           type="button" :disabled="busy"
-          class="flex h-6 items-center gap-1 rounded-md border border-danger/40 px-2 text-[11px] text-danger hover:bg-danger/10 disabled:opacity-40"
+          class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1 rounded-md border border-danger/40 px-2 text-[12px] text-danger hover:bg-danger/10 disabled:opacity-40"
           @click="applyLines('discard')"
         >
-          <Undo2 :size="12" />Discard {{ selected.size }}
+          <Undo2 :size="14" />Discard {{ selected.size }}
         </button>
         <button
           type="button" :disabled="busy"
-          class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
+          class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1 rounded-md bg-accent px-2 text-[12px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
           @click="applyLines(target.source === 'staged' ? 'unstage' : 'stage')"
         >
-          <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} {{ selected.size }} {{ selected.size === 1 ? 'line' : 'lines' }}
+          <component :is="target.source === 'staged' ? Minus : Plus" :size="14" />{{ stageVerb }} {{ selected.size }} {{ selected.size === 1 ? 'line' : 'lines' }}
         </button>
       </template>
       <template v-else-if="fileEntry">
         <button
           v-if="canDiscard"
           type="button" :disabled="busy"
-          class="flex h-6 items-center gap-1 rounded-md px-2 text-[11px] text-danger/90 hover:bg-danger/10 disabled:opacity-40"
+          class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1 rounded-md px-2 text-[12px] text-danger/90 hover:bg-danger/10 disabled:opacity-40"
           title="Discard all changes to this file"
           @click="wholeFile('discard')"
-        ><Undo2 :size="12" />Discard file</button>
+        ><Undo2 :size="14" />Discard file</button>
         <button
           type="button" :disabled="busy"
-          class="flex h-6 items-center gap-1 rounded-md border border-line-strong px-2 text-[11px] text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
+          class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1 rounded-md border border-line-strong px-2 text-[12px] text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
           @click="wholeFile(target.source === 'staged' ? 'unstage' : 'stage')"
         >
-          <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} file
+          <component :is="target.source === 'staged' ? Minus : Plus" :size="14" />{{ stageVerb }} file
         </button>
       </template>
-      <div class="flex rounded-md border border-line p-0.5">
+      <div v-if="!isImage" class="flex rounded-md border border-line p-0.5">
         <button
-          type="button" class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+          type="button" class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px]"
           :class="ui.diffMode === 'unified' ? 'bg-surface-3 text-fg' : 'text-faint hover:text-fg'"
           @click="ui.diffMode = 'unified'"
-        ><Rows3 :size="12" />Unified</button>
+        ><Rows3 :size="14" />Unified</button>
         <button
-          type="button" class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+          type="button" class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px]"
           :class="ui.diffMode === 'split' ? 'bg-surface-3 text-fg' : 'text-faint hover:text-fg'"
           @click="ui.diffMode = 'split'"
-        ><Columns2 :size="12" />Split</button>
+        ><Columns2 :size="14" />Split</button>
       </div>
       <button type="button" class="rounded p-1 text-faint hover:bg-hover hover:text-fg" title="Close diff (Esc)" @click="ui.closeDiff()">
-        <X :size="14" />
+        <X :size="16" />
       </button>
     </div>
 
-    <div v-if="error" class="m-4 rounded-md border border-danger/30 bg-danger/10 p-3 text-[12px] text-danger select-text">{{ error }}</div>
-    <div v-else-if="diff?.binary" class="p-8 text-center text-[12px] text-muted">Binary file — no text diff to show.</div>
-    <div v-else-if="diff && !hunks.length && !loading" class="p-8 text-center text-[12px] text-muted">
+    <ImageDiff
+      v-if="isImage"
+      :repo="repos.activeTab?.path ?? ''"
+      :target="target"
+      :refresh-key="target.source === 'commit' ? null : repos.active?.snapshot.workingCopy"
+    />
+    <div v-else-if="error" class="m-4 rounded-md border border-danger/30 bg-danger/10 p-3 text-[13px] text-danger select-text">{{ error }}</div>
+    <div v-else-if="diff?.binary" class="p-8 text-center text-[13px] text-muted">Binary file — no text diff to show.</div>
+    <div v-else-if="diff && !hunks.length && !loading" class="p-8 text-center text-[13px] text-muted">
       <template v-if="target.source !== 'commit' && !fileEntry">No {{ target.source }} changes left in this file.</template>
       <template v-else>No content changes{{ target.oldPath ? ' (pure rename)' : '' }}.</template>
     </div>
 
-    <div v-else ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[20px]" :class="{ 'opacity-60': loading }">
-      <div v-if="diff?.truncated" class="border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[11px] text-warning">
+    <div v-else ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading }">
+      <div v-if="diff?.truncated" class="border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
         Diff is very large; showing the first 20,000 lines.
       </div>
       <div v-for="(hunk, hi) in hunks" :key="hi" class="mb-3">
-        <div class="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-surface-2 px-3 py-1 text-[11px] text-accent/80">
-          <span class="truncate">{{ hunk.header }}</span>
+        <div class="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-surface-2 px-3 py-1 text-[12px] text-accent/80">
+          <span class="min-w-0 truncate">{{ hunk.header }}</span>
           <div class="flex-1" />
           <template v-if="canStage">
             <button
               v-if="canDiscard"
               type="button" :disabled="busy"
-              class="flex items-center gap-1 rounded px-1.5 py-0.5 font-sans text-[11px] text-danger/90 hover:bg-danger/10 disabled:opacity-40"
+              class="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-danger/90 hover:bg-danger/10 disabled:opacity-40"
               @click="applyHunk(hi, 'discard')"
             >
-              <Undo2 :size="11" />Discard hunk
+              <Undo2 :size="12" />Discard hunk
             </button>
             <button
               type="button" :disabled="busy"
-              class="flex items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[11px] text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
+              class="flex shrink-0 items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
               @click="applyHunk(hi, target.source === 'staged' ? 'unstage' : 'stage')"
             >
-              <component :is="target.source === 'staged' ? Minus : Plus" :size="11" />{{ stageVerb }} hunk
+              <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} hunk
             </button>
           </template>
         </div>
@@ -282,7 +290,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
           </div>
         </template>
       </div>
-      <div v-if="canStage && hunks.length" class="px-3 pb-4 font-sans text-[11px] text-faint">
+      <div v-if="canStage && hunks.length" class="px-3 pb-4 font-sans text-[12px] text-faint">
         Tip: click a line number to select lines (shift-click for a range), then {{ stageVerb.toLowerCase() }} only those lines.
       </div>
     </div>

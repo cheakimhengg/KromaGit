@@ -70,28 +70,28 @@ function setFirst(el: unknown, index: number) {
 <template>
   <Transition enter-from-class="opacity-0" leave-to-class="opacity-0" enter-active-class="transition duration-150" leave-active-class="transition duration-100">
     <div v-if="ui.dialog" class="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 pt-[10vh] backdrop-blur-[2px]" @mousedown.self="ui.closeDialog(null)" @keydown="onKey">
-      <div ref="dialogEl" class="max-w-[92vw] rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/60" :class="ui.dialog.wide ? 'w-[780px]' : 'w-[440px]'" role="dialog" aria-modal="true">
+      <div ref="dialogEl" class="max-w-[92vw] rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/60" :class="ui.dialog.wide ? 'w-[820px]' : 'w-[480px]'" role="dialog" aria-modal="true">
         <div class="flex items-start gap-3 px-5 pt-5">
-          <AlertTriangle v-if="ui.dialog.danger" :size="18" class="mt-0.5 shrink-0 text-danger" />
+          <AlertTriangle v-if="ui.dialog.danger" :size="20" class="mt-0.5 shrink-0 text-danger" />
           <div class="min-w-0 flex-1">
-            <h2 class="text-[14px] font-semibold text-fg">{{ ui.dialog.title }}</h2>
-            <p v-if="ui.dialog.message" class="mt-1.5 text-[12px] leading-relaxed whitespace-pre-line text-muted">{{ ui.dialog.message }}</p>
+            <h2 class="text-[15px] font-semibold text-fg">{{ ui.dialog.title }}</h2>
+            <p v-if="ui.dialog.message" class="mt-1.5 text-[13px] leading-relaxed whitespace-pre-line text-muted">{{ ui.dialog.message }}</p>
           </div>
         </div>
 
-        <div v-if="ui.dialog.detail?.length" class="mx-5 mt-3 max-h-40 overflow-y-auto rounded-md border border-line bg-bg px-3 py-2 font-mono text-[11px] text-muted">
+        <div v-if="ui.dialog.detail?.length" class="mx-5 mt-3 max-h-40 overflow-y-auto rounded-md border border-line bg-bg px-3 py-2 font-mono text-[12px] text-muted">
           <div v-for="d in ui.dialog.detail.slice(0, 200)" :key="d" class="truncate" :title="d">{{ d }}</div>
           <div v-if="ui.dialog.detail.length > 200" class="text-faint">…and {{ ui.dialog.detail.length - 200 }} more</div>
         </div>
 
         <pre
           v-if="ui.dialog.preview"
-          class="mx-5 mt-3 max-h-[46vh] overflow-auto rounded-md border border-line bg-bg p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted select-text"
+          class="mx-5 mt-3 max-h-[46vh] overflow-auto rounded-md border border-line bg-bg p-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-muted select-text"
         >{{ ui.dialog.preview }}</pre>
 
         <div v-if="ui.dialog.fields?.length" class="space-y-3 px-5 pt-4">
           <label v-for="(f, i) in ui.dialog.fields" :key="f.key" class="block">
-            <span class="mb-1 block text-[11px] font-medium text-muted">{{ f.label }}<span v-if="f.optional" class="text-faint"> (optional)</span></span>
+            <span class="mb-1 block text-[12px] font-medium text-muted">{{ f.label }}<span v-if="f.optional" class="text-faint"> (optional)</span></span>
             <textarea
               v-if="f.multiline"
               :ref="(el) => setFirst(el, i)"
@@ -105,28 +105,28 @@ function setFirst(el: unknown, index: number) {
               v-else
               :ref="(el) => setFirst(el, i)"
               v-model="values[f.key]"
-              class="gw-input h-8"
+              class="gw-input h-9"
               :class="{ 'font-mono': f.mono }"
               :placeholder="f.placeholder"
               spellcheck="false"
               autocomplete="off"
             />
-            <span v-if="(touched || values[f.key]) && errors[f.key]" class="mt-1 block text-[11px] text-danger">{{ errors[f.key] }}</span>
+            <span v-if="(touched || values[f.key]) && errors[f.key]" class="mt-1 block text-[12px] text-danger">{{ errors[f.key] }}</span>
           </label>
         </div>
 
         <div v-if="ui.dialog.checkboxes?.length" class="space-y-1.5 px-5 pt-3">
-          <label v-for="c in ui.dialog.checkboxes" :key="c.key" class="flex cursor-pointer items-center gap-2 text-[12px] text-muted select-none">
+          <label v-for="c in ui.dialog.checkboxes" :key="c.key" class="flex cursor-pointer items-center gap-2 text-[13px] text-muted select-none">
             <input v-model="checks[c.key]" type="checkbox" class="h-3.5 w-3.5 accent-[var(--gw-accent)]" />{{ c.label }}
           </label>
         </div>
 
         <div class="mt-5 flex justify-end gap-2 border-t border-line px-5 py-3">
-          <button type="button" class="h-8 rounded-md border border-line-strong px-3 text-[12px] text-fg hover:bg-hover" @click="ui.closeDialog(null)">Cancel</button>
+          <button type="button" class="h-9 rounded-md border border-line-strong px-3 text-[13px] text-fg hover:bg-hover" @click="ui.closeDialog(null)">Cancel</button>
           <button
             ref="confirmBtn"
             type="button"
-            class="h-8 rounded-md px-3 text-[12px] font-semibold hover:brightness-110 disabled:opacity-40"
+            class="h-9 rounded-md px-3 text-[13px] font-semibold hover:brightness-110 disabled:opacity-40"
             :class="ui.dialog.danger ? 'bg-danger text-white' : 'bg-accent text-on-accent'"
             :disabled="touched && !valid"
             @click="submit"

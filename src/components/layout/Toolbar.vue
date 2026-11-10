@@ -48,31 +48,31 @@ function pushMenu(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="flex h-[52px] shrink-0 items-center gap-1 border-b border-line bg-surface px-3">
+  <div class="flex h-[58px] shrink-0 items-center gap-1 border-b border-line bg-surface px-3">
     <div class="mr-3 flex min-w-0 flex-col justify-center">
-      <span class="truncate text-[13px] leading-tight font-semibold text-fg">{{ snapshot?.name ?? 'No repository' }}</span>
+      <span class="truncate text-[14px] leading-tight font-semibold text-fg">{{ snapshot?.name ?? 'No repository' }}</span>
       <button
         v-if="snapshot"
         type="button"
-        class="-ml-1 flex items-center gap-1 rounded px-1 text-[11px] text-muted hover:bg-hover hover:text-fg disabled:opacity-50"
+        class="-ml-1 flex items-center gap-1 rounded px-1 text-[12px] text-muted hover:bg-hover hover:text-fg disabled:opacity-50"
         title="Switch branch"
         :disabled="busy"
         @click="branchMenu"
       >
-        <GitBranch :size="11" class="text-accent" />
+        <GitBranch :size="12" class="text-accent" />
         <span class="max-w-[180px] truncate">{{ snapshot.currentBranch }}</span>
-        <ChevronDown :size="11" />
+        <ChevronDown :size="12" />
       </button>
     </div>
 
-    <div class="mx-1 h-7 w-px bg-line" />
+    <div class="mx-1 h-8 w-px bg-line" />
     <ToolButton :icon="Undo2" label="Undo" :title="ops.nextUndo ? `Undo: ${ops.nextUndo.label}` : 'Nothing to undo'" :disabled="busy || !ops.nextUndo" @click="ops.undo()" />
     <ToolButton :icon="Redo2" label="Redo" :title="ops.nextRedo ? `Redo: ${ops.nextRedo.label}` : 'Nothing to redo'" :disabled="busy || !ops.nextRedo" @click="ops.redo()" />
-    <div class="mx-1 h-7 w-px bg-line" />
+    <div class="mx-1 h-8 w-px bg-line" />
     <ToolButton :icon="CloudDownload" label="Fetch" :disabled="busy || !hasRemote" :loading="ops.running === 'Fetch'" @click="git.fetchAll()" />
     <ToolButton :icon="ArrowDownToLine" label="Pull" dropdown :disabled="busy || !hasRemote" @click="git.pull('merge')" @dropdown="pullMenu" />
     <ToolButton :icon="ArrowUpFromLine" label="Push" dropdown :disabled="busy || !hasRemote" @click="git.push()" @dropdown="pushMenu" />
-    <div class="mx-1 h-7 w-px bg-line" />
+    <div class="mx-1 h-8 w-px bg-line" />
     <ToolButton :icon="GitBranchPlus" label="Branch" :disabled="busy" @click="git.createBranch()" />
     <ToolButton :icon="Tag" label="Tag" :disabled="busy || !snapshot?.head.oid" @click="git.createTag()" />
     <ToolButton :icon="Archive" label="Stash" :disabled="busy" @click="git.stashPush()" />
@@ -82,7 +82,7 @@ function pushMenu(e: MouseEvent) {
 
     <ToolButton :icon="CalendarClock" label="Standup" :accent="ui.centerView === 'standup'" title="What did I do? Commits across all open repositories" @click="ui.showPanel('standup')" />
     <ToolButton :icon="Brush" label="Cleanup" :accent="ui.centerView === 'cleanup'" title="Find merged, gone and stale branches" @click="ui.showPanel('cleanup')" />
-    <div class="mx-1 h-7 w-px bg-line" />
+    <div class="mx-1 h-8 w-px bg-line" />
     <ToolButton :icon="Terminal" label="Terminal" @click="git.openInTerminal()" />
     <ToolButton :icon="Code2" label="Editor" @click="git.openInEditor()" />
     <ToolButton :icon="RefreshCw" label="Refresh" :loading="repos.busy" :disabled="busy" @click="repos.load(repos.activeTabId)" />

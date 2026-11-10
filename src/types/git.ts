@@ -149,6 +149,17 @@ export interface StatusPayload {
   operation: RepoOperation | null
 }
 
+export interface ImageSide {
+  dataUrl: string
+  bytes: number
+}
+
+export interface ImagePair {
+  before: ImageSide | null
+  after: ImageSide | null
+  tooLarge: boolean
+}
+
 export type DiffSource = 'unstaged' | 'staged' | 'commit'
 
 export interface DiffTarget {

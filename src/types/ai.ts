@@ -12,7 +12,7 @@ export type ThemePref = 'dark' | 'light' | 'system'
 
 export interface Settings {
   appearance: { theme: ThemePref; zoom: number }
-  general: { terminalApp: string; editorApp: string }
+  general: { terminalApp: string; editorApp: string; showAvatars: boolean }
   ai: AiSettings
   /** keyed by repository root */
   repos: Record<string, { commitTemplate: string }>
