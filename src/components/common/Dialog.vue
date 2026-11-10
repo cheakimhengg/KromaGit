@@ -69,8 +69,8 @@ function setFirst(el: unknown, index: number) {
 
 <template>
   <Transition enter-from-class="opacity-0" leave-to-class="opacity-0" enter-active-class="transition duration-150" leave-active-class="transition duration-100">
-    <div v-if="ui.dialog" class="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 pt-[14vh] backdrop-blur-[2px]" @mousedown.self="ui.closeDialog(null)" @keydown="onKey">
-      <div ref="dialogEl" class="w-[440px] max-w-[92vw] rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/60" role="dialog" aria-modal="true">
+    <div v-if="ui.dialog" class="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 pt-[10vh] backdrop-blur-[2px]" @mousedown.self="ui.closeDialog(null)" @keydown="onKey">
+      <div ref="dialogEl" class="max-w-[92vw] rounded-xl border border-line-strong bg-surface-2 shadow-2xl shadow-black/60" :class="ui.dialog.wide ? 'w-[780px]' : 'w-[440px]'" role="dialog" aria-modal="true">
         <div class="flex items-start gap-3 px-5 pt-5">
           <AlertTriangle v-if="ui.dialog.danger" :size="18" class="mt-0.5 shrink-0 text-danger" />
           <div class="min-w-0 flex-1">
@@ -83,6 +83,11 @@ function setFirst(el: unknown, index: number) {
           <div v-for="d in ui.dialog.detail.slice(0, 200)" :key="d" class="truncate" :title="d">{{ d }}</div>
           <div v-if="ui.dialog.detail.length > 200" class="text-faint">…and {{ ui.dialog.detail.length - 200 }} more</div>
         </div>
+
+        <pre
+          v-if="ui.dialog.preview"
+          class="mx-5 mt-3 max-h-[46vh] overflow-auto rounded-md border border-line bg-bg p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted select-text"
+        >{{ ui.dialog.preview }}</pre>
 
         <div v-if="ui.dialog.fields?.length" class="space-y-3 px-5 pt-4">
           <label v-for="(f, i) in ui.dialog.fields" :key="f.key" class="block">

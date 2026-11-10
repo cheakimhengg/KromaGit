@@ -158,6 +158,8 @@ export interface DiffTarget {
   untracked?: boolean
   commit?: string
   parent?: string
+  /** new-file line to scroll to (e.g. from a review comment) */
+  line?: number
 }
 
 export interface RepoSnapshot {

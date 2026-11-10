@@ -6,11 +6,14 @@ import { useReposStore } from '@/stores/repos'
 import { useOpsStore } from '@/stores/ops'
 import { gitApi } from '@/api/git'
 import * as git from '@/actions/git'
+import { useAiStore } from '@/stores/ai'
 
 const props = defineProps<{ stagedCount: number }>()
 const ui = useUiStore()
 const repos = useReposStore()
 const ops = useOpsStore()
+const ai = useAiStore()
+const generating = ref(false)
 
 interface Draft {
   summary: string
@@ -64,6 +67,26 @@ watch(
   },
 )
 
+async function generate() {
+  if (generating.value) return
+  const d = draft.value
+  if ((d.summary.trim() || d.description.trim()) && d.prefilled === null) {
+    const ok = await ui.confirm({ title: 'Replace your message?', message: 'The AI suggestion will overwrite the summary and description you typed.', confirmLabel: 'Replace' })
+    if (!ok) return
+  }
+  generating.value = true
+  try {
+    const msg = await ai.generateCommitMessage()
+    if (msg) {
+      d.summary = msg.summary
+      d.description = msg.description
+      d.prefilled = null
+    }
+  } finally {
+    generating.value = false
+  }
+}
+
 async function submit() {
   if (!canCommit.value) return
   const d = draft.value
@@ -101,10 +124,12 @@ function onKeydown(e: KeyboardEvent) {
       <button
         type="button"
         class="absolute top-1/2 right-1 -translate-y-1/2 rounded-md p-1 text-accent-2 hover:bg-accent-2/15"
-        title="Generate message with AI"
-        @click="ui.notWired('AI commit message (Phase 4)')"
+        :title="stagedCount ? 'Generate message with AI from the staged changes' : 'Stage changes first'"
+        :disabled="generating || !stagedCount"
+        @click="generate"
       >
-        <Sparkles :size="15" />
+        <Loader2 v-if="generating" :size="15" class="animate-spin" />
+        <Sparkles v-else :size="15" />
       </button>
     </div>
     <textarea
@@ -122,9 +147,10 @@ function onKeydown(e: KeyboardEvent) {
       <div class="flex-1" />
       <button
         type="button"
-        class="flex h-7 items-center gap-1 rounded-md border border-line-strong px-2.5 text-[12px] text-fg hover:bg-hover"
-        title="AI review of staged changes"
-        @click="ui.notWired('AI review (Phase 4)')"
+        class="flex h-7 items-center gap-1 rounded-md border border-line-strong px-2.5 text-[12px] text-fg hover:bg-hover disabled:opacity-40"
+        :title="stagedCount ? 'AI review of the staged changes' : 'Stage changes first'"
+        :disabled="!stagedCount || ai.review.status === 'running'"
+        @click="ai.runReview()"
       >
         <ScanSearch :size="13" />Review
       </button>

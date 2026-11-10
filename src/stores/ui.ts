@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { Component } from 'vue'
 import type { DiffTarget } from '@/types/git'
 
-export type CenterView = 'graph' | 'diff'
+export type CenterView = 'graph' | 'diff' | 'review' | 'split' | 'standup' | 'cleanup'
 export type DiffMode = 'unified' | 'split'
 
 export interface MenuItem {
@@ -48,6 +48,9 @@ export interface DialogOptions {
   checkboxes?: DialogCheckbox[]
   confirmLabel?: string
   danger?: boolean
+  /** large monospace preview, e.g. exactly what will be sent to an AI provider */
+  preview?: string
+  wide?: boolean
 }
 
 export interface DialogResult {
@@ -69,7 +72,8 @@ export const useUiStore = defineStore('ui', () => {
   const diffMode = ref<DiffMode>('unified')
   const fileViewMode = ref<'list' | 'tree'>('list')
   const zoom = ref(100)
-  const aiProvider = ref<string | null>(null)
+  const settingsOpen = ref(false)
+  const previousView = ref<CenterView>('graph')
 
   const menu = ref<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const toasts = ref<Toast[]>([])
@@ -83,18 +87,28 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function openDiff(target: DiffTarget) {
+    if (centerView.value !== 'diff') previousView.value = centerView.value
     diffTarget.value = target
     centerView.value = 'diff'
   }
 
   function closeDiff() {
-    centerView.value = 'graph'
+    centerView.value = previousView.value === 'diff' ? 'graph' : previousView.value
+    previousView.value = 'graph'
     diffTarget.value = null
+  }
+
+  function showPanel(view: CenterView) {
+    diffTarget.value = null
+    previousView.value = 'graph'
+    centerView.value = view
   }
 
   function resetForRepoSwitch() {
     selectedCommit.value = null
-    closeDiff()
+    diffTarget.value = null
+    previousView.value = 'graph'
+    if (centerView.value === 'diff' || centerView.value === 'review' || centerView.value === 'split' || centerView.value === 'cleanup') centerView.value = 'graph'
   }
 
   function openMenu(event: MouseEvent, items: MenuItem[]) {
@@ -148,8 +162,8 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     sidebarCollapsed, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode, zoom,
-    aiProvider, menu, toasts, dialog,
-    selectCommit, openDiff, closeDiff, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
+    settingsOpen, previousView, menu, toasts, dialog,
+    selectCommit, openDiff, closeDiff, showPanel, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
     openDialog, closeDialog, confirm, prompt,
   }
 })

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import {
   Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, Check, ChevronDown, CloudDownload, Code2, GitBranch,
-  GitBranchPlus, Redo2, RefreshCw, Settings, Tag, Terminal, Undo2,
+  GitBranchPlus, Redo2, RefreshCw, Settings, Tag, Terminal, Undo2, CalendarClock, Brush,
 } from 'lucide-vue-next'
 import ToolButton from '@/components/common/ToolButton.vue'
 import { useReposStore } from '@/stores/repos'
@@ -80,9 +80,12 @@ function pushMenu(e: MouseEvent) {
 
     <div class="flex-1" />
 
+    <ToolButton :icon="CalendarClock" label="Standup" :accent="ui.centerView === 'standup'" title="What did I do? Commits across all open repositories" @click="ui.showPanel('standup')" />
+    <ToolButton :icon="Brush" label="Cleanup" :accent="ui.centerView === 'cleanup'" title="Find merged, gone and stale branches" @click="ui.showPanel('cleanup')" />
+    <div class="mx-1 h-7 w-px bg-line" />
     <ToolButton :icon="Terminal" label="Terminal" @click="git.openInTerminal()" />
     <ToolButton :icon="Code2" label="Editor" @click="git.openInEditor()" />
     <ToolButton :icon="RefreshCw" label="Refresh" :loading="repos.busy" :disabled="busy" @click="repos.load(repos.activeTabId)" />
-    <ToolButton :icon="Settings" label="Settings" @click="ui.notWired('Settings')" />
+    <ToolButton :icon="Settings" label="Settings" @click="ui.settingsOpen = true" />
   </div>
 </template>

@@ -4,11 +4,15 @@ import { CloudCheck, CloudOff, FileDiff, GitBranch, Loader2, Sparkles, ZoomIn } 
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 import { useOpsStore } from '@/stores/ops'
+import { useSettingsStore } from '@/stores/settings'
+import { useAiStore } from '@/stores/ai'
 import { fullDate, relativeTime } from '@/lib/format'
 
 const repos = useReposStore()
 const ui = useUiStore()
 const ops = useOpsStore()
+const settings = useSettingsStore()
+const ai = useAiStore()
 const snapshot = computed(() => repos.active?.snapshot ?? null)
 const head = computed(() => snapshot.value?.head ?? null)
 const changes = computed(() => (snapshot.value ? snapshot.value.workingCopy.unstaged.length + snapshot.value.workingCopy.staged.length : 0))
@@ -28,13 +32,14 @@ const version = __APP_VERSION__
       <span v-if="lastFetch" class="flex items-center gap-1" :title="`Last fetch: ${fullDate(lastFetch)}`"><CloudCheck :size="12" />Fetched {{ relativeTime(lastFetch) }}</span>
       <span v-else class="flex items-center gap-1"><CloudOff :size="12" />Never fetched</span>
       <span class="flex items-center gap-1"><FileDiff :size="12" />{{ changes }} {{ changes === 1 ? 'change' : 'changes' }}</span>
-      <span v-if="ops.running" class="flex items-center gap-1 text-accent"><Loader2 :size="12" class="animate-spin" />{{ ops.running }}…</span>
+      <span v-if="ai.progress" class="flex items-center gap-1 text-accent-2"><Loader2 :size="12" class="animate-spin" />{{ ai.progress }}</span>
+      <span v-else-if="ops.running" class="flex items-center gap-1 text-accent"><Loader2 :size="12" class="animate-spin" />{{ ops.running }}…</span>
       <span v-else-if="repos.busy" class="flex items-center gap-1 text-faint"><Loader2 :size="12" class="animate-spin" />Loading…</span>
     </template>
     <div class="flex-1" />
-    <span class="flex items-center gap-1" :title="ui.aiProvider ? 'Active AI provider' : 'AI is optional — set up a provider in Settings (Phase 4)'">
-      <Sparkles :size="12" :class="ui.aiProvider ? 'text-accent-2' : 'text-faint'" />{{ ui.aiProvider ?? 'AI off' }}
-    </span>
+    <button type="button" class="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-fg" :title="settings.statusLabel ? 'Active AI provider — click to change' : 'AI is optional — click to set up a provider'" @click="ui.settingsOpen = true">
+      <Sparkles :size="12" :class="settings.statusLabel ? 'text-accent-2' : 'text-faint'" />{{ settings.statusLabel ?? 'AI off' }}
+    </button>
     <span class="flex items-center gap-1"><ZoomIn :size="12" />{{ ui.zoom }}%</span>
     <span class="font-mono text-faint">v{{ version }}</span>
   </div>

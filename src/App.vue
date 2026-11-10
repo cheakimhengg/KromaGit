@@ -12,11 +12,18 @@ import ContextMenu from '@/components/common/ContextMenu.vue'
 import Toaster from '@/components/common/Toaster.vue'
 import Dialog from '@/components/common/Dialog.vue'
 import OperationBanner from '@/components/layout/OperationBanner.vue'
+import SettingsDialog from '@/components/settings/SettingsDialog.vue'
+import ReviewPanel from '@/components/ai/ReviewPanel.vue'
+import SplitPanel from '@/components/ai/SplitPanel.vue'
+import StandupPanel from '@/components/ai/StandupPanel.vue'
+import CleanupPanel from '@/components/ai/CleanupPanel.vue'
+import { useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 
 const repos = useReposStore()
 const ui = useUiStore()
+const settings = useSettingsStore()
 
 watch(() => repos.activeTabId, () => ui.resetForRepoSwitch())
 
@@ -33,6 +40,7 @@ function onFocus() {
 }
 
 onMounted(() => {
+  void settings.load()
   void repos.openStartupPaths()
   window.addEventListener('keydown', onKey)
   window.addEventListener('focus', onFocus)
@@ -68,6 +76,10 @@ onBeforeUnmount(() => {
           <Sidebar v-show="!ui.sidebarCollapsed" class="w-[260px] shrink-0" />
           <main class="min-w-0 flex-1">
             <DiffViewer v-if="ui.centerView === 'diff' && ui.diffTarget" :target="ui.diffTarget" />
+            <ReviewPanel v-else-if="ui.centerView === 'review'" />
+            <SplitPanel v-else-if="ui.centerView === 'split'" />
+            <StandupPanel v-else-if="ui.centerView === 'standup'" />
+            <CleanupPanel v-else-if="ui.centerView === 'cleanup'" />
             <CommitGraph v-show="ui.centerView === 'graph'" />
           </main>
           <RightPanel class="w-[340px] shrink-0" />
@@ -84,6 +96,7 @@ onBeforeUnmount(() => {
     <StatusBar />
     <ContextMenu />
     <Toaster />
+    <SettingsDialog />
     <Dialog />
   </div>
 </template>

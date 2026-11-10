@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { FolderTree, List, Loader2, Minus, Plus, Trash2, Undo2 } from 'lucide-vue-next'
+import { FolderTree, List, Loader2, Minus, Plus, Split, Trash2, Undo2 } from 'lucide-vue-next'
+import { useAiStore } from '@/stores/ai'
 import FileList from './FileList.vue'
 import CommitBox from './CommitBox.vue'
 import CountBadge from '@/components/common/CountBadge.vue'
@@ -11,6 +12,8 @@ import * as git from '@/actions/git'
 import { useOpsStore } from '@/stores/ops'
 
 const ops = useOpsStore()
+const ai = useAiStore()
+const totalFiles = computed(() => new Set([...wc.value.staged, ...wc.value.unstaged].map((f) => f.path)).size)
 
 const repos = useReposStore()
 const ui = useUiStore()
@@ -40,6 +43,12 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
       <span class="text-[12px] font-semibold">Working Copy</span>
       <Loader2 v-if="loading" :size="13" class="animate-spin text-faint" />
       <div class="flex-1" />
+      <button
+        type="button" :disabled="totalFiles < 2 || !!ops.running || ai.split.status === 'running'"
+        class="flex h-6 items-center gap-1 rounded-md border border-line px-2 text-[11px] text-muted hover:border-accent-2/50 hover:text-fg disabled:opacity-30"
+        title="AI: suggest how to split these changes into several commits"
+        @click="ai.suggestSplit()"
+      ><Split :size="11" class="text-accent-2" />Split…</button>
       <div class="flex rounded-md border border-line p-0.5">
         <button
           type="button" class="rounded p-1" :class="ui.fileViewMode === 'list' ? 'bg-surface-3 text-fg' : 'text-faint hover:text-fg'"

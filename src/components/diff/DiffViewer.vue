@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { Columns2, FileCode2, Loader2, Minus, Plus, Rows3, Undo2, X } from 'lucide-vue-next'
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
@@ -32,7 +32,10 @@ watch(
     error.value = null
     try {
       const d = await gitApi.getFileDiff(path ?? '', target)
-      if (!cancelled) diff.value = d
+      if (!cancelled) {
+        diff.value = d
+        if (target.line && (!old || old[0] !== target)) void focusLine(target.line)
+      }
     } catch (e) {
       if (!cancelled) {
         diff.value = null
@@ -44,6 +47,17 @@ watch(
   },
   { immediate: true },
 )
+
+const scroller = ref<HTMLElement | null>(null)
+const focused = ref<number | null>(null)
+
+async function focusLine(line: number) {
+  ui.diffMode = 'unified'
+  focused.value = line
+  await nextTick()
+  const el = scroller.value?.querySelector(`[data-new="${line}"]`) ?? scroller.value?.querySelector(`[data-near="${line}"]`)
+  el?.scrollIntoView({ block: 'center' })
+}
 
 const language = computed(() => languageFromPath(props.target.path))
 const canStage = computed(() => props.target.source !== 'commit' && !props.target.untracked && !props.target.oldPath)
@@ -197,7 +211,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
       <template v-else>No content changes{{ target.oldPath ? ' (pure rename)' : '' }}.</template>
     </div>
 
-    <div v-else class="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[20px]" :class="{ 'opacity-60': loading }">
+    <div v-else ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[20px]" :class="{ 'opacity-60': loading }">
       <div v-if="diff?.truncated" class="border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[11px] text-warning">
         Diff is very large; showing the first 20,000 lines.
       </div>
@@ -227,7 +241,8 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         <template v-if="ui.diffMode === 'unified'">
           <div
             v-for="(l, li) in hunk.lines" :key="li"
-            class="flex min-w-max" :class="lineClass(l, selected.has(key(hi, li)))"
+            class="flex min-w-max" :class="[lineClass(l, selected.has(key(hi, li))), focused !== null && l.newNo === focused ? 'ring-1 ring-accent-2 ring-inset' : '']"
+            :data-new="l.newNo" :data-near="l.oldNo"
           >
             <span
               class="w-12 shrink-0 pr-2 text-right text-faint select-none"

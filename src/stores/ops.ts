@@ -133,7 +133,59 @@ export const useOpsStore = defineStore('ops', () => {
     }
   }
 
-  return { running, stacks, nextUndo, nextRedo, run, undo: () => replay('undo'), redo: () => replay('redo') }
+  /**
+   * Runs a multi-step flow (e.g. applying a split plan) as one operation:
+   * one running state, one refresh, and one undo entry built by `fn`.
+   * Stops at the first failing step; earlier steps stay applied (and undoable).
+   */
+  async function batch(
+    label: string,
+    fn: (exec: (action: GitAction) => Promise<OpOutcome>, startOid: string | null) => Promise<UndoPlan | null>,
+    successText?: string,
+  ): Promise<boolean> {
+    const repos = useReposStore()
+    const ui = useUiStore()
+    const tab = repos.activeTab
+    if (!tab) return false
+    if (running.value) {
+      ui.toast({ kind: 'info', title: 'Please wait', detail: `${running.value} is still running.` })
+      return false
+    }
+    running.value = label
+    const stack = stackFor(tab.id)
+    let lastOid: string | null = null
+    let plan: UndoPlan | null = null
+    let ok = false
+    const exec = async (action: GitAction) => {
+      const o = await gitApi.runAction(tab.path, action)
+      lastOid = o.after.oid
+      return o
+    }
+    try {
+      const start = (await gitApi.getStatus(tab.path)).head.oid ?? null
+      lastOid = start
+      try {
+        plan = await fn(exec, start)
+        ok = true
+        ui.toast({ kind: 'success', title: successText ?? label }, 3000)
+      } catch (e) {
+        ui.toast({ kind: 'error', title: `${label} stopped`, detail: `${errorMessage(e)}${start !== lastOid ? ' Steps already done are kept; use Undo to roll them back.' : ''}` }, 10000)
+        if (start && start !== lastOid) plan = { undo: [{ type: 'reset', target: start, mode: 'mixed' }], redo: [] }
+      }
+      if (plan) {
+        stack.undo.push({ label, ...plan, guardOid: lastOid })
+        stack.redo = []
+      }
+    } catch (e) {
+      ui.toast({ kind: 'error', title: `${label} failed`, detail: errorMessage(e) }, 9000)
+    } finally {
+      running.value = null
+      await repos.refresh(tab.id, 'all')
+    }
+    return ok
+  }
+
+  return { running, stacks, nextUndo, nextRedo, run, batch, undo: () => replay('undo'), redo: () => replay('redo') }
 })
 
 function lastLine(output: string): string | undefined {
