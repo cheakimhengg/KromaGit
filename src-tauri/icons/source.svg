@@ -1,19 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1e2433"/>
-      <stop offset="1" stop-color="#0d1117"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#232a3b"/>
+      <stop offset="1" stop-color="#0b0e14"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7c9cff"/>
+    <radialGradient id="glow" cx="0.72" cy="0.22" r="0.7">
+      <stop offset="0" stop-color="#7c9cff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#7c9cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="laneA" gradientUnits="userSpaceOnUse" x1="372" y1="236" x2="372" y2="788">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#7c9cff"/>
+    </linearGradient>
+    <linearGradient id="laneB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f472b6"/>
       <stop offset="1" stop-color="#b47cff"/>
     </linearGradient>
+    <linearGradient id="laneC" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#fb923c"/>
+    </linearGradient>
   </defs>
-  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
-  <path d="M352 260 V764" stroke="#5eead4" stroke-width="56" stroke-linecap="round" fill="none"/>
-  <path d="M352 640 C352 520 672 540 672 400 V340" stroke="url(#accent)" stroke-width="56" stroke-linecap="round" fill="none"/>
-  <circle cx="352" cy="260" r="64" fill="#0d1117" stroke="#5eead4" stroke-width="40"/>
-  <circle cx="352" cy="764" r="64" fill="#0d1117" stroke="#5eead4" stroke-width="40"/>
-  <circle cx="672" cy="300" r="64" fill="#0d1117" stroke="#b47cff" stroke-width="40"/>
-  <path d="M700 620 l24 56 56 24 -56 24 -24 56 -24 -56 -56 -24 56 -24z" fill="#fbbf24"/>
+
+  <rect x="72" y="72" width="880" height="880" rx="196" fill="url(#bg)"/>
+  <rect x="72" y="72" width="880" height="880" rx="196" fill="url(#glow)"/>
+  <rect x="73.5" y="73.5" width="877" height="877" rx="194.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+
+  <!-- main lane -->
+  <path d="M372 236 V788" stroke="url(#laneA)" stroke-width="64" stroke-linecap="round" fill="none"/>
+  <!-- branch merging back -->
+  <path d="M652 300 C652 470 372 470 372 610" stroke="url(#laneB)" stroke-width="64" stroke-linecap="round" fill="none"/>
+  <!-- second branch -->
+  <path d="M372 400 C372 520 700 520 700 660 V740" stroke="url(#laneC)" stroke-width="56" stroke-linecap="round" fill="none" opacity="0.95"/>
+
+  <!-- commits -->
+  <circle cx="372" cy="236" r="70" fill="#0f131c" stroke="#5eead4" stroke-width="40"/>
+  <circle cx="652" cy="300" r="62" fill="#0f131c" stroke="#f472b6" stroke-width="38"/>
+  <circle cx="700" cy="752" r="56" fill="#0f131c" stroke="#fb923c" stroke-width="36"/>
+  <circle cx="372" cy="788" r="70" fill="#0f131c" stroke="#7c9cff" stroke-width="40"/>
 </svg>

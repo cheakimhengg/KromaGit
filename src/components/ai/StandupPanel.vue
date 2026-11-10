@@ -76,7 +76,7 @@ onMounted(async () => {
         <input v-model="author" class="gw-input h-7 w-56 font-mono" placeholder="author email" spellcheck="false" title="Only commits by this author" />
         <button
           type="button" :disabled="!author.trim() || s.status === 'running'"
-          class="flex h-7 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-[#0b0e14] disabled:opacity-40"
+          class="flex h-7 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent disabled:opacity-40"
           @click="run"
         ><Loader2 v-if="s.status === 'running'" :size="12" class="animate-spin" /><Search v-else :size="12" />Find commits</button>
       </div>

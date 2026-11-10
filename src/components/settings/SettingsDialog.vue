@@ -8,14 +8,21 @@ import { PROVIDERS, isCloud, useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 import { TEMPLATE_PRESETS } from '@/ai/prompts'
+import { useCommands } from '@/commands/registry'
+import { formatCombo, isMac } from '@/lib/shortcuts'
+import { ZOOM_MAX, ZOOM_MIN } from '@/lib/theme'
+import { Monitor, Moon, Sun } from 'lucide-vue-next'
 import type { CloudProvider, ProviderId, Settings } from '@/types/ai'
 
 const ui = useUiStore()
 const store = useSettingsStore()
 const repos = useReposStore()
 
-type Tab = 'ai' | 'repo' | 'workflow'
-const tab = ref<Tab>('ai')
+type Tab = 'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts'
+const tab = ref<Tab>('general')
+const { staticCommands } = useCommands()
+const shortcutList = computed(() => staticCommands.filter((c) => c.shortcut && !/^tab-[2-8]$/.test(c.id)))
+const isMacOS = isMac
 const draft = ref<Settings>(clone(store.settings))
 const keyInput = ref('')
 const busy = ref<string | null>(null)
@@ -29,6 +36,8 @@ watch(
   () => ui.settingsOpen,
   async (open) => {
     if (!open) return
+    tab.value = ui.settingsTab
+    ui.settingsTab = 'general'
     if (!store.loaded) await store.load()
     draft.value = clone(store.settings)
     template.value = store.templateFor(repoRoot.value)
@@ -145,7 +154,7 @@ function onKey(e: KeyboardEvent) {
         <h2 class="text-[14px] font-semibold">Settings</h2>
         <div class="ml-4 flex gap-1">
           <button
-            v-for="t in ([['ai', 'AI'], ['repo', 'This repository'], ['workflow', 'Standup & cleanup']] as const)" :key="t[0]"
+            v-for="t in ([['general', 'General'], ['ai', 'AI'], ['repo', 'This repository'], ['workflow', 'Standup & cleanup'], ['shortcuts', 'Shortcuts']] as const)" :key="t[0]"
             type="button" class="rounded-md px-2.5 py-1 text-[12px]" :class="tab === t[0] ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="tab = t[0]"
           >{{ t[1] }}</button>
@@ -154,7 +163,53 @@ function onKey(e: KeyboardEvent) {
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-[12px]">
-        <template v-if="tab === 'ai'">
+        <template v-if="tab === 'general'">
+          <div class="grid grid-cols-[130px_1fr] items-center gap-x-3 gap-y-4">
+            <label class="text-muted">Theme</label>
+            <div class="flex gap-2">
+              <button
+                v-for="t in ([['dark', 'Dark', Moon], ['light', 'Light', Sun], ['system', 'System', Monitor]] as const)" :key="t[0]"
+                type="button"
+                class="flex items-center gap-1.5 rounded-md border px-3 py-1.5"
+                :class="store.settings.appearance.theme === t[0] ? 'border-accent bg-accent/10 text-fg' : 'border-line text-muted hover:text-fg'"
+                @click="store.setTheme(t[0]); draft.appearance.theme = t[0]"
+              ><component :is="t[2]" :size="13" />{{ t[1] }}</button>
+            </div>
+            <label class="text-muted">Zoom</label>
+            <div class="flex items-center gap-3">
+              <input
+                type="range" :min="ZOOM_MIN" :max="ZOOM_MAX" step="10" class="w-48 accent-[var(--gw-accent)]"
+                :value="store.settings.appearance.zoom"
+                @change="store.zoomBy(Number(($event.target as HTMLInputElement).value) - store.settings.appearance.zoom); draft.appearance.zoom = Number(($event.target as HTMLInputElement).value)"
+              />
+              <span class="w-10 font-mono text-fg">{{ store.settings.appearance.zoom }}%</span>
+              <span class="text-[11px] text-faint">{{ formatCombo('Mod+=') }} / {{ formatCombo('Mod+-') }} / {{ formatCombo('Mod+0') }}</span>
+            </div>
+            <label class="text-muted">Terminal app</label>
+            <div>
+              <input v-model="draft.general.terminalApp" class="gw-input h-8 font-mono" :placeholder="isMacOS ? 'Terminal (default) — e.g. iTerm, Warp, Ghostty' : 'System default — e.g. wezterm start --cwd {path}'" spellcheck="false" />
+            </div>
+            <label class="text-muted">Editor app</label>
+            <div>
+              <input v-model="draft.general.editorApp" class="gw-input h-8 font-mono" :placeholder="isMacOS ? 'VS Code / Cursor if installed — e.g. Zed, Sublime Text' : 'code (default) — e.g. zed {path}'" spellcheck="false" />
+              <p class="mt-1 text-[11px] text-faint">{{ isMacOS ? 'An application name, or a full command line.' : 'A command line;' }} <code>{path}</code> is replaced by the repository folder (appended if omitted).</p>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="tab === 'shortcuts'">
+          <p class="mb-3 text-muted">Press <kbd class="rounded border border-line px-1 font-mono">{{ formatCombo('Mod+K') }}</kbd> to search every command. Shortcuts:</p>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1">
+            <div v-for="c in shortcutList" :key="c.id" class="flex items-center justify-between border-b border-line/60 py-1">
+              <span class="text-fg/90">{{ c.id === 'tab-1' ? 'Go to tab 1–9' : c.title }}</span>
+              <kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[11px] text-muted">{{ c.id === 'tab-1' ? formatCombo('Mod+1') + '…9' : formatCombo(c.shortcut!) }}</kbd>
+            </div>
+            <div class="flex items-center justify-between border-b border-line/60 py-1"><span class="text-fg/90">Move through commits</span><kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[11px] text-muted">↑ ↓ / j k</kbd></div>
+            <div class="flex items-center justify-between border-b border-line/60 py-1"><span class="text-fg/90">Close diff / panel</span><kbd class="rounded border border-line bg-surface px-1.5 font-mono text-[11px] text-muted">Esc</kbd></div>
+          </div>
+        </template>
+
+        <template v-else-if="tab === 'ai'">
           <p class="mb-3 text-muted">AI is optional. Pick where requests go; API keys are stored in your system keychain, never in a file.</p>
           <div class="grid grid-cols-5 gap-2">
             <button
@@ -202,7 +257,7 @@ function onKey(e: KeyboardEvent) {
                 </div>
                 <div class="flex gap-2" :class="{ 'mt-2': hasKey }">
                   <input v-model="keyInput" type="password" class="gw-input h-8 font-mono" :placeholder="hasKey ? 'Replace key…' : 'Paste your API key'" autocomplete="off" spellcheck="false" @keydown.enter="saveKey" />
-                  <button type="button" :disabled="!keyInput.trim() || busy === 'key'" class="h-8 shrink-0 rounded-md bg-accent px-3 font-semibold text-[#0b0e14] disabled:opacity-40" @click="saveKey">Save key</button>
+                  <button type="button" :disabled="!keyInput.trim() || busy === 'key'" class="h-8 shrink-0 rounded-md bg-accent px-3 font-semibold text-on-accent disabled:opacity-40" @click="saveKey">Save key</button>
                 </div>
               </div>
               <label class="text-muted">Privacy</label>
@@ -255,7 +310,7 @@ function onKey(e: KeyboardEvent) {
 
       <div class="flex justify-end gap-2 border-t border-line px-5 py-3">
         <button type="button" class="h-8 rounded-md border border-line-strong px-3 text-[12px] hover:bg-hover" @click="ui.settingsOpen = false">Cancel</button>
-        <button type="button" :disabled="busy === 'save'" class="h-8 rounded-md bg-accent px-3 text-[12px] font-semibold text-[#0b0e14] hover:brightness-110 disabled:opacity-40" @click="save">Save</button>
+        <button type="button" :disabled="busy === 'save'" class="h-8 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40" @click="save">Save</button>
       </div>
     </div>
   </div>

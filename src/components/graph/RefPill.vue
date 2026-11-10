@@ -14,7 +14,7 @@ const icon = computed(() => {
 })
 const style = computed(() =>
   props.refLabel.current
-    ? { background: props.color, color: '#0b0e14', borderColor: props.color }
+    ? { background: props.color, color: 'var(--gw-on-accent)', borderColor: props.color }
     : { background: `${props.color}22`, color: props.color, borderColor: `${props.color}55` },
 )
 </script>

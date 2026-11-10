@@ -8,7 +8,11 @@ export interface AiSettings {
   cloudConsent: Record<string, boolean>
 }
 
+export type ThemePref = 'dark' | 'light' | 'system'
+
 export interface Settings {
+  appearance: { theme: ThemePref; zoom: number }
+  general: { terminalApp: string; editorApp: string }
   ai: AiSettings
   /** keyed by repository root */
   repos: Record<string, { commitTemplate: string }>

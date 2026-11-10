@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { GraphEdge, GraphRow } from '@/lib/graph-layout'
-import { ROW_HEIGHT, laneColor, laneX } from '@/lib/lanes'
+import { ROW_HEIGHT, avatarColors, laneColor, laneX } from '@/lib/lanes'
 import { avatarHue, initials } from '@/lib/format'
 
 const props = defineProps<{
@@ -40,7 +40,7 @@ const edges = computed(() => {
 
 const cx = computed(() => laneX(props.row.lane))
 const color = computed(() => laneColor(props.row.color))
-const hue = computed(() => avatarHue(props.authorEmail || props.authorName))
+const av = computed(() => avatarColors(avatarHue(props.authorEmail || props.authorName)))
 </script>
 
 <template>
@@ -51,10 +51,10 @@ const hue = computed(() => avatarHue(props.authorEmail || props.authorName))
     </template>
     <template v-else>
       <circle v-if="isHead" :cx="cx" :cy="MID" r="12.5" fill="none" :stroke="color" stroke-width="1.5" stroke-dasharray="2 2" />
-      <circle :cx="cx" :cy="MID" r="9.5" :fill="`hsl(${hue} 45% 30%)`" :stroke="color" stroke-width="2" />
+      <circle :cx="cx" :cy="MID" r="9.5" :fill="av.bg" :stroke="color" stroke-width="2" />
       <text
         :x="cx" :y="MID + 0.5" text-anchor="middle" dominant-baseline="central"
-        font-size="7.5" font-weight="700" :fill="`hsl(${hue} 90% 88%)`" style="font-family: var(--font-sans)"
+        font-size="7.5" font-weight="700" :fill="av.fg" style="font-family: var(--font-sans)"
       >{{ initials(authorName) }}</text>
     </template>
   </svg>

@@ -21,6 +21,8 @@ export interface AiApi {
 
 export function defaultSettings(): Settings {
   return {
+    appearance: { theme: 'dark', zoom: 100 },
+    general: { terminalApp: '', editorApp: '' },
     ai: {
       provider: 'none',
       models: { ollama: '', anthropic: 'claude-opus-5-5', openai: 'gpt-4.1-mini', gemini: 'gemini-2.5-flash' },

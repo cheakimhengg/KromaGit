@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
   Check, Cherry, Copy, GitBranchPlus, Loader2, PanelLeftOpen, Pencil, RotateCcw, Search, Tag, Undo, User, X,
@@ -20,6 +20,7 @@ const ui = useUiStore()
 const messageQuery = ref('')
 const authorQuery = ref('')
 const scrollEl = ref<HTMLElement | null>(null)
+const searchInput = ref<HTMLInputElement | null>(null)
 
 const snapshot = computed(() => repos.active?.snapshot ?? null)
 const layout = computed(() => repos.active?.layout ?? null)
@@ -111,6 +112,42 @@ function commitMenu(e: MouseEvent, c: Commit) {
   ui.openMenu(e, items)
 }
 
+watch(() => ui.searchRequest, async () => {
+  await nextTick()
+  searchInput.value?.focus()
+  searchInput.value?.select()
+})
+
+/** Arrow keys / j k move the selection; the details panel follows. */
+function onListKey(e: KeyboardEvent) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return
+  const count = rowCount.value
+  if (!count) return
+  const current = ui.selectedCommit ? displayIndexOf(ui.selectedCommit) : -1
+  let next = current
+  if (e.key === 'ArrowDown' || e.key === 'j') next = Math.min(count - 1, current + 1)
+  else if (e.key === 'ArrowUp' || e.key === 'k') next = Math.max(0, current - 1)
+  else if (e.key === 'Home') next = 0
+  else if (e.key === 'End') next = count - 1
+  else if (e.key === 'PageDown') next = Math.min(count - 1, current + 20)
+  else if (e.key === 'PageUp') next = Math.max(0, current - 20)
+  else if (e.key === 'Escape' && ui.selectedCommit) {
+    ui.selectCommit(null)
+    e.stopPropagation()
+    return
+  } else return
+  e.preventDefault()
+  if (next < 0) next = 0
+  ui.selectCommit(commits.value[rowIndex(next)].hash)
+  virtualizer.value.scrollToIndex(next, { align: 'auto' })
+}
+
+function displayIndexOf(hash: string): number {
+  const i = commits.value.findIndex((c) => c.hash === hash)
+  if (i === -1) return -1
+  return visibleIndexes.value ? visibleIndexes.value.indexOf(i) : i
+}
+
 function rowIndex(virtualIndex: number) {
   return visibleIndexes.value ? visibleIndexes.value[virtualIndex] : virtualIndex
 }
@@ -127,7 +164,7 @@ function rowIndex(virtualIndex: number) {
       </button>
       <div class="relative w-64">
         <Search :size="12" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
-        <input v-model="messageQuery" class="gw-input pl-6" placeholder="Search commits… (message or hash)" spellcheck="false" />
+        <input ref="searchInput" v-model="messageQuery" class="gw-input pl-6" placeholder="Search commits… (message or hash)" spellcheck="false" />
       </div>
       <div class="relative w-44">
         <User :size="12" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
@@ -184,7 +221,7 @@ function rowIndex(virtualIndex: number) {
       </span>
     </div>
 
-    <div ref="scrollEl" class="min-h-0 flex-1 overflow-auto" tabindex="0">
+    <div ref="scrollEl" class="min-h-0 flex-1 overflow-auto outline-none" tabindex="0" @keydown="onListKey">
       <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
         <template v-for="v in virtualizer.getVirtualItems()" :key="v.index">
           <div

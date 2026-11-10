@@ -68,9 +68,34 @@ impl Default for CleanupSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AppearanceSettings {
+    /// "dark" | "light" | "system"
+    pub theme: String,
+    /// percent, 70-150
+    pub zoom: u32,
+}
+
+impl Default for AppearanceSettings {
+    fn default() -> Self {
+        Self { theme: "dark".into(), zoom: 100 }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GeneralSettings {
+    /// app name (macOS) or command line; empty = system default
+    pub terminal_app: String,
+    pub editor_app: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
+    pub appearance: AppearanceSettings,
+    pub general: GeneralSettings,
     pub ai: AiSettings,
     /// keyed by repository root path
     pub repos: HashMap<String, RepoSettings>,

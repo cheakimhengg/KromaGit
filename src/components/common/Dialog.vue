@@ -127,7 +127,7 @@ function setFirst(el: unknown, index: number) {
             ref="confirmBtn"
             type="button"
             class="h-8 rounded-md px-3 text-[12px] font-semibold hover:brightness-110 disabled:opacity-40"
-            :class="ui.dialog.danger ? 'bg-danger text-white' : 'bg-accent text-[#0b0e14]'"
+            :class="ui.dialog.danger ? 'bg-danger text-white' : 'bg-accent text-on-accent'"
             :disabled="touched && !valid"
             @click="submit"
           >{{ ui.dialog.confirmLabel ?? 'OK' }}</button>

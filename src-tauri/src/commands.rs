@@ -72,13 +72,15 @@ pub async fn git_action(repo: String, action: git::ops::Action) -> AppResult<git
 }
 
 #[tauri::command]
-pub async fn open_in_terminal(path: String) -> AppResult<()> {
-    blocking(move || crate::system::open_terminal(&path)).await
+pub async fn open_in_terminal(app: tauri::AppHandle, path: String) -> AppResult<()> {
+    let choice = crate::settings::load(&config_dir(&app)?).general.terminal_app;
+    blocking(move || crate::system::open_terminal(&path, &choice)).await
 }
 
 #[tauri::command]
-pub async fn open_in_editor(path: String) -> AppResult<()> {
-    blocking(move || crate::system::open_editor(&path)).await
+pub async fn open_in_editor(app: tauri::AppHandle, path: String) -> AppResult<()> {
+    let choice = crate::settings::load(&config_dir(&app)?).general.editor_app;
+    blocking(move || crate::system::open_editor(&path, &choice)).await
 }
 
 // ---------- settings, keychain, AI ----------

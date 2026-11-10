@@ -61,7 +61,8 @@ onBeforeUnmount(() => {
         :class="item.danger ? 'text-danger hover:bg-danger/15' : 'text-fg hover:bg-accent/15'"
         @click="run(item)"
       >
-        <component :is="item.icon" v-if="item.icon" :size="14" class="shrink-0 opacity-80" />
+        <span v-if="item.swatch" class="h-3 w-3 shrink-0 rounded-full" :style="{ background: item.swatch }" />
+        <component :is="item.icon" v-else-if="item.icon" :size="14" class="shrink-0 opacity-80" />
         <span v-else class="w-[14px]" />
         <span class="flex-1">{{ item.label }}</span>
         <span v-if="item.shortcut" class="font-mono text-[10px] text-faint">{{ item.shortcut }}</span>

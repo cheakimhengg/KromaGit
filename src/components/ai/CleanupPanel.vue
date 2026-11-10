@@ -52,7 +52,7 @@ const remoteCount = computed(() => chosen.value.filter((x) => x.remoteBranch).le
     <div class="space-y-3 p-4">
       <p class="text-[12px] text-muted">
         Local branches merged into <span class="font-mono text-fg">{{ settings.settings.cleanup.baseBranches.join(', ') }}</span>, whose remote was deleted (<span class="font-mono">[gone]</span>), or with no commits in {{ settings.settings.cleanup.staleDays }} days.
-        <button type="button" class="text-accent hover:underline" @click="ui.settingsOpen = true">Change</button>
+        <button type="button" class="text-accent hover:underline" @click="ui.openSettings('workflow')">Change</button>
       </p>
 
       <div v-if="c.status === 'running'" class="flex justify-center p-10"><Loader2 :size="18" class="animate-spin text-faint" /></div>

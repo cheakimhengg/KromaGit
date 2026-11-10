@@ -30,7 +30,7 @@ const names = { merge: 'Merge', rebase: 'Rebase', cherryPick: 'Cherry-pick', rev
     <button
       type="button" :disabled="!!ops.running || conflicts > 0"
       :title="conflicts ? 'Resolve and stage all conflicted files first' : 'Continue'"
-      class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-[#0b0e14] hover:brightness-110 disabled:opacity-40"
+      class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
       @click="git.continueOperation()"
     ><Play :size="12" />Continue</button>
   </div>

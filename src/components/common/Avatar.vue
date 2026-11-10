@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { avatarHue, initials } from '@/lib/format'
+import { avatarColors } from '@/lib/lanes'
 
 const props = withDefaults(defineProps<{ name: string; email?: string; size?: number }>(), { size: 22 })
 
 const style = computed(() => {
-  const hue = avatarHue(props.email || props.name)
+  const c = avatarColors(avatarHue(props.email || props.name))
   return {
     width: `${props.size}px`,
     height: `${props.size}px`,
     fontSize: `${Math.round(props.size * 0.42)}px`,
-    background: `hsl(${hue} 45% 32%)`,
-    color: `hsl(${hue} 90% 88%)`,
+    background: c.bg,
+    color: c.fg,
   }
 })
 </script>

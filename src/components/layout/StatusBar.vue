@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CloudCheck, CloudOff, FileDiff, GitBranch, Loader2, Sparkles, ZoomIn } from 'lucide-vue-next'
+import { CloudCheck, CloudOff, FileDiff, GitBranch, Loader2, Moon, Sparkles, Sun, ZoomIn } from 'lucide-vue-next'
+import { resolvedTheme } from '@/lib/theme'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 import { useOpsStore } from '@/stores/ops'
@@ -37,10 +38,17 @@ const version = __APP_VERSION__
       <span v-else-if="repos.busy" class="flex items-center gap-1 text-faint"><Loader2 :size="12" class="animate-spin" />Loading…</span>
     </template>
     <div class="flex-1" />
-    <button type="button" class="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-fg" :title="settings.statusLabel ? 'Active AI provider — click to change' : 'AI is optional — click to set up a provider'" @click="ui.settingsOpen = true">
+    <button type="button" class="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-fg" :title="settings.statusLabel ? 'Active AI provider — click to change' : 'AI is optional — click to set up a provider'" @click="ui.openSettings('ai')">
       <Sparkles :size="12" :class="settings.statusLabel ? 'text-accent-2' : 'text-faint'" />{{ settings.statusLabel ?? 'AI off' }}
     </button>
-    <span class="flex items-center gap-1"><ZoomIn :size="12" />{{ ui.zoom }}%</span>
+    <span class="flex items-center gap-0.5" title="Zoom (⌘/Ctrl + = / − / 0)">
+      <button type="button" class="rounded px-1 hover:bg-hover hover:text-fg" title="Zoom out" @click="settings.zoomBy(-10)">−</button>
+      <button type="button" class="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-fg" title="Reset zoom" @click="settings.resetZoom()"><ZoomIn :size="12" />{{ settings.settings.appearance.zoom }}%</button>
+      <button type="button" class="rounded px-1 hover:bg-hover hover:text-fg" title="Zoom in" @click="settings.zoomBy(10)">+</button>
+    </span>
+    <button type="button" class="flex items-center rounded px-1 hover:bg-hover hover:text-fg" :title="`Theme: ${settings.settings.appearance.theme} — click to switch`" @click="settings.toggleTheme()">
+      <component :is="resolvedTheme === 'light' ? Sun : Moon" :size="12" />
+    </button>
     <span class="font-mono text-faint">v{{ version }}</span>
   </div>
 </template>
