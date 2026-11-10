@@ -1,40 +1,23 @@
 use std::path::Path;
-use std::process::Command;
 
 use kromagit_lib::ai::{collect, history};
 use kromagit_lib::git::runner::Git;
 
+mod common;
+use common::write;
+
 fn sh_env(dir: &Path, args: &[&str], date: Option<&str>) {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(dir)
-        .args(args)
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_AUTHOR_NAME", "Mara")
-        .env("GIT_AUTHOR_EMAIL", "mara@example.dev")
-        .env("GIT_COMMITTER_NAME", "Mara")
-        .env("GIT_COMMITTER_EMAIL", "mara@example.dev");
-    if let Some(d) = date {
-        cmd.env("GIT_AUTHOR_DATE", d).env("GIT_COMMITTER_DATE", d);
-    }
-    let out = cmd.output().unwrap();
-    assert!(out.status.success(), "git {:?}: {}", args, String::from_utf8_lossy(&out.stderr));
+    common::git_with_date(dir, args, date);
 }
 fn sh(dir: &Path, args: &[&str]) {
     sh_env(dir, args, None)
-}
-fn write(dir: &Path, f: &str, c: &str) {
-    if let Some(p) = dir.join(f).parent() {
-        std::fs::create_dir_all(p).unwrap();
-    }
-    std::fs::write(dir.join(f), c).unwrap();
 }
 
 fn repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
     sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
-    sh(d, &["config", "user.email", "mara@example.dev"]);
+    sh(d, &["config", "user.email", "test@example.dev"]);
     write(d, "src/app.ts", "export const a = 1\n");
     sh(d, &["add", "-A"]);
     sh(d, &["commit", "-qm", "feat(app): first"]);
@@ -70,7 +53,7 @@ fn recent_messages_and_user_email() {
     let tmp = repo();
     let g = Git::new(tmp.path());
     assert_eq!(history::recent_messages(&g, 20).unwrap(), vec!["feat(app): first".to_string()]);
-    assert_eq!(history::user_email(&g).unwrap(), "mara@example.dev");
+    assert_eq!(history::user_email(&g).unwrap(), "test@example.dev");
 }
 
 #[test]
@@ -128,8 +111,8 @@ fn standup_spans_repos_and_filters_by_author() {
     sh(b.path(), &["add", "-A"]);
     sh(b.path(), &["commit", "-qm", "feat(auth): login form"]);
 
-    let paths = vec![a.path().to_string_lossy().into_owned(), b.path().to_string_lossy().into_owned(), "/no/such/repo".into()];
-    let res = history::standup_commits(&paths, "1 week ago", "now", "mara@example.dev");
+    let paths = vec![a.path().to_string_lossy().into_owned(), b.path().to_string_lossy().into_owned(), common::path_str(&std::env::temp_dir().join("kromagit-no-such-repo"))];
+    let res = history::standup_commits(&paths, "1 week ago", "now", "test@example.dev");
     assert_eq!(res[0].commits.len(), 1);
     assert_eq!(res[1].commits.len(), 2);
     assert!(res[1].commits.iter().any(|c| c.subject == "feat(auth): login form" && c.source == "feature/login"));

@@ -2,7 +2,18 @@
   "name": "kromagit",
   "private": true,
   "version": "0.1.0",
+  "description": "Local-first Git desktop client with optional AI (Ollama or your own API key)",
+  "license": "MIT",
+  "author": "Chea KimHeng",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cheakimhengg/KromaGit.git"
+  },
   "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

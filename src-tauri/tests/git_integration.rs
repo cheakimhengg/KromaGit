@@ -1,29 +1,12 @@
 use std::path::Path;
-use std::process::Command;
 
 use kromagit_lib::git::{self, model::DiffRequest, runner::Git};
 
-fn sh(dir: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_AUTHOR_NAME", "Test User")
-        .env("GIT_AUTHOR_EMAIL", "test@example.dev")
-        .env("GIT_COMMITTER_NAME", "Test User")
-        .env("GIT_COMMITTER_EMAIL", "test@example.dev")
-        .output()
-        .expect("git runs");
-    assert!(out.status.success(), "git {:?} failed: {}", args, String::from_utf8_lossy(&out.stderr));
-}
+mod common;
+use common::{git as sh_out, write};
 
-fn write(dir: &Path, file: &str, content: &str) {
-    let p = dir.join(file);
-    if let Some(parent) = p.parent() {
-        std::fs::create_dir_all(parent).unwrap();
-    }
-    std::fs::write(p, content).unwrap();
+fn sh(dir: &Path, args: &[&str]) {
+    sh_out(dir, args);
 }
 
 fn sample_repo() -> tempfile::TempDir {
@@ -113,7 +96,7 @@ fn reads_a_real_repository_end_to_end() {
 #[test]
 fn handles_empty_repository_and_non_repo() {
     let tmp = tempfile::tempdir().unwrap();
-    sh(tmp.path(), &["-c", "init.defaultBranch=main", "init", "-q"]);
+    common::init_repo(tmp.path());
     let g = Git::new(tmp.path());
     assert!(git::log::get_commits(&g, Some(100)).unwrap().is_empty());
     let status = git::status::get_status(&g).unwrap();
@@ -166,10 +149,10 @@ fn payload_json_keys_match_the_frontend_types() {
     assert_eq!(keys(&diff["hunks"][0]), ["header", "lines", "newLines", "newStart", "oldLines", "oldStart"]);
     assert_eq!(keys(&diff["hunks"][0]["lines"][0]), ["kind", "oldNo", "text"]);
 
-    let err = serde_json::to_value(git::open_repo("/definitely/not/a/repo").unwrap_err()).unwrap();
+    let err = serde_json::to_value(git::open_repo(&common::path_str(&std::env::temp_dir().join("kromagit-definitely-missing"))).unwrap_err()).unwrap();
     assert_eq!(keys(&err), ["command", "kind", "message"]);
     assert_eq!(err["kind"], "pathNotFound");
-    assert_eq!(err["message"], "Folder not found: /definitely/not/a/repo");
+    assert!(err["message"].as_str().unwrap().starts_with("Folder not found: "));
 }
 
 fn req(path: &str, source: &str, untracked: bool, commit: Option<&str>, parent: Option<&str>) -> DiffRequest {

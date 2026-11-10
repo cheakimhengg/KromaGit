@@ -20,6 +20,9 @@ import CleanupPanel from '@/components/ai/CleanupPanel.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
+import CommandPalette from '@/components/common/CommandPalette.vue'
+import { useCommands } from '@/commands/registry'
+import { isEditable, matchCombo } from '@/lib/shortcuts'
 
 const repos = useReposStore()
 const ui = useUiStore()
@@ -27,8 +30,24 @@ const settings = useSettingsStore()
 
 watch(() => repos.activeTabId, () => ui.resetForRepoSwitch())
 
+const { staticCommands } = useCommands()
+const shortcutCommands = staticCommands.filter((c) => c.shortcut)
+
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && !ui.menu && !ui.dialog && ui.centerView === 'diff') ui.closeDiff()
+  if (ui.dialog || ui.paletteOpen || ui.settingsOpen) return
+  if (e.key === 'Escape' && !ui.menu) {
+    if (ui.centerView === 'diff') ui.closeDiff()
+    else if (ui.centerView !== 'graph') ui.showPanel('graph')
+    return
+  }
+  const typing = isEditable(e.target)
+  for (const c of shortcutCommands) {
+    if (!matchCombo(e, c.shortcut!)) continue
+    if (typing && !c.global) return
+    e.preventDefault()
+    if (!c.enabled || c.enabled()) void c.run()
+    return
+  }
 }
 
 let lastFocusRefresh = 0
@@ -89,7 +108,7 @@ onBeforeUnmount(() => {
     <div v-else class="flex flex-1 flex-col items-center justify-center gap-3 text-muted" data-tauri-drag-region>
       <div class="text-[15px] text-fg">No repository open</div>
       <div class="text-[12px]">Open a folder that contains a Git repository to get started.</div>
-      <button type="button" class="mt-1 flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-semibold text-[#0b0e14] hover:brightness-110" @click="repos.openRepo()">
+      <button type="button" class="mt-1 flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-semibold text-on-accent hover:brightness-110" @click="repos.openRepo()">
         <FolderOpen :size="14" />Open a repository
       </button>
     </div>
@@ -97,6 +116,7 @@ onBeforeUnmount(() => {
     <ContextMenu />
     <Toaster />
     <SettingsDialog />
+    <CommandPalette />
     <Dialog />
   </div>
 </template>

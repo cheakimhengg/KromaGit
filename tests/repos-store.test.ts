@@ -142,6 +142,34 @@ describe('repos store', () => {
     repos.closeTab(first.id)
     expect(repos.activeTabId).toBe(second.id)
     repos.setTabGroup(second.id, 'frontend')
-    expect(repos.tabs[0].groupId).toBe('frontend')
+    expect(repos.tabs.find((t) => t.id === second.id)!.groupId).toBe('frontend')
+  })
+
+  it('keeps group members together and manages groups', async () => {
+    api.getCommits.mockResolvedValue(chain(1))
+    const repos = useReposStore()
+    const loose = repos.tabs.find((t) => !t.groupId)!
+    repos.setTabGroup(loose.id, 'backend')
+    const order = repos.tabs.map((t) => t.groupId ?? '-')
+    expect(order.lastIndexOf('backend') - order.indexOf('backend')).toBe(order.filter((g) => g === 'backend').length - 1)
+
+    const gid = repos.createGroup('Infra')
+    expect(repos.groups.find((g) => g.id === gid)?.name).toBe('Infra')
+    repos.setTabGroup(loose.id, gid)
+    repos.toggleGroupCollapsed(gid)
+    expect(repos.groups.find((g) => g.id === gid)?.collapsed).toBe(true)
+    repos.setGroupColor(gid, '#123456')
+    expect(repos.groups.find((g) => g.id === gid)?.color).toBe('#123456')
+
+    repos.ungroup(gid)
+    expect(repos.groups.some((g) => g.id === gid)).toBe(false)
+    expect(repos.tabs.find((t) => t.id === loose.id)?.groupId).toBeUndefined()
+
+    const [a, b] = repos.tabs
+    repos.moveTab(b.id, a.id, null)
+    expect(repos.tabs[0].id).toBe(b.id)
+    expect(repos.tabs[0].groupId).toBeUndefined()
+    repos.moveTab(b.id, null)
+    expect(repos.tabs[repos.tabs.length - 1].id).toBe(b.id)
   })
 })

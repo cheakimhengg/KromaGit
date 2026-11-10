@@ -165,7 +165,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         </button>
         <button
           type="button" :disabled="busy"
-          class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-[#0b0e14] hover:brightness-110 disabled:opacity-40"
+          class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
           @click="applyLines(target.source === 'staged' ? 'unstage' : 'stage')"
         >
           <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} {{ selected.size }} {{ selected.size === 1 ? 'line' : 'lines' }}

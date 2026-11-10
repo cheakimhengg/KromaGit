@@ -6,10 +6,13 @@ import { invoke } from '@tauri-apps/api/core'
 import { errorMessage, gitApi, inTauri } from '@/api/git'
 import { useUiStore } from './ui'
 
+const groupId = () => `group-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`
+
 export interface TabGroup {
   id: string
   name: string
   color: string
+  collapsed?: boolean
 }
 
 export interface RepoTab {
@@ -283,13 +286,93 @@ export const useReposStore = defineStore('repos', () => {
     }
   }
 
-  function setTabGroup(tabId: string, groupId: string | undefined) {
+  function setTabGroup(tabId: string, gid: string | undefined) {
     const tab = tabs.value.find((t) => t.id === tabId)
-    if (tab) tab.groupId = groupId
+    if (!tab) return
+    tab.groupId = gid
+    // keep group members next to each other in tab order
+    if (gid) {
+      const idx = tabs.value.indexOf(tab)
+      tabs.value.splice(idx, 1)
+      let last = -1
+      tabs.value.forEach((t, i) => {
+        if (t.groupId === gid) last = i
+      })
+      tabs.value.splice(last === -1 ? idx : last + 1, 0, tab)
+    }
+  }
+
+  function createGroup(name: string, color?: string): string {
+    const used = new Set(groups.value.map((g) => g.color))
+    const g: TabGroup = { id: groupId(), name: name.trim() || 'Group', color: color ?? GROUP_COLORS.find((c) => !used.has(c)) ?? GROUP_COLORS[groups.value.length % GROUP_COLORS.length] }
+    groups.value.push(g)
+    return g.id
+  }
+
+  async function promptNewGroup(tabId?: string) {
+    const r = await useUiStore().prompt({
+      title: 'New tab group',
+      fields: [{ key: 'name', label: 'Group name', placeholder: 'Backend', validate: (v) => (v.trim().length > 24 ? 'Keep it under 24 characters' : null) }],
+      confirmLabel: 'Create group',
+    })
+    if (!r) return
+    const gid = createGroup(r.values.name)
+    if (tabId) setTabGroup(tabId, gid)
+  }
+
+  async function renameGroup(gid: string) {
+    const g = groups.value.find((x) => x.id === gid)
+    if (!g) return
+    const r = await useUiStore().prompt({ title: 'Rename group', fields: [{ key: 'name', label: 'Group name', initial: g.name }], confirmLabel: 'Rename' })
+    if (r) g.name = r.values.name.trim() || g.name
+  }
+
+  function setGroupColor(gid: string, color: string) {
+    const g = groups.value.find((x) => x.id === gid)
+    if (g) g.color = color
+  }
+
+  function toggleGroupCollapsed(gid: string) {
+    const g = groups.value.find((x) => x.id === gid)
+    if (g) g.collapsed = !g.collapsed
+  }
+
+  /** Removes the group; its tabs stay open, ungrouped. */
+  function ungroup(gid: string) {
+    for (const t of tabs.value) if (t.groupId === gid) t.groupId = undefined
+    groups.value = groups.value.filter((g) => g.id !== gid)
+  }
+
+  async function closeGroup(gid: string) {
+    const members = tabs.value.filter((t) => t.groupId === gid)
+    const g = groups.value.find((x) => x.id === gid)
+    if (!g) return
+    if (members.length) {
+      const ok = await useUiStore().confirm({ title: `Close ${members.length} ${members.length === 1 ? 'tab' : 'tabs'} in “${g.name}”?`, message: 'The repositories are not changed; you can reopen them any time.', confirmLabel: 'Close tabs' })
+      if (!ok) return
+    }
+    for (const t of members) closeTab(t.id)
+    groups.value = groups.value.filter((x) => x.id !== gid)
+  }
+
+  /** Drag-and-drop: put `tabId` before `beforeId` (or at the end) and adopt the target's group. */
+  function moveTab(tabId: string, beforeId: string | null, gid?: string | null) {
+    const from = tabs.value.findIndex((t) => t.id === tabId)
+    if (from === -1 || tabId === beforeId) return
+    const [tab] = tabs.value.splice(from, 1)
+    const to = beforeId ? tabs.value.findIndex((t) => t.id === beforeId) : -1
+    if (to === -1) tabs.value.push(tab)
+    else tabs.value.splice(to, 0, tab)
+    if (gid !== undefined) tab.groupId = gid ?? undefined
+  }
+
+  function closeOtherTabs(keepId: string) {
+    for (const t of tabs.value.filter((x) => x.id !== keepId)) closeTab(t.id)
   }
 
   return {
     groups, tabs, activeTabId, activeTab, active, busy,
     activate, openRepo, openRepoAt, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh,
+    createGroup, promptNewGroup, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, closeOtherTabs,
   }
 })

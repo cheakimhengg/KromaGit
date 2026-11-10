@@ -33,7 +33,7 @@ export async function ensureReady(feature: string): Promise<boolean> {
     message: `${reason}\n\nKromaGit works fully without AI. To turn it on, open Settings → AI and choose:\n• Ollama — free and local; nothing leaves your machine (install from ollama.com, then \`ollama pull qwen2.5-coder\`)\n• Anthropic, OpenAI or Gemini — bring your own API key (stored in your system keychain)`,
     confirmLabel: 'Open AI settings',
   })
-  if (open) ui.settingsOpen = true
+  if (open) ui.openSettings('ai')
   return false
 }
 

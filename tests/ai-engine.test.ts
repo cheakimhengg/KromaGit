@@ -43,6 +43,7 @@ describe('ai engine', () => {
     ui.closeDialog({ values: {}, checks: {} })
     expect(await p).toBe(false)
     expect(ui.settingsOpen).toBe(true)
+    expect(ui.settingsTab).toBe('ai')
   })
 
   it('requires an API key for cloud providers', async () => {

@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { aiApi, defaultSettings } from '@/api/ai'
-import { errorMessage } from '@/api/git'
-import type { CloudProvider, ProviderId, Settings } from '@/types/ai'
+import { errorMessage, inTauri } from '@/api/git'
+import { applyTheme, applyZoom, clampZoom, resolvedTheme } from '@/lib/theme'
+import { clone } from '@/lib/clone'
+import type { CloudProvider, ProviderId, Settings, ThemePref } from '@/types/ai'
 import { useUiStore } from './ui'
 
 export const PROVIDERS: { id: ProviderId; name: string; cloud: boolean; blurb: string; models: string[] }[] = [
@@ -27,6 +29,8 @@ export const useSettingsStore = defineStore('settings', () => {
       settings.value = {
         ...d,
         ...s,
+        appearance: { ...d.appearance, ...s.appearance },
+        general: { ...d.general, ...s.general },
         ai: { ...d.ai, ...s.ai, models: { ...d.ai.models, ...s.ai?.models } },
         cleanup: { ...d.cleanup, ...s.cleanup },
         standup: { ...d.standup, ...s.standup },
@@ -36,13 +40,32 @@ export const useSettingsStore = defineStore('settings', () => {
       useUiStore().toast({ kind: 'error', title: 'Could not load settings', detail: errorMessage(e) })
     } finally {
       loaded.value = true
+      applyAppearance()
     }
+  }
+
+  function applyAppearance() {
+    applyTheme(settings.value.appearance.theme)
+    void applyZoom(settings.value.appearance.zoom, inTauri).catch(() => {})
   }
 
   async function save(next: Settings = settings.value) {
     await aiApi.saveSettings(next)
     settings.value = next
+    applyAppearance()
   }
+
+  async function patchAppearance(p: Partial<Settings['appearance']>) {
+    const next = clone(settings.value)
+    next.appearance = { ...next.appearance, ...p }
+    next.appearance.zoom = clampZoom(next.appearance.zoom)
+    await save(next).catch((e) => useUiStore().toast({ kind: 'error', title: 'Could not save settings', detail: errorMessage(e) }))
+  }
+
+  const setTheme = (theme: ThemePref) => patchAppearance({ theme })
+  const toggleTheme = () => setTheme(resolvedTheme.value === 'light' ? 'dark' : 'light')
+  const zoomBy = (delta: number) => patchAppearance({ zoom: settings.value.appearance.zoom + delta })
+  const resetZoom = () => patchAppearance({ zoom: 100 })
 
   async function refreshKeys() {
     keys.value = await aiApi.apiKeyStatus().catch(() => keys.value)
@@ -67,5 +90,5 @@ export const useSettingsStore = defineStore('settings', () => {
     return settings.value.repos[repoRoot]?.commitTemplate ?? ''
   }
 
-  return { settings, keys, loaded, load, save, refreshKeys, provider, model, providerInfo, notReadyReason, statusLabel, templateFor }
+  return { settings, keys, loaded, load, save, refreshKeys, setTheme, toggleTheme, zoomBy, resetZoom, provider, model, providerInfo, notReadyReason, statusLabel, templateFor }
 })

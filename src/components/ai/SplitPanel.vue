@@ -92,7 +92,7 @@ const valid = computed(() => groups.value.length > 0 && groups.value.every((g) =
         <button type="button" class="h-8 rounded-md border border-line-strong px-3 text-[12px] hover:bg-hover" @click="ai.split.groups = []; ai.split.status = 'idle'; ui.showPanel('graph')">Discard plan</button>
         <button
           type="button" :disabled="!valid || !!ops.running"
-          class="flex h-8 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-[#0b0e14] hover:brightness-110 disabled:opacity-40"
+          class="flex h-8 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
           @click="ai.applySplit(groups)"
         >
           <Loader2 v-if="ops.running" :size="13" class="animate-spin" /><GitCommitHorizontal v-else :size="13" />Create {{ groups.length }} {{ groups.length === 1 ? 'commit' : 'commits' }}

@@ -12,6 +12,8 @@ export interface MenuItem {
   danger?: boolean
   separator?: boolean
   shortcut?: string
+  /** small colour swatch instead of an icon */
+  swatch?: string
   action?: () => void
 }
 
@@ -71,8 +73,14 @@ export const useUiStore = defineStore('ui', () => {
   const diffTarget = ref<DiffTarget | null>(null)
   const diffMode = ref<DiffMode>('unified')
   const fileViewMode = ref<'list' | 'tree'>('list')
-  const zoom = ref(100)
   const settingsOpen = ref(false)
+  const paletteOpen = ref(false)
+  /** which Settings tab to show next time it opens */
+  const settingsTab = ref<'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts'>('general')
+  /** bumped to ask components to act (commit box, AI generate, graph search) */
+  const commitRequest = ref(0)
+  const generateRequest = ref(0)
+  const searchRequest = ref(0)
   const previousView = ref<CenterView>('graph')
 
   const menu = ref<{ x: number; y: number; items: MenuItem[] } | null>(null)
@@ -109,6 +117,18 @@ export const useUiStore = defineStore('ui', () => {
     diffTarget.value = null
     previousView.value = 'graph'
     if (centerView.value === 'diff' || centerView.value === 'review' || centerView.value === 'split' || centerView.value === 'cleanup') centerView.value = 'graph'
+  }
+
+  function openSettings(tab: typeof settingsTab.value = 'general') {
+    settingsTab.value = tab
+    settingsOpen.value = true
+  }
+
+  const requestCommit = () => commitRequest.value++
+  const requestGenerate = () => generateRequest.value++
+  function focusSearch() {
+    showPanel('graph')
+    searchRequest.value++
   }
 
   function openMenu(event: MouseEvent, items: MenuItem[]) {
@@ -161,9 +181,9 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   return {
-    sidebarCollapsed, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode, zoom,
-    settingsOpen, previousView, menu, toasts, dialog,
-    selectCommit, openDiff, closeDiff, showPanel, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
+    sidebarCollapsed, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode,
+    settingsOpen, settingsTab, paletteOpen, commitRequest, generateRequest, searchRequest, previousView, menu, toasts, dialog,
+    selectCommit, openDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
     openDialog, closeDialog, confirm, prompt,
   }
 })

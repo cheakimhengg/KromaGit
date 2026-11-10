@@ -14,6 +14,7 @@ const repos = useReposStore()
 const ops = useOpsStore()
 const ai = useAiStore()
 const generating = ref(false)
+const summaryInput = ref<HTMLInputElement | null>(null)
 
 interface Draft {
   summary: string
@@ -99,18 +100,22 @@ async function submit() {
   }
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-    e.preventDefault()
-    void submit()
+watch(() => ui.commitRequest, () => {
+  if (canCommit.value) void submit()
+  else if (!props.stagedCount && !draft.value.amend) ui.toast({ kind: 'info', title: 'Nothing to commit', detail: 'Stage some changes first.' }, 2500)
+  else if (!draft.value.summary.trim()) {
+    ui.toast({ kind: 'info', title: 'Write a summary first' }, 2500)
+    summaryInput.value?.focus()
   }
-}
+})
+watch(() => ui.generateRequest, () => void generate())
 </script>
 
 <template>
-  <div class="border-t border-line bg-surface p-3" @keydown="onKeydown">
+  <div class="border-t border-line bg-surface p-3">
     <div class="relative">
       <input
+        ref="summaryInput"
         v-model="draft.summary"
         class="gw-input h-8 pr-16 text-[13px]"
         :placeholder="operation ? 'Finish or abort the operation first' : 'Summary (required)'"
@@ -158,7 +163,7 @@ function onKeydown(e: KeyboardEvent) {
         type="button"
         :disabled="!canCommit"
         :title="canCommit ? `${draft.amend ? 'Amend' : 'Commit'} (⌘/Ctrl+Enter)` : stagedCount === 0 && !draft.amend ? 'Stage some changes first' : 'Write a summary'"
-        class="flex h-7 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-[#0b0e14] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+        class="flex h-7 items-center gap-1 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         @click="submit"
       >
         <Loader2 v-if="ops.running === 'Commit' || ops.running === 'Amend commit'" :size="13" class="animate-spin" />
