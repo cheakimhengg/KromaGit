@@ -2,8 +2,9 @@
 name = "kromagit"
 version = "0.1.0"
 description = "Local-first AI Git desktop client"
-authors = ["KromaGit contributors"]
+authors = ["Chea KimHeng"]
 license = "MIT"
+repository = "https://github.com/cheakimhengg/KromaGit"
 edition = "2021"
 rust-version = "1.82"
 

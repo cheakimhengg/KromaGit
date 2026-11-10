@@ -1,30 +1,13 @@
 use std::path::Path;
-use std::process::Command;
 
 use kromagit_lib::git::ops::{run_action, Action};
 use kromagit_lib::git::{diff, model::DiffRequest, runner::Git, status};
 
-fn git_env(cmd: &mut Command) -> &mut Command {
-    cmd.env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_AUTHOR_NAME", "Test User")
-        .env("GIT_AUTHOR_EMAIL", "test@example.dev")
-        .env("GIT_COMMITTER_NAME", "Test User")
-        .env("GIT_COMMITTER_EMAIL", "test@example.dev")
-}
+mod common;
+use common::{read, write};
 
 fn sh(dir: &Path, args: &[&str]) -> String {
-    let out = git_env(&mut Command::new("git")).current_dir(dir).args(args).output().unwrap();
-    assert!(out.status.success(), "git {:?}: {}", args, String::from_utf8_lossy(&out.stderr));
-    String::from_utf8_lossy(&out.stdout).trim().to_string()
-}
-
-fn write(dir: &Path, f: &str, c: &str) {
-    std::fs::write(dir.join(f), c).unwrap();
-}
-
-fn read(dir: &Path, f: &str) -> String {
-    std::fs::read_to_string(dir.join(f)).unwrap()
+    common::git(dir, args)
 }
 
 /// Actions are run through the library with the test identity in the environment.
@@ -39,16 +22,7 @@ fn try_act(dir: &Path, json: serde_json::Value) -> Result<kromagit_lib::git::ops
 }
 
 fn repo() -> tempfile::TempDir {
-    for (k, v) in [
-        ("GIT_CONFIG_GLOBAL", "/dev/null"),
-        ("GIT_CONFIG_NOSYSTEM", "1"),
-        ("GIT_AUTHOR_NAME", "Test User"),
-        ("GIT_AUTHOR_EMAIL", "test@example.dev"),
-        ("GIT_COMMITTER_NAME", "Test User"),
-        ("GIT_COMMITTER_EMAIL", "test@example.dev"),
-    ] {
-        std::env::set_var(k, v);
-    }
+    common::isolate();
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
     sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
