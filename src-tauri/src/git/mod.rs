@@ -1,6 +1,8 @@
 pub mod diff;
 pub mod log;
 pub mod model;
+pub mod ops;
+pub mod patch;
 pub mod refs;
 pub mod runner;
 pub mod status;

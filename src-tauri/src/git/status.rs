@@ -23,6 +23,7 @@ pub fn get_status(git: &Git) -> AppResult<StatusPayload> {
     apply_stats(&mut payload.staged, &staged_stats);
     apply_stats(&mut payload.unstaged, &unstaged_stats);
 
+    payload.operation = super::ops::operation_in_progress(git)?;
     for f in payload.unstaged.iter_mut().filter(|f| f.status == "?").take(MAX_UNTRACKED_LINE_COUNTS) {
         f.additions = count_lines(&git.cwd().join(&f.path)).unwrap_or(0);
     }

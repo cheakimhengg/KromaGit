@@ -150,7 +150,7 @@ fn payload_json_keys_match_the_frontend_types() {
     assert_eq!(keys(&refs["worktrees"][0]), ["branch", "head", "isMain", "path"]);
 
     let status = serde_json::to_value(git::status::get_status(&g).unwrap()).unwrap();
-    assert_eq!(keys(&status), ["head", "staged", "unstaged"]);
+    assert_eq!(keys(&status), ["head", "operation", "staged", "unstaged"]);
     assert_eq!(keys(&status["head"]), ["ahead", "behind", "branch", "detached", "oid", "upstream"]);
     assert_eq!(keys(&status["unstaged"][0]), ["additions", "deletions", "path", "status"]);
 

@@ -93,6 +93,7 @@ export interface DiffLine {
   oldNo?: number
   newNo?: number
   text: string
+  noEol?: boolean
 }
 
 export interface DiffHunk {
@@ -139,10 +140,13 @@ export interface RefsPayload {
   lastFetch: number | null
 }
 
+export type RepoOperation = 'merge' | 'rebase' | 'cherryPick' | 'revert'
+
 export interface StatusPayload {
   head: HeadInfo
   staged: FileChange[]
   unstaged: FileChange[]
+  operation: RepoOperation | null
 }
 
 export type DiffSource = 'unstaged' | 'staged' | 'commit'
@@ -171,4 +175,65 @@ export interface RepoSnapshot {
   submodules: Submodule[]
   lastFetch: number | null
   workingCopy: WorkingCopy
+  operation: RepoOperation | null
+}
+
+export interface HunkSelection {
+  header: string
+  /** line indexes within the hunk; null = whole hunk */
+  lines: number[] | null
+}
+
+export type PullMode = 'merge' | 'rebase' | 'ffOnly'
+export type ResetMode = 'soft' | 'mixed' | 'hard' | 'keep'
+
+/** Mirrors `Action` in src-tauri/src/git/ops.rs. */
+export type GitAction =
+  | { type: 'stage'; paths: string[] }
+  | { type: 'unstage'; paths: string[] }
+  | { type: 'stageAll' }
+  | { type: 'unstageAll' }
+  | { type: 'discard'; paths: string[]; untracked: string[] }
+  | { type: 'discardAll' }
+  | { type: 'applySelection'; path: string; source: 'unstaged' | 'staged'; hunks: HunkSelection[]; discard: boolean }
+  | { type: 'applyPatch'; patch: string; cached: boolean; reverse: boolean }
+  | { type: 'commit'; message: string; amend: boolean }
+  | { type: 'checkout'; branch: string }
+  | { type: 'checkoutDetached'; target: string }
+  | { type: 'checkoutRemote'; remoteBranch: string; name: string }
+  | { type: 'createBranch'; name: string; start: string | null; checkout: boolean }
+  | { type: 'deleteBranch'; name: string; force: boolean }
+  | { type: 'deleteRemoteBranch'; remote: string; branch: string }
+  | { type: 'renameBranch'; old: string; new: string }
+  | { type: 'createTag'; name: string; target: string | null; message: string | null }
+  | { type: 'deleteTag'; name: string }
+  | { type: 'restoreRef'; refname: string; oid: string }
+  | { type: 'deleteHeadRef' }
+  | { type: 'fetch'; remote: string | null }
+  | { type: 'pull'; mode: PullMode }
+  | { type: 'push'; remote: string | null; branch: string | null; setUpstream: boolean; force: boolean }
+  | { type: 'merge'; target: string }
+  | { type: 'rebase'; onto: string }
+  | { type: 'cherryPick'; hash: string }
+  | { type: 'revert'; hash: string }
+  | { type: 'reset'; target: string; mode: ResetMode }
+  | { type: 'stashPush'; message: string | null; includeUntracked: boolean }
+  | { type: 'stashPop'; index: number }
+  | { type: 'stashApply'; index: number }
+  | { type: 'stashApplyOid'; oid: string }
+  | { type: 'stashDrop'; index: number }
+  | { type: 'stashStore'; oid: string; message: string }
+  | { type: 'abortOperation' }
+  | { type: 'continueOperation' }
+
+export interface HeadState {
+  oid: string | null
+  branch: string | null
+}
+
+export interface OpOutcome {
+  before: HeadState
+  after: HeadState
+  data: string | null
+  output: string
 }

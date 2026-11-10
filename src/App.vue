@@ -10,6 +10,8 @@ import DiffViewer from '@/components/diff/DiffViewer.vue'
 import RightPanel from '@/components/panel/RightPanel.vue'
 import ContextMenu from '@/components/common/ContextMenu.vue'
 import Toaster from '@/components/common/Toaster.vue'
+import Dialog from '@/components/common/Dialog.vue'
+import OperationBanner from '@/components/layout/OperationBanner.vue'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 
@@ -19,7 +21,7 @@ const ui = useUiStore()
 watch(() => repos.activeTabId, () => ui.resetForRepoSwitch())
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && !ui.menu && ui.centerView === 'diff') ui.closeDiff()
+  if (e.key === 'Escape' && !ui.menu && !ui.dialog && ui.centerView === 'diff') ui.closeDiff()
 }
 
 let lastFocusRefresh = 0
@@ -61,6 +63,7 @@ onBeforeUnmount(() => {
       </div>
       <template v-else>
         <Toolbar />
+        <OperationBanner />
         <div class="flex min-h-0 flex-1">
           <Sidebar v-show="!ui.sidebarCollapsed" class="w-[260px] shrink-0" />
           <main class="min-w-0 flex-1">
@@ -81,5 +84,6 @@ onBeforeUnmount(() => {
     <StatusBar />
     <ContextMenu />
     <Toaster />
+    <Dialog />
   </div>
 </template>

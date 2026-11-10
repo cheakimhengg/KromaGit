@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
-  Check, Cherry, Copy, GitBranchPlus, Loader2, PanelLeftOpen, Pencil, RotateCcw, Search, Undo, User, X,
+  Check, Cherry, Copy, GitBranchPlus, Loader2, PanelLeftOpen, Pencil, RotateCcw, Search, Tag, Undo, User, X,
 } from 'lucide-vue-next'
 import GraphCell from './GraphCell.vue'
 import RefPill from './RefPill.vue'
@@ -12,6 +12,7 @@ import { useUiStore, type MenuItem } from '@/stores/ui'
 import { ROW_HEIGHT, graphWidth, laneColor, laneX } from '@/lib/lanes'
 import { fullDate, relativeTime } from '@/lib/format'
 import type { Commit, RefLabel } from '@/types/git'
+import * as git from '@/actions/git'
 
 const repos = useReposStore()
 const ui = useUiStore()
@@ -82,19 +83,31 @@ function displayRefs(c: Commit): { ref: RefLabel; hasRemote: boolean }[] {
 }
 
 function commitMenu(e: MouseEvent, c: Commit) {
-  const items: MenuItem[] = [
-    { label: 'Checkout this commit', icon: Check, action: () => ui.notWired('Checkout (detached)') },
-    { label: 'Create branch here…', icon: GitBranchPlus, action: () => ui.notWired('Create branch') },
+  const isHead = c.hash === headOid.value
+  const label = c.shortHash
+  const branch = snapshot.value?.currentBranch ?? 'HEAD'
+  const items: MenuItem[] = []
+  if (!isHead) items.push({ label: 'Checkout this commit (detached)', icon: Check, action: () => git.checkoutCommit(c.hash) })
+  items.push(
+    { label: 'Create branch here…', icon: GitBranchPlus, action: () => git.createBranch({ ref: c.hash, label }) },
+    { label: 'Create tag here…', icon: Tag, action: () => git.createTag({ ref: c.hash, label }) },
     { separator: true },
-    { label: 'Cherry-pick', icon: Cherry, action: () => ui.notWired('Cherry-pick') },
-    { label: 'Revert commit', icon: Undo, action: () => ui.notWired('Revert') },
+  )
+  if (!isHead) items.push({ label: `Cherry-pick onto ${branch}`, icon: Cherry, action: () => git.cherryPick(c.hash) })
+  items.push({ label: 'Revert commit', icon: Undo, action: () => git.revert(c.hash) })
+  if (!isHead) {
+    items.push(
+      { separator: true },
+      { label: `Reset ${branch} here — soft…`, icon: RotateCcw, action: () => git.reset(c.hash, 'soft') },
+      { label: `Reset ${branch} here — mixed…`, icon: RotateCcw, action: () => git.reset(c.hash, 'mixed') },
+      { label: `Reset ${branch} here — hard…`, icon: RotateCcw, danger: true, action: () => git.reset(c.hash, 'hard') },
+    )
+  }
+  items.push(
     { separator: true },
-    { label: 'Reset soft to here', icon: RotateCcw, action: () => ui.notWired('Reset --soft') },
-    { label: 'Reset mixed to here', icon: RotateCcw, action: () => ui.notWired('Reset --mixed') },
-    { label: 'Reset hard to here…', icon: RotateCcw, danger: true, action: () => ui.notWired('Reset --hard (will confirm)') },
-    { separator: true },
-    { label: 'Copy hash', icon: Copy, shortcut: c.shortHash, action: () => { void navigator.clipboard?.writeText(c.hash); ui.toast({ kind: 'success', title: 'Copied hash', detail: c.hash }, 1800) } },
-  ]
+    { label: 'Copy hash', icon: Copy, shortcut: c.shortHash, action: () => git.copyText(c.hash, 'Copied hash') },
+    { label: 'Copy message', icon: Copy, action: () => git.copyText(c.subject, 'Copied message') },
+  )
   ui.openMenu(e, items)
 }
 

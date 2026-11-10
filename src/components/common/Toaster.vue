@@ -8,7 +8,7 @@ const colors = { info: 'text-accent', success: 'text-success', error: 'text-dang
 </script>
 
 <template>
-  <div class="pointer-events-none fixed right-4 bottom-10 z-50 flex w-80 flex-col gap-2">
+  <div class="pointer-events-none fixed bottom-10 left-4 z-50 flex w-80 flex-col gap-2">
     <TransitionGroup
       enter-from-class="translate-y-2 opacity-0"
       leave-to-class="opacity-0"

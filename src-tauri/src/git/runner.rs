@@ -1,8 +1,22 @@
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 use crate::error::{AppError, AppResult};
+
+#[derive(Default)]
+pub struct RunOptions<'a> {
+    pub input: Option<&'a [u8]>,
+    pub ok_codes: &'a [i32],
+    pub timeout: Option<Duration>,
+}
+
+pub struct RunOutput {
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
 
 /// Resolves the git executable once. GUI apps on macOS start with a minimal
 /// PATH, so prefer Homebrew installs before falling back to `git` on PATH.
@@ -52,8 +66,13 @@ impl Git {
             ])
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_EDITOR", "true")
+            .env("GIT_SEQUENCE_EDITOR", "true")
+            .env("GIT_MERGE_AUTOEDIT", "no")
             .env("LC_ALL", "C")
-            .stdin(Stdio::null());
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
@@ -68,24 +87,94 @@ impl Git {
 
     /// Runs git and treats any exit code in `ok_codes` as success.
     pub fn run_with_codes(&self, args: &[&str], ok_codes: &[i32]) -> AppResult<Vec<u8>> {
-        let out = self.command(args).output().map_err(|e| {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                AppError::Io(e)
-            } else if !self.cwd.is_dir() {
-                AppError::PathNotFound(self.cwd.display().to_string())
-            } else {
-                AppError::GitNotFound
+        Ok(self.exec(args, &RunOptions { ok_codes, ..Default::default() })?.stdout)
+    }
+
+    /// Runs git with stdin input, returning stdout.
+    pub fn run_with_input(&self, args: &[&str], input: &[u8]) -> AppResult<Vec<u8>> {
+        Ok(self.exec(args, &RunOptions { input: Some(input), ..Default::default() })?.stdout)
+    }
+
+    /// Full-control runner: optional stdin, extra ok codes and a kill timeout
+    /// (used for network commands so a stuck remote can never hang the app).
+    pub fn exec(&self, args: &[&str], opts: &RunOptions) -> AppResult<RunOutput> {
+        let mut cmd = self.command(args);
+        if opts.input.is_some() {
+            cmd.stdin(Stdio::piped());
+        }
+        let mut child = cmd.spawn().map_err(|e| self.spawn_error(e))?;
+
+        let stdin_thread = match (opts.input, child.stdin.take()) {
+            (Some(input), Some(mut stdin)) => {
+                let data = input.to_vec();
+                Some(std::thread::spawn(move || {
+                    let _ = stdin.write_all(&data);
+                }))
             }
-        })?;
-        let code = out.status.code().unwrap_or(-1);
+            _ => None,
+        };
+        let mut stdout = child.stdout.take();
+        let mut stderr = child.stderr.take();
+        let out_thread = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(s) = stdout.as_mut() {
+                let _ = s.read_to_end(&mut buf);
+            }
+            buf
+        });
+        let err_thread = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(s) = stderr.as_mut() {
+                let _ = s.read_to_end(&mut buf);
+            }
+            buf
+        });
+
+        let started = Instant::now();
+        let status = loop {
+            if let Some(status) = child.try_wait()? {
+                break status;
+            }
+            if opts.timeout.is_some_and(|t| started.elapsed() > t) {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(AppError::Git {
+                    command: format!("git {}", args.join(" ")),
+                    message: format!(
+                        "Timed out after {}s. Check your network and credentials (KromaGit cannot answer interactive prompts).",
+                        opts.timeout.unwrap_or_default().as_secs()
+                    ),
+                });
+            }
+            std::thread::sleep(Duration::from_millis(15));
+        };
+        if let Some(t) = stdin_thread {
+            let _ = t.join();
+        }
+        let stdout = out_thread.join().unwrap_or_default();
+        let stderr = err_thread.join().unwrap_or_default();
+
+        let code = status.code().unwrap_or(-1);
+        let ok_codes = if opts.ok_codes.is_empty() { &[0][..] } else { opts.ok_codes };
         if ok_codes.contains(&code) {
-            Ok(out.stdout)
+            Ok(RunOutput { stdout, stderr })
         } else {
-            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            let msg = String::from_utf8_lossy(&stderr).trim().to_string();
+            let msg = if msg.is_empty() { String::from_utf8_lossy(&stdout).trim().to_string() } else { msg };
             Err(AppError::Git {
                 command: format!("git {}", args.join(" ")),
-                message: if stderr.is_empty() { format!("git exited with code {code}") } else { stderr },
+                message: if msg.is_empty() { format!("git exited with code {code}") } else { msg },
             })
+        }
+    }
+
+    fn spawn_error(&self, e: std::io::Error) -> AppError {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            AppError::Io(e)
+        } else if !self.cwd.is_dir() {
+            AppError::PathNotFound(self.cwd.display().to_string())
+        } else {
+            AppError::GitNotFound
         }
     }
 

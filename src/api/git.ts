@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
-  Commit, CommitDetails, DiffTarget, FileDiff, RefLabel, RefsPayload, RepoInfo, StatusPayload,
+  Commit, CommitDetails, DiffTarget, FileDiff, GitAction, OpOutcome, RefLabel, RefsPayload, RepoInfo, StatusPayload,
 } from '@/types/git'
 import { mockApi } from './mock-backend'
 
@@ -11,6 +11,9 @@ export interface GitApi {
   getStatus(repo: string): Promise<StatusPayload>
   getCommitDetails(repo: string, hash: string): Promise<CommitDetails>
   getFileDiff(repo: string, target: DiffTarget): Promise<FileDiff>
+  runAction(repo: string, action: GitAction): Promise<OpOutcome>
+  openInTerminal(path: string): Promise<void>
+  openInEditor(path: string): Promise<void>
 }
 
 export interface AppError {
@@ -60,6 +63,9 @@ const tauriApi: GitApi = {
         parent: target.parent ?? null,
       },
     }),
+  runAction: (repo, action) => invoke<OpOutcome>('git_action', { repo, action }),
+  openInTerminal: (path) => invoke<void>('open_in_terminal', { path }),
+  openInEditor: (path) => invoke<void>('open_in_editor', { path }),
 }
 
 export const gitApi: GitApi = inTauri ? tauriApi : mockApi

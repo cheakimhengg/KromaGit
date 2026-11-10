@@ -168,6 +168,7 @@ export function createMockRepo(name: string, path: string, commitCount = 5000): 
     name, path, currentBranch: CURRENT_BRANCH, commits, branches, remotes, tags, stashes, worktrees, submodules,
     head: { branch: CURRENT_BRANCH, oid: branchTips.get(CURRENT_BRANCH) ?? null, detached: false, upstream: `origin/${CURRENT_BRANCH}`, ahead: 3, behind: 1 },
     lastFetch: null,
+    operation: null,
     workingCopy: {
       unstaged: [
         { path: 'src/components/graph/GraphCell.vue', status: 'M', additions: 24, deletions: 6 },

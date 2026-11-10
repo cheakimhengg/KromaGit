@@ -37,7 +37,7 @@ const refs = (tip = 'c0'): RefsPayload => ({
   branches: [{ name: 'main', current: true, ahead: 0, behind: 0, tipHash: tip }],
   remotes: [], tags: [], stashes: [], worktrees: [], submodules: [], lastFetch: null,
 })
-const status = (oid = 'c0'): StatusPayload => ({ head: head(oid), staged: [], unstaged: [{ path: 'a.txt', status: 'M', additions: 1, deletions: 0 }] })
+const status = (oid = 'c0'): StatusPayload => ({ head: head(oid), staged: [], unstaged: [{ path: 'a.txt', status: 'M', additions: 1, deletions: 0 }], operation: null })
 
 function deferred<T>() {
   let resolve!: (v: T) => void

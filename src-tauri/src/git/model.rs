@@ -110,6 +110,8 @@ pub struct StatusPayload {
     pub head: HeadInfo,
     pub staged: Vec<FileChange>,
     pub unstaged: Vec<FileChange>,
+    /// "merge" | "rebase" | "cherryPick" | "revert" while one is paused
+    pub operation: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
@@ -148,6 +150,9 @@ pub struct DiffLine {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_no: Option<u32>,
     pub text: String,
+    /// line is followed by "\ No newline at end of file"
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub no_eol: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

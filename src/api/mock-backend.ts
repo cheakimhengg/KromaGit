@@ -1,5 +1,5 @@
 import type { GitApi } from './git'
-import type { CommitDetails, FileChange, FileStatus } from '@/types/git'
+import type { CommitDetails, FileChange, FileStatus, GitAction, OpOutcome } from '@/types/git'
 import { createMockRepo, mockDiff } from '@/mock/data'
 import { hashString } from '@/lib/format'
 
@@ -36,7 +36,7 @@ export const mockApi: GitApi = {
   },
   getStatus: (path) => {
     const r = repo(path)
-    return delay({ head: r.head, staged: r.workingCopy.staged, unstaged: r.workingCopy.unstaged })
+    return delay({ head: r.head, staged: [...r.workingCopy.staged], unstaged: [...r.workingCopy.unstaged], operation: null })
   },
   getCommitDetails: (path, hash) => {
     const c = repo(path).commits.find((x) => x.hash === hash)
@@ -55,4 +55,30 @@ export const mockApi: GitApi = {
     return delay(details)
   },
   getFileDiff: (_path, target) => delay({ ...mockDiff(target.path), path: target.path }),
+  runAction: (path, action) => delay(mockAction(path, action), 150),
+  openInTerminal: () => delay(undefined),
+  openInEditor: () => delay(undefined),
+}
+
+/** Simulates the working-copy effects of a few actions so the browser demo stays interactive. */
+function mockAction(path: string, action: GitAction): OpOutcome {
+  const r = repo(path)
+  const wc = r.workingCopy
+  const head = { oid: r.head.oid, branch: r.head.branch }
+  const move = (paths: string[], from: FileChange[], to: FileChange[]) => {
+    for (const p of paths) {
+      const i = from.findIndex((f) => f.path === p)
+      if (i !== -1) to.push(...from.splice(i, 1))
+    }
+  }
+  switch (action.type) {
+    case 'stage': move(action.paths, wc.unstaged, wc.staged); break
+    case 'unstage': move(action.paths, wc.staged, wc.unstaged); break
+    case 'stageAll': wc.staged.push(...wc.unstaged.splice(0)); break
+    case 'unstageAll': wc.unstaged.push(...wc.staged.splice(0)); break
+    case 'discard': wc.unstaged = wc.unstaged.filter((f) => !action.paths.includes(f.path) && !action.untracked.includes(f.path)); break
+    case 'discardAll': wc.unstaged = []; break
+    case 'commit': wc.staged = []; break
+  }
+  return { before: head, after: head, data: null, output: '' }
 }

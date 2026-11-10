@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, markRaw, reactive, ref, shallowReactive, watch } from 'vue'
 import type { Commit, HeadInfo, RefsPayload, RepoSnapshot, StatusPayload } from '@/types/git'
 import { computeGraphLayout, type GraphLayout } from '@/lib/graph-layout'
+import { invoke } from '@tauri-apps/api/core'
 import { errorMessage, gitApi, inTauri } from '@/api/git'
 import { useUiStore } from './ui'
 
@@ -42,7 +43,7 @@ export function describeHead(head: HeadInfo): string {
 function emptySnapshot(tab: RepoTab): RepoSnapshot {
   return {
     name: tab.name, path: tab.path, head: EMPTY_HEAD, currentBranch: '—', commits: [], branches: [], remotes: [],
-    tags: [], stashes: [], worktrees: [], submodules: [], lastFetch: null, workingCopy: { staged: [], unstaged: [] },
+    tags: [], stashes: [], worktrees: [], submodules: [], lastFetch: null, workingCopy: { staged: [], unstaged: [] }, operation: null,
   }
 }
 
@@ -182,7 +183,7 @@ export const useReposStore = defineStore('repos', () => {
     try {
       const status = await gitApi.getStatus(tab.path)
       if (generations.get(tab.id)?.status !== gen) return null
-      patch(state, { head: status.head, workingCopy: { staged: status.staged, unstaged: status.unstaged } })
+      patch(state, { head: status.head, workingCopy: { staged: status.staged, unstaged: status.unstaged }, operation: status.operation ?? null })
       return status
     } catch (e) {
       reportError(state, e, 'working copy')
@@ -202,6 +203,14 @@ export const useReposStore = defineStore('repos', () => {
   }
 
   /** Cheap refresh (e.g. on window focus): reload history only if HEAD or branch tips moved. */
+  /** Re-reads repository state after a write action without clearing what is on screen. */
+  async function refresh(tabId: string, scope: 'status' | 'all') {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    if (!tab) return
+    if (scope === 'status') await loadStatus(tab)
+    else await Promise.all([loadStatus(tab), loadRefs(tab), loadCommits(tab)])
+  }
+
   async function softRefresh(tabId = activeTabId.value) {
     const tab = tabs.value.find((t) => t.id === tabId)
     const state = tab && states.get(tab.id)
@@ -248,8 +257,7 @@ export const useReposStore = defineStore('repos', () => {
 
   async function openStartupPaths() {
     if (!inTauri) return
-    const { invoke } = await import('@tauri-apps/api/core')
-    const paths = await invoke<string[]>('startup_paths').catch(() => [])
+    const paths = await invoke<string[]>('startup_paths').catch(() => [] as string[])
     for (const p of paths) await openRepoAt(p)
   }
 
@@ -282,6 +290,6 @@ export const useReposStore = defineStore('repos', () => {
 
   return {
     groups, tabs, activeTabId, activeTab, active, busy,
-    activate, openRepo, openRepoAt, openStartupPaths, closeTab, setTabGroup, load, softRefresh,
+    activate, openRepo, openRepoAt, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh,
   }
 })

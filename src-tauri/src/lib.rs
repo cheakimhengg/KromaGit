@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod error;
 pub mod git;
+pub mod system;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +16,9 @@ pub fn run() {
             commands::get_status,
             commands::get_commit_details,
             commands::get_file_diff,
+            commands::git_action,
+            commands::open_in_terminal,
+            commands::open_in_editor,
         ])
         .run(tauri::generate_context!())
         .expect("error while running KromaGit");

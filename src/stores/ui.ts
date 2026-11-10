@@ -22,6 +22,43 @@ export interface Toast {
   detail?: string
 }
 
+export interface DialogField {
+  key: string
+  label: string
+  placeholder?: string
+  initial?: string
+  multiline?: boolean
+  optional?: boolean
+  mono?: boolean
+  validate?: (value: string) => string | null
+}
+
+export interface DialogCheckbox {
+  key: string
+  label: string
+  initial?: boolean
+}
+
+export interface DialogOptions {
+  title: string
+  message?: string
+  /** monospace details, e.g. the list of files that will be discarded */
+  detail?: string[]
+  fields?: DialogField[]
+  checkboxes?: DialogCheckbox[]
+  confirmLabel?: string
+  danger?: boolean
+}
+
+export interface DialogResult {
+  values: Record<string, string>
+  checks: Record<string, boolean>
+}
+
+interface OpenDialog extends DialogOptions {
+  resolve: (r: DialogResult | null) => void
+}
+
 let toastSeq = 0
 
 export const useUiStore = defineStore('ui', () => {
@@ -36,6 +73,7 @@ export const useUiStore = defineStore('ui', () => {
 
   const menu = ref<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const toasts = ref<Toast[]>([])
+  const dialog = ref<OpenDialog | null>(null)
 
   const diffPath = computed(() => diffTarget.value?.path ?? null)
   const diffSource = computed(() => diffTarget.value?.source ?? null)
@@ -84,12 +122,34 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function notWired(action: string) {
-    toast({ kind: 'info', title: action, detail: 'Write actions arrive in Phase 3.' })
+    toast({ kind: 'info', title: action, detail: 'Coming in a later phase.' })
+  }
+
+  function openDialog(options: DialogOptions): Promise<DialogResult | null> {
+    dialog.value?.resolve(null)
+    return new Promise((resolve) => {
+      dialog.value = { ...options, resolve }
+    })
+  }
+
+  function closeDialog(result: DialogResult | null) {
+    const d = dialog.value
+    dialog.value = null
+    d?.resolve(result)
+  }
+
+  async function confirm(options: Omit<DialogOptions, 'fields'>): Promise<boolean> {
+    return (await openDialog(options)) !== null
+  }
+
+  async function prompt(options: DialogOptions): Promise<DialogResult | null> {
+    return openDialog(options)
   }
 
   return {
     sidebarCollapsed, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode, zoom,
-    aiProvider, menu, toasts,
+    aiProvider, menu, toasts, dialog,
     selectCommit, openDiff, closeDiff, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
+    openDialog, closeDialog, confirm, prompt,
   }
 })

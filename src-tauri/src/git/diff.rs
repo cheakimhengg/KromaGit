@@ -158,6 +158,12 @@ pub fn parse_unified_diff(raw: &[u8]) -> FileDiff {
 
     for line in text.split('\n') {
         let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.starts_with('\\') {
+            if let Some(last) = hunk.as_mut().and_then(|h| h.lines.last_mut()) {
+                last.no_eol = true;
+            }
+            continue;
+        }
         let in_hunk = hunk.is_some() && (old_left > 0 || new_left > 0);
 
         if in_hunk {
@@ -170,7 +176,6 @@ pub fn parse_unified_diff(raw: &[u8]) -> FileDiff {
                 Some(b'+') => ("add", &line[1..]),
                 Some(b'-') => ("del", &line[1..]),
                 Some(b' ') => ("context", &line[1..]),
-                Some(b'\\') => continue,
                 None => ("context", ""),
                 _ => continue,
             };
@@ -193,7 +198,7 @@ pub fn parse_unified_diff(raw: &[u8]) -> FileDiff {
                     (Some(old_no - 1), Some(new_no - 1))
                 }
             };
-            h.lines.push(DiffLine { kind, old_no: o, new_no: n, text: body.to_string() });
+            h.lines.push(DiffLine { kind, old_no: o, new_no: n, text: body.to_string(), no_eol: false });
             total += 1;
             continue;
         }
@@ -262,6 +267,8 @@ mod tests {
         assert_eq!(d.hunks[1].old_lines, 1);
         assert_eq!(d.hunks[1].lines.len(), 3);
         assert_eq!(d.hunks[1].lines[2].new_no, Some(10));
+        assert!(d.hunks[1].lines[2].no_eol);
+        assert!(!d.hunks[1].lines[1].no_eol);
     }
 
     #[test]

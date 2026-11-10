@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
-import { Columns2, FileCode2, Loader2, Minus, Plus, Rows3, X } from 'lucide-vue-next'
+import { Columns2, FileCode2, Loader2, Minus, Plus, Rows3, Undo2, X } from 'lucide-vue-next'
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
 import { errorMessage, gitApi } from '@/api/git'
 import { languageFromPath } from '@/lib/format'
 import { highlightLine } from '@/lib/highlight'
 import { toSplitRows } from '@/lib/diff-split'
-import type { DiffLine, DiffTarget, FileDiff } from '@/types/git'
+import type { DiffLine, DiffTarget, FileDiff, HunkSelection } from '@/types/git'
+import { useOpsStore } from '@/stores/ops'
+import * as git from '@/actions/git'
 
 const props = defineProps<{ target: DiffTarget }>()
 const ui = useUiStore()
 const repos = useReposStore()
+const ops = useOpsStore()
 
 const diff = shallowRef<FileDiff | null>(null)
 const loading = ref(false)
@@ -20,11 +23,11 @@ const selected = ref(new Set<string>())
 let anchor: { hunk: number; line: number } | null = null
 
 watch(
-  () => [props.target, repos.activeTab?.path] as const,
-  async ([target, path], _old, onCleanup) => {
+  () => [props.target, repos.activeTab?.path, props.target.source === 'commit' ? null : repos.active?.snapshot.workingCopy] as const,
+  async ([target, path], old, onCleanup) => {
     let cancelled = false
     onCleanup(() => (cancelled = true))
-    selected.value = new Set()
+    if (!old || old[0] !== target) selected.value = new Set()
     loading.value = true
     error.value = null
     try {
@@ -43,8 +46,45 @@ watch(
 )
 
 const language = computed(() => languageFromPath(props.target.path))
-const canStage = computed(() => props.target.source !== 'commit' && !props.target.untracked)
+const canStage = computed(() => props.target.source !== 'commit' && !props.target.untracked && !props.target.oldPath)
 const stageVerb = computed(() => (props.target.source === 'staged' ? 'Unstage' : 'Stage'))
+const canDiscard = computed(() => props.target.source === 'unstaged')
+const busy = computed(() => !!ops.running)
+const fileEntry = computed(() => {
+  const wc = repos.active?.snapshot.workingCopy
+  if (!wc || props.target.source === 'commit') return null
+  const list = props.target.source === 'staged' ? wc.staged : wc.unstaged
+  return list.find((f) => f.path === props.target.path) ?? null
+})
+
+function selectionFromLines(): HunkSelection[] {
+  const byHunk = new Map<number, number[]>()
+  for (const k of selected.value) {
+    const [h, l] = k.split(':').map(Number)
+    if (!byHunk.has(h)) byHunk.set(h, [])
+    byHunk.get(h)!.push(l)
+  }
+  return [...byHunk].map(([h, lines]) => ({ header: hunks.value[h].header, lines: lines.sort((a, b) => a - b) }))
+}
+
+async function applyLines(mode: 'stage' | 'unstage' | 'discard') {
+  const sel = selectionFromLines()
+  if (!sel.length) return
+  const res = await git.applySelection(props.target, sel, mode)
+  if (res) selected.value = new Set()
+}
+
+function applyHunk(index: number, mode: 'stage' | 'unstage' | 'discard') {
+  return git.applySelection(props.target, [{ header: hunks.value[index].header, lines: null }], mode)
+}
+
+function wholeFile(mode: 'stage' | 'unstage' | 'discard') {
+  const f = fileEntry.value
+  if (!f) return
+  if (mode === 'stage') return git.stage([f])
+  if (mode === 'unstage') return git.unstage([f])
+  return git.discard([f])
+}
 const sourceLabel = computed(() => {
   if (props.target.untracked) return 'Untracked'
   if (props.target.source === 'commit') return `Commit ${props.target.commit?.slice(0, 7) ?? ''}`
@@ -100,14 +140,39 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
       </span>
       <Loader2 v-if="loading" :size="13" class="animate-spin text-faint" />
       <div class="flex-1" />
-      <button
-        v-if="selected.size > 0"
-        type="button"
-        class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-[#0b0e14] hover:brightness-110"
-        @click="ui.notWired(`${stageVerb} ${selected.size} selected lines`); selected = new Set()"
-      >
-        <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} {{ selected.size }} lines
-      </button>
+      <template v-if="selected.size > 0">
+        <button
+          v-if="canDiscard"
+          type="button" :disabled="busy"
+          class="flex h-6 items-center gap-1 rounded-md border border-danger/40 px-2 text-[11px] text-danger hover:bg-danger/10 disabled:opacity-40"
+          @click="applyLines('discard')"
+        >
+          <Undo2 :size="12" />Discard {{ selected.size }}
+        </button>
+        <button
+          type="button" :disabled="busy"
+          class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-[#0b0e14] hover:brightness-110 disabled:opacity-40"
+          @click="applyLines(target.source === 'staged' ? 'unstage' : 'stage')"
+        >
+          <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} {{ selected.size }} {{ selected.size === 1 ? 'line' : 'lines' }}
+        </button>
+      </template>
+      <template v-else-if="fileEntry">
+        <button
+          v-if="canDiscard"
+          type="button" :disabled="busy"
+          class="flex h-6 items-center gap-1 rounded-md px-2 text-[11px] text-danger/90 hover:bg-danger/10 disabled:opacity-40"
+          title="Discard all changes to this file"
+          @click="wholeFile('discard')"
+        ><Undo2 :size="12" />Discard file</button>
+        <button
+          type="button" :disabled="busy"
+          class="flex h-6 items-center gap-1 rounded-md border border-line-strong px-2 text-[11px] text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
+          @click="wholeFile(target.source === 'staged' ? 'unstage' : 'stage')"
+        >
+          <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} file
+        </button>
+      </template>
       <div class="flex rounded-md border border-line p-0.5">
         <button
           type="button" class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
@@ -128,7 +193,8 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
     <div v-if="error" class="m-4 rounded-md border border-danger/30 bg-danger/10 p-3 text-[12px] text-danger select-text">{{ error }}</div>
     <div v-else-if="diff?.binary" class="p-8 text-center text-[12px] text-muted">Binary file — no text diff to show.</div>
     <div v-else-if="diff && !hunks.length && !loading" class="p-8 text-center text-[12px] text-muted">
-      No content changes{{ target.oldPath ? ' (pure rename)' : '' }}.
+      <template v-if="target.source !== 'commit' && !fileEntry">No {{ target.source }} changes left in this file.</template>
+      <template v-else>No content changes{{ target.oldPath ? ' (pure rename)' : '' }}.</template>
     </div>
 
     <div v-else class="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[20px]" :class="{ 'opacity-60': loading }">
@@ -139,14 +205,23 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         <div class="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-surface-2 px-3 py-1 text-[11px] text-accent/80">
           <span class="truncate">{{ hunk.header }}</span>
           <div class="flex-1" />
-          <button
-            v-if="canStage"
-            type="button"
-            class="flex items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[11px] text-fg hover:border-accent/60 hover:bg-accent/10"
-            @click="ui.notWired(`${stageVerb} hunk ${hi + 1}`)"
-          >
-            <component :is="target.source === 'staged' ? Minus : Plus" :size="11" />{{ stageVerb }} hunk
-          </button>
+          <template v-if="canStage">
+            <button
+              v-if="canDiscard"
+              type="button" :disabled="busy"
+              class="flex items-center gap-1 rounded px-1.5 py-0.5 font-sans text-[11px] text-danger/90 hover:bg-danger/10 disabled:opacity-40"
+              @click="applyHunk(hi, 'discard')"
+            >
+              <Undo2 :size="11" />Discard hunk
+            </button>
+            <button
+              type="button" :disabled="busy"
+              class="flex items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[11px] text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
+              @click="applyHunk(hi, target.source === 'staged' ? 'unstage' : 'stage')"
+            >
+              <component :is="target.source === 'staged' ? Minus : Plus" :size="11" />{{ stageVerb }} hunk
+            </button>
+          </template>
         </div>
 
         <template v-if="ui.diffMode === 'unified'">

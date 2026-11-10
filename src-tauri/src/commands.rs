@@ -65,3 +65,18 @@ pub async fn get_commit_details(repo: String, hash: String) -> AppResult<CommitD
 pub async fn get_file_diff(repo: String, request: DiffRequest) -> AppResult<FileDiff> {
     blocking(move || git::diff::get_file_diff(&Git::new(repo), &request)).await
 }
+
+#[tauri::command]
+pub async fn git_action(repo: String, action: git::ops::Action) -> AppResult<git::ops::OpOutcome> {
+    blocking(move || git::ops::run_action(&Git::new(repo), &action)).await
+}
+
+#[tauri::command]
+pub async fn open_in_terminal(path: String) -> AppResult<()> {
+    blocking(move || crate::system::open_terminal(&path)).await
+}
+
+#[tauri::command]
+pub async fn open_in_editor(path: String) -> AppResult<()> {
+    blocking(move || crate::system::open_editor(&path)).await
+}

@@ -1,41 +1,48 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
-  Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, ChevronDown, Code2, GitBranch, GitBranchPlus,
-  RefreshCw, Redo2, Settings, Tag, Terminal, Undo2, CloudDownload, Check,
+  Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, Check, ChevronDown, CloudDownload, Code2, GitBranch,
+  GitBranchPlus, Redo2, RefreshCw, Settings, Tag, Terminal, Undo2,
 } from 'lucide-vue-next'
 import ToolButton from '@/components/common/ToolButton.vue'
 import { useReposStore } from '@/stores/repos'
+import { useOpsStore } from '@/stores/ops'
 import { useUiStore, type MenuItem } from '@/stores/ui'
+import * as git from '@/actions/git'
 
 const repos = useReposStore()
+const ops = useOpsStore()
 const ui = useUiStore()
 const snapshot = computed(() => repos.active?.snapshot ?? null)
+const busy = computed(() => !!ops.running)
+const hasRemote = computed(() => (snapshot.value?.remotes.length ?? 0) > 0)
 
 function branchMenu(e: MouseEvent) {
   if (!snapshot.value) return
   const items: MenuItem[] = snapshot.value.branches.map((b) => ({
     label: b.name,
     icon: b.current ? Check : GitBranch,
-    action: () => ui.notWired(`Checkout ${b.name}`),
+    action: () => !b.current && git.checkout(b.name),
   }))
+  if (!items.length) items.push({ label: 'No local branches' })
+  items.push({ separator: true }, { label: 'New branch…', icon: GitBranchPlus, action: () => git.createBranch() })
   ui.openMenuBelow(e.currentTarget as Element, items)
 }
 
 function pullMenu(e: MouseEvent) {
   ui.openMenuBelow((e.currentTarget as Element).parentElement!, [
-    { label: 'Pull (merge)', action: () => ui.notWired('Pull (merge)') },
-    { label: 'Pull (rebase)', action: () => ui.notWired('Pull (rebase)') },
-    { label: 'Pull (fast-forward only)', action: () => ui.notWired('Pull (ff-only)') },
+    { label: 'Pull (merge)', action: () => git.pull('merge') },
+    { label: 'Pull (rebase)', action: () => git.pull('rebase') },
+    { label: 'Pull (fast-forward only)', action: () => git.pull('ffOnly') },
   ])
 }
 
 function pushMenu(e: MouseEvent) {
   ui.openMenuBelow((e.currentTarget as Element).parentElement!, [
-    { label: 'Push', action: () => ui.notWired('Push') },
-    { label: 'Push and set upstream', action: () => ui.notWired('Push --set-upstream') },
+    { label: 'Push', action: () => git.push() },
+    { label: 'Push and set upstream', action: () => git.push({ setUpstream: true }) },
     { separator: true },
-    { label: 'Force push (with lease)…', danger: true, action: () => ui.notWired('Force push with lease') },
+    { label: 'Force push (with lease)…', danger: true, action: () => git.push({ force: true }) },
   ])
 }
 </script>
@@ -47,8 +54,9 @@ function pushMenu(e: MouseEvent) {
       <button
         v-if="snapshot"
         type="button"
-        class="-ml-1 flex items-center gap-1 rounded px-1 text-[11px] text-muted hover:bg-hover hover:text-fg"
+        class="-ml-1 flex items-center gap-1 rounded px-1 text-[11px] text-muted hover:bg-hover hover:text-fg disabled:opacity-50"
         title="Switch branch"
+        :disabled="busy"
         @click="branchMenu"
       >
         <GitBranch :size="11" class="text-accent" />
@@ -58,23 +66,23 @@ function pushMenu(e: MouseEvent) {
     </div>
 
     <div class="mx-1 h-7 w-px bg-line" />
-    <ToolButton :icon="Undo2" label="Undo" title="Undo: commit “feat(graph): …”" @click="ui.notWired('Undo')" />
-    <ToolButton :icon="Redo2" label="Redo" disabled />
+    <ToolButton :icon="Undo2" label="Undo" :title="ops.nextUndo ? `Undo: ${ops.nextUndo.label}` : 'Nothing to undo'" :disabled="busy || !ops.nextUndo" @click="ops.undo()" />
+    <ToolButton :icon="Redo2" label="Redo" :title="ops.nextRedo ? `Redo: ${ops.nextRedo.label}` : 'Nothing to redo'" :disabled="busy || !ops.nextRedo" @click="ops.redo()" />
     <div class="mx-1 h-7 w-px bg-line" />
-    <ToolButton :icon="CloudDownload" label="Fetch" @click="ui.notWired('Fetch')" />
-    <ToolButton :icon="ArrowDownToLine" label="Pull" dropdown @click="ui.notWired('Pull (merge)')" @dropdown="pullMenu" />
-    <ToolButton :icon="ArrowUpFromLine" label="Push" dropdown @click="ui.notWired('Push')" @dropdown="pushMenu" />
+    <ToolButton :icon="CloudDownload" label="Fetch" :disabled="busy || !hasRemote" :loading="ops.running === 'Fetch'" @click="git.fetchAll()" />
+    <ToolButton :icon="ArrowDownToLine" label="Pull" dropdown :disabled="busy || !hasRemote" @click="git.pull('merge')" @dropdown="pullMenu" />
+    <ToolButton :icon="ArrowUpFromLine" label="Push" dropdown :disabled="busy || !hasRemote" @click="git.push()" @dropdown="pushMenu" />
     <div class="mx-1 h-7 w-px bg-line" />
-    <ToolButton :icon="GitBranchPlus" label="Branch" @click="ui.notWired('Create branch')" />
-    <ToolButton :icon="Tag" label="Tag" @click="ui.notWired('Create tag')" />
-    <ToolButton :icon="Archive" label="Stash" @click="ui.notWired('Stash')" />
-    <ToolButton :icon="ArchiveRestore" label="Pop" @click="ui.notWired('Pop stash')" />
+    <ToolButton :icon="GitBranchPlus" label="Branch" :disabled="busy" @click="git.createBranch()" />
+    <ToolButton :icon="Tag" label="Tag" :disabled="busy || !snapshot?.head.oid" @click="git.createTag()" />
+    <ToolButton :icon="Archive" label="Stash" :disabled="busy" @click="git.stashPush()" />
+    <ToolButton :icon="ArchiveRestore" label="Pop" :disabled="busy || !snapshot?.stashes.length" @click="git.stashPop(0)" />
 
     <div class="flex-1" />
 
-    <ToolButton :icon="Terminal" label="Terminal" @click="ui.notWired('Open in terminal')" />
-    <ToolButton :icon="Code2" label="Editor" @click="ui.notWired('Open in editor')" />
-    <ToolButton :icon="RefreshCw" label="Refresh" :loading="repos.busy" @click="repos.load(repos.activeTabId)" />
+    <ToolButton :icon="Terminal" label="Terminal" @click="git.openInTerminal()" />
+    <ToolButton :icon="Code2" label="Editor" @click="git.openInEditor()" />
+    <ToolButton :icon="RefreshCw" label="Refresh" :loading="repos.busy" :disabled="busy" @click="repos.load(repos.activeTabId)" />
     <ToolButton :icon="Settings" label="Settings" @click="ui.notWired('Settings')" />
   </div>
 </template>

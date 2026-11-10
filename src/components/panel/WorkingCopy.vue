@@ -7,6 +7,10 @@ import CountBadge from '@/components/common/CountBadge.vue'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 import type { FileChange } from '@/types/git'
+import * as git from '@/actions/git'
+import { useOpsStore } from '@/stores/ops'
+
+const ops = useOpsStore()
 
 const repos = useReposStore()
 const ui = useUiStore()
@@ -20,17 +24,12 @@ function open(file: FileChange, staged: boolean) {
   ui.openDiff({ path: file.path, oldPath: file.oldPath, source: staged ? 'staged' : 'unstaged', untracked: file.status === '?' })
 }
 
-function copy(text: string) {
-  void navigator.clipboard?.writeText(text)
-  ui.toast({ kind: 'success', title: 'Copied', detail: text }, 1800)
-}
-
 function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
   ui.openMenu(e, [
-    { label: staged ? 'Unstage file' : 'Stage file', icon: staged ? Minus : Plus, action: () => ui.notWired(staged ? 'Unstage' : 'Stage') },
+    { label: staged ? 'Unstage file' : 'Stage file', icon: staged ? Minus : Plus, action: () => (staged ? git.unstage([file]) : git.stage([file])) },
     { label: 'Open diff', action: () => open(file, staged) },
-    { label: 'Copy path', action: () => copy(file.path) },
-    ...(staged ? [] : [{ separator: true }, { label: 'Discard changes…', icon: Undo2, danger: true, action: () => ui.notWired('Discard') }]),
+    { label: 'Copy path', action: () => git.copyText(file.path) },
+    ...(staged ? [] : [{ separator: true }, { label: 'Discard changes…', icon: Undo2, danger: true, action: () => git.discard([file]) }]),
   ])
 }
 </script>
@@ -60,20 +59,20 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
           <CountBadge :count="wc.unstaged.length" />
           <div class="flex-1" />
           <button
-            type="button" :disabled="!wc.unstaged.length"
+            type="button" :disabled="!wc.unstaged.length || !!ops.running"
             class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-danger/90 hover:bg-danger/10 disabled:opacity-30"
-            @click="ui.notWired('Discard all')"
+            @click="git.discardAll()"
           ><Trash2 :size="11" />Discard all</button>
           <button
-            type="button" :disabled="!wc.unstaged.length"
+            type="button" :disabled="!wc.unstaged.length || !!ops.running"
             class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-success hover:bg-success/10 disabled:opacity-30"
-            @click="ui.notWired('Stage all')"
+            @click="git.stageAll()"
           ><Plus :size="11" />Stage all</button>
         </div>
         <FileList
           class="min-h-0 flex-1"
           :files="wc.unstaged" :mode="ui.fileViewMode" :checked="false" :active-path="activePath('unstaged')"
-          @open="(f) => open(f, false)" @toggle="() => ui.notWired('Stage')" @menu="(e, f) => fileMenu(e, f, false)"
+          @open="(f) => open(f, false)" @toggle="(f) => git.stage([f])" @menu="(e, f) => fileMenu(e, f, false)"
         >
           <template #empty><div v-if="!loading" class="px-3 py-2 text-[11px] text-faint italic">No unstaged changes</div></template>
         </FileList>
@@ -85,15 +84,15 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
           <CountBadge :count="wc.staged.length" />
           <div class="flex-1" />
           <button
-            type="button" :disabled="!wc.staged.length"
+            type="button" :disabled="!wc.staged.length || !!ops.running"
             class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-fg disabled:opacity-30"
-            @click="ui.notWired('Unstage all')"
+            @click="git.unstageAll()"
           ><Minus :size="11" />Unstage all</button>
         </div>
         <FileList
           class="min-h-0 flex-1"
           :files="wc.staged" :mode="ui.fileViewMode" :checked="true" :active-path="activePath('staged')"
-          @open="(f) => open(f, true)" @toggle="() => ui.notWired('Unstage')" @menu="(e, f) => fileMenu(e, f, true)"
+          @open="(f) => open(f, true)" @toggle="(f) => git.unstage([f])" @menu="(e, f) => fileMenu(e, f, true)"
         >
           <template #empty><div v-if="!loading" class="px-3 py-2 text-[11px] text-faint italic">Nothing staged yet</div></template>
         </FileList>
