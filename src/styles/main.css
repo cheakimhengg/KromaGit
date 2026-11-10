@@ -1,0 +1,115 @@
+@import 'tailwindcss';
+
+@custom-variant light (&:where(.light, .light *));
+
+:root {
+  --gw-bg: #0b0e14;
+  --gw-surface: #10141c;
+  --gw-surface-2: #151a24;
+  --gw-surface-3: #1c2230;
+  --gw-hover: #212838;
+  --gw-border: #232a3a;
+  --gw-border-strong: #2f3850;
+  --gw-text: #e4e8f1;
+  --gw-muted: #949cb0;
+  --gw-faint: #5e6780;
+  --gw-accent: #7c9cff;
+  --gw-accent-2: #b47cff;
+  --gw-success: #3fcf8e;
+  --gw-warning: #f5b843;
+  --gw-danger: #f2626f;
+  --gw-info: #5eead4;
+  --gw-add-bg: rgba(63, 207, 142, 0.12);
+  --gw-add-strong: rgba(63, 207, 142, 0.28);
+  --gw-del-bg: rgba(242, 98, 111, 0.12);
+  --gw-del-strong: rgba(242, 98, 111, 0.28);
+  --gw-select: rgba(124, 156, 255, 0.16);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--gw-bg);
+  --color-surface: var(--gw-surface);
+  --color-surface-2: var(--gw-surface-2);
+  --color-surface-3: var(--gw-surface-3);
+  --color-hover: var(--gw-hover);
+  --color-line: var(--gw-border);
+  --color-line-strong: var(--gw-border-strong);
+  --color-fg: var(--gw-text);
+  --color-muted: var(--gw-muted);
+  --color-faint: var(--gw-faint);
+  --color-accent: var(--gw-accent);
+  --color-accent-2: var(--gw-accent-2);
+  --color-success: var(--gw-success);
+  --color-warning: var(--gw-warning);
+  --color-danger: var(--gw-danger);
+  --color-info: var(--gw-info);
+  --color-select: var(--gw-select);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--gw-bg);
+  color: var(--gw-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gw-border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--gw-faint);
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@layer components {
+  .gw-input {
+    @apply h-7 w-full rounded-md border border-line bg-surface-2 px-2 text-[12px] text-fg outline-none placeholder:text-faint focus:border-accent/60 focus:ring-2 focus:ring-accent/15;
+  }
+}
+
+.hljs-keyword,
+.hljs-built_in,
+.hljs-literal { color: #c792ea; }
+.hljs-string,
+.hljs-regexp { color: #a5d6a7; }
+.hljs-number { color: #f78c6c; }
+.hljs-comment { color: #5e6780; font-style: italic; }
+.hljs-title,
+.hljs-title.function_ { color: #82aaff; }
+.hljs-type,
+.hljs-title.class_ { color: #ffcb6b; }
+.hljs-attr,
+.hljs-property { color: #89ddff; }
+.hljs-variable,
+.hljs-params { color: #e4e8f1; }
+.hljs-tag,
+.hljs-name { color: #f07178; }

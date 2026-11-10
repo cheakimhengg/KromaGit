@@ -1,0 +1,22 @@
+<script setup lang="ts">
+import type { FileStatus } from '@/types/git'
+
+defineProps<{ status: FileStatus }>()
+
+const styles: Record<FileStatus, string> = {
+  M: 'bg-warning/15 text-warning',
+  A: 'bg-success/15 text-success',
+  D: 'bg-danger/15 text-danger',
+  R: 'bg-accent/15 text-accent',
+  '?': 'bg-info/15 text-info',
+}
+const titles: Record<FileStatus, string> = {
+  M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', '?': 'Untracked',
+}
+</script>
+
+<template>
+  <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold" :class="styles[status]" :title="titles[status]">
+    {{ status }}
+  </span>
+</template>
