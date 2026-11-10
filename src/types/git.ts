@@ -16,17 +16,16 @@ export interface Commit {
   shortHash: string
   parents: string[]
   author: Person
-  /** unix seconds */
+  /** unix seconds (author date) */
   date: number
   subject: string
-  body: string
   refs: RefLabel[]
 }
 
 export interface Branch {
   name: string
   current: boolean
-  upstream?: string
+  upstream?: string | null
   upstreamGone?: boolean
   ahead: number
   behind: number
@@ -53,16 +52,17 @@ export interface Stash {
 export interface Worktree {
   path: string
   branch: string
+  head?: string
   isMain: boolean
 }
 
 export interface Submodule {
   path: string
   hash: string
-  status: 'clean' | 'modified' | 'uninitialized'
+  status: 'clean' | 'modified' | 'uninitialized' | 'conflict'
 }
 
-export type FileStatus = 'M' | 'A' | 'D' | 'R' | '?'
+export type FileStatus = 'M' | 'A' | 'D' | 'R' | '?' | 'U'
 
 export interface FileChange {
   path: string
@@ -75,6 +75,15 @@ export interface FileChange {
 export interface WorkingCopy {
   unstaged: FileChange[]
   staged: FileChange[]
+}
+
+export interface HeadInfo {
+  branch: string | null
+  oid: string | null
+  detached: boolean
+  upstream: string | null
+  ahead: number
+  behind: number
 }
 
 export type DiffLineKind = 'context' | 'add' | 'del'
@@ -98,13 +107,60 @@ export interface DiffHunk {
 export interface FileDiff {
   path: string
   oldPath?: string
-  language: string
+  binary?: boolean
+  truncated?: boolean
   hunks: DiffHunk[]
+}
+
+export interface CommitDetails {
+  hash: string
+  parents: string[]
+  author: Person
+  authorDate: number
+  committer: Person
+  commitDate: number
+  subject: string
+  body: string
+  files: FileChange[]
+}
+
+export interface RepoInfo {
+  root: string
+  name: string
+}
+
+export interface RefsPayload {
+  branches: Branch[]
+  remotes: Remote[]
+  tags: Tag[]
+  stashes: Stash[]
+  worktrees: Worktree[]
+  submodules: Submodule[]
+  lastFetch: number | null
+}
+
+export interface StatusPayload {
+  head: HeadInfo
+  staged: FileChange[]
+  unstaged: FileChange[]
+}
+
+export type DiffSource = 'unstaged' | 'staged' | 'commit'
+
+export interface DiffTarget {
+  path: string
+  oldPath?: string
+  source: DiffSource
+  untracked?: boolean
+  commit?: string
+  parent?: string
 }
 
 export interface RepoSnapshot {
   name: string
   path: string
+  head: HeadInfo
+  /** branch name, or "detached at <sha>" */
   currentBranch: string
   commits: Commit[]
   branches: Branch[]
@@ -113,5 +169,6 @@ export interface RepoSnapshot {
   stashes: Stash[]
   worktrees: Worktree[]
   submodules: Submodule[]
+  lastFetch: number | null
   workingCopy: WorkingCopy
 }

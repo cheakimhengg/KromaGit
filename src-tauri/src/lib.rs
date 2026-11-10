@@ -1,36 +1,21 @@
-use serde::Serialize;
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AppInfo {
-    version: String,
-    platform: String,
-}
-
-#[tauri::command]
-fn app_info() -> AppInfo {
-    AppInfo {
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        platform: std::env::consts::OS.to_string(),
-    }
-}
+pub mod commands;
+pub mod error;
+pub mod git;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![app_info])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            commands::app_info,
+            commands::startup_paths,
+            commands::open_repo,
+            commands::get_commits,
+            commands::get_refs,
+            commands::get_status,
+            commands::get_commit_details,
+            commands::get_file_diff,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running KromaGit");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn app_info_reports_crate_version() {
-        let info = app_info();
-        assert_eq!(info.version, env!("CARGO_PKG_VERSION"));
-        assert!(!info.platform.is_empty());
-    }
 }

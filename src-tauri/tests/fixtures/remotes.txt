@@ -1,0 +1,2 @@
+origin	../upstream.git (fetch)
+origin	../upstream.git (push)

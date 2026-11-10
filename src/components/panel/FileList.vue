@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import { ChevronRight, Folder } from 'lucide-vue-next'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { buildRefTree, type RefTreeNode } from '@/lib/ref-tree'
@@ -12,6 +13,9 @@ const props = defineProps<{
   activePath?: string | null
 }>()
 const emit = defineEmits<{ open: [FileChange]; toggle: [FileChange]; menu: [MouseEvent, FileChange] }>()
+
+const ROW = 24
+const scrollEl = ref<HTMLElement | null>(null)
 
 interface Row {
   key: string
@@ -42,6 +46,15 @@ const rows = computed<Row[]>(() => {
   return out
 })
 
+const virtualizer = useVirtualizer(
+  computed(() => ({
+    count: rows.value.length,
+    getScrollElement: () => scrollEl.value,
+    estimateSize: () => ROW,
+    overscan: 12,
+  })),
+)
+
 function split(path: string) {
   const i = path.lastIndexOf('/')
   return i === -1 ? { dir: '', name: path } : { dir: path.slice(0, i + 1), name: path.slice(i + 1) }
@@ -49,37 +62,47 @@ function split(path: string) {
 </script>
 
 <template>
-  <div>
-    <template v-for="row in rows" :key="row.key">
-      <div v-if="row.folder" class="flex h-6 items-center gap-1 pr-2 text-[11px] text-muted" :style="{ paddingLeft: `${row.depth * 12 + 8}px` }">
-        <ChevronRight :size="11" class="rotate-90 text-faint" /><Folder :size="12" class="text-faint" />
-        <span class="truncate">{{ row.folder }}</span>
-      </div>
-      <div
-        v-else-if="row.file"
-        class="group flex h-6 cursor-pointer items-center gap-1.5 pr-2 text-[12px]"
-        :class="activePath === row.file.path ? 'bg-select' : 'hover:bg-hover'"
-        :style="{ paddingLeft: `${row.depth * 12 + (mode === 'tree' ? 22 : 8)}px` }"
-        @click="emit('open', row.file)"
-        @contextmenu="emit('menu', $event, row.file)"
-      >
-        <input
-          type="checkbox"
-          :checked="checked"
-          class="h-3 w-3 shrink-0 cursor-pointer accent-[var(--gw-accent)]"
-          :title="checked ? 'Unstage' : 'Stage'"
-          @click.stop="emit('toggle', row.file)"
-        />
-        <StatusBadge :status="row.file.status" />
-        <span class="flex min-w-0 flex-1 items-baseline gap-1 truncate" :title="row.file.oldPath ? `${row.file.oldPath} → ${row.file.path}` : row.file.path">
-          <span class="truncate text-fg" :class="{ 'line-through opacity-60': row.file.status === 'D' }">{{ split(row.file.path).name }}</span>
-          <span v-if="mode === 'list'" class="truncate text-[10px] text-faint">{{ split(row.file.path).dir }}</span>
-        </span>
-        <span class="hidden shrink-0 font-mono text-[10px] group-hover:inline">
-          <span class="text-success">+{{ row.file.additions }}</span>
-          <span class="ml-1 text-danger">−{{ row.file.deletions }}</span>
-        </span>
-      </div>
-    </template>
+  <div ref="scrollEl" class="h-full overflow-y-auto">
+    <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
+      <template v-for="v in virtualizer.getVirtualItems()" :key="rows[v.index].key">
+        <div
+          v-if="rows[v.index].folder"
+          class="absolute left-0 flex w-full items-center gap-1 pr-2 text-[11px] text-muted"
+          :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + 8}px` }"
+        >
+          <ChevronRight :size="11" class="rotate-90 text-faint" /><Folder :size="12" class="text-faint" />
+          <span class="truncate">{{ rows[v.index].folder }}</span>
+        </div>
+        <div
+          v-else
+          class="group absolute left-0 flex w-full cursor-pointer items-center gap-1.5 pr-2 text-[12px]"
+          :class="activePath === rows[v.index].file!.path ? 'bg-select' : 'hover:bg-hover'"
+          :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + (mode === 'tree' ? 22 : 8)}px` }"
+          @click="emit('open', rows[v.index].file!)"
+          @contextmenu="emit('menu', $event, rows[v.index].file!)"
+        >
+          <input
+            type="checkbox"
+            :checked="checked"
+            class="h-3 w-3 shrink-0 cursor-pointer accent-[var(--gw-accent)]"
+            :title="checked ? 'Unstage' : 'Stage'"
+            @click.stop.prevent="emit('toggle', rows[v.index].file!)"
+          />
+          <StatusBadge :status="rows[v.index].file!.status" />
+          <span
+            class="flex min-w-0 flex-1 items-baseline gap-1 truncate"
+            :title="rows[v.index].file!.oldPath ? `${rows[v.index].file!.oldPath} → ${rows[v.index].file!.path}` : rows[v.index].file!.path"
+          >
+            <span class="truncate text-fg" :class="{ 'line-through opacity-60': rows[v.index].file!.status === 'D' }">{{ split(rows[v.index].file!.path).name }}</span>
+            <span v-if="mode === 'list'" class="truncate text-[10px] text-faint">{{ split(rows[v.index].file!.path).dir }}</span>
+          </span>
+          <span class="hidden shrink-0 font-mono text-[10px] group-hover:inline">
+            <span class="text-success">+{{ rows[v.index].file!.additions }}</span>
+            <span class="ml-1 text-danger">−{{ rows[v.index].file!.deletions }}</span>
+          </span>
+        </div>
+      </template>
+    </div>
+    <slot v-if="!files.length" name="empty" />
   </div>
 </template>

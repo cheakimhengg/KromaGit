@@ -74,7 +74,7 @@ function pushMenu(e: MouseEvent) {
 
     <ToolButton :icon="Terminal" label="Terminal" @click="ui.notWired('Open in terminal')" />
     <ToolButton :icon="Code2" label="Editor" @click="ui.notWired('Open in editor')" />
-    <ToolButton :icon="RefreshCw" label="Refresh" @click="ui.notWired('Refresh')" />
+    <ToolButton :icon="RefreshCw" label="Refresh" :loading="repos.busy" @click="repos.load(repos.activeTabId)" />
     <ToolButton :icon="Settings" label="Settings" @click="ui.notWired('Settings')" />
   </div>
 </template>

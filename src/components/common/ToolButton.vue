@@ -9,6 +9,7 @@ defineProps<{
   disabled?: boolean
   dropdown?: boolean
   accent?: boolean
+  loading?: boolean
 }>()
 defineEmits<{ click: [MouseEvent]; dropdown: [MouseEvent] }>()
 </script>
@@ -23,7 +24,7 @@ defineEmits<{ click: [MouseEvent]; dropdown: [MouseEvent] }>()
       :class="[dropdown ? 'rounded-r-none pr-1' : '', accent ? 'text-accent' : '']"
       @click="$emit('click', $event)"
     >
-      <component :is="icon" :size="16" :stroke-width="1.75" />
+      <component :is="icon" :size="16" :stroke-width="1.75" :class="{ 'animate-spin': loading }" />
       <span v-if="label" class="text-[10px] leading-none">{{ label }}</span>
     </button>
     <button

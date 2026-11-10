@@ -1,30 +1,65 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Columns2, FileCode2, Minus, Plus, Rows3, X } from 'lucide-vue-next'
+import { computed, ref, shallowRef, watch } from 'vue'
+import { Columns2, FileCode2, Loader2, Minus, Plus, Rows3, X } from 'lucide-vue-next'
 import { useUiStore } from '@/stores/ui'
-import { mockDiff } from '@/mock/data'
+import { useReposStore } from '@/stores/repos'
+import { errorMessage, gitApi } from '@/api/git'
 import { languageFromPath } from '@/lib/format'
 import { highlightLine } from '@/lib/highlight'
 import { toSplitRows } from '@/lib/diff-split'
-import type { DiffLine } from '@/types/git'
+import type { DiffLine, DiffTarget, FileDiff } from '@/types/git'
 
+const props = defineProps<{ target: DiffTarget }>()
 const ui = useUiStore()
+const repos = useReposStore()
 
-const diff = computed(() => {
-  const d = mockDiff(ui.diffPath ?? '')
-  return { ...d, language: languageFromPath(d.path) === 'plaintext' ? 'typescript' : languageFromPath(d.path) }
-})
-
+const diff = shallowRef<FileDiff | null>(null)
+const loading = ref(false)
+const error = ref<string | null>(null)
 const selected = ref(new Set<string>())
 let anchor: { hunk: number; line: number } | null = null
-watch(() => [ui.diffPath, ui.diffSource], () => (selected.value = new Set()))
 
-const canStage = computed(() => ui.diffSource !== 'commit')
-const stageVerb = computed(() => (ui.diffSource === 'staged' ? 'Unstage' : 'Stage'))
-const sourceLabel = computed(() => ({ unstaged: 'Unstaged', staged: 'Staged', commit: 'Commit' })[ui.diffSource])
+watch(
+  () => [props.target, repos.activeTab?.path] as const,
+  async ([target, path], _old, onCleanup) => {
+    let cancelled = false
+    onCleanup(() => (cancelled = true))
+    selected.value = new Set()
+    loading.value = true
+    error.value = null
+    try {
+      const d = await gitApi.getFileDiff(path ?? '', target)
+      if (!cancelled) diff.value = d
+    } catch (e) {
+      if (!cancelled) {
+        diff.value = null
+        error.value = errorMessage(e)
+      }
+    } finally {
+      if (!cancelled) loading.value = false
+    }
+  },
+  { immediate: true },
+)
 
-const html = computed(() => diff.value.hunks.map((h) => h.lines.map((l) => highlightLine(l.text, diff.value.language))))
-const splitRows = computed(() => diff.value.hunks.map((h) => toSplitRows(h.lines)))
+const language = computed(() => languageFromPath(props.target.path))
+const canStage = computed(() => props.target.source !== 'commit' && !props.target.untracked)
+const stageVerb = computed(() => (props.target.source === 'staged' ? 'Unstage' : 'Stage'))
+const sourceLabel = computed(() => {
+  if (props.target.untracked) return 'Untracked'
+  if (props.target.source === 'commit') return `Commit ${props.target.commit?.slice(0, 7) ?? ''}`
+  return props.target.source === 'staged' ? 'Staged' : 'Unstaged'
+})
+
+const hunks = computed(() => diff.value?.hunks ?? [])
+const html = computed(() => hunks.value.map((h) => h.lines.map((l) => highlightLine(l.text, language.value))))
+const splitRows = computed(() => hunks.value.map((h) => toSplitRows(h.lines)))
+const stats = computed(() => {
+  let add = 0
+  let del = 0
+  for (const h of hunks.value) for (const l of h.lines) l.kind === 'add' ? add++ : l.kind === 'del' ? del++ : 0
+  return { add, del }
+})
 
 const key = (hunk: number, line: number) => `${hunk}:${line}`
 
@@ -33,7 +68,7 @@ function toggleLine(e: MouseEvent, hunk: number, line: number, l: DiffLine) {
   const next = new Set(selected.value)
   if (e.shiftKey && anchor && anchor.hunk === hunk) {
     const [a, b] = [Math.min(anchor.line, line), Math.max(anchor.line, line)]
-    for (let i = a; i <= b; i++) if (diff.value.hunks[hunk].lines[i].kind !== 'context') next.add(key(hunk, i))
+    for (let i = a; i <= b; i++) if (hunks.value[hunk].lines[i].kind !== 'context') next.add(key(hunk, i))
   } else {
     const k = key(hunk, line)
     if (next.has(k)) next.delete(k)
@@ -55,9 +90,15 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
 <template>
   <div class="flex h-full min-w-0 flex-col bg-bg">
     <div class="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
-      <FileCode2 :size="14" class="text-accent" />
-      <span class="truncate font-mono text-[12px] text-fg">{{ diff.path }}</span>
-      <span class="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">{{ sourceLabel }}</span>
+      <FileCode2 :size="14" class="shrink-0 text-accent" />
+      <span class="truncate font-mono text-[12px] text-fg" :title="target.oldPath ? `${target.oldPath} → ${target.path}` : target.path">
+        <template v-if="target.oldPath"><span class="text-faint">{{ target.oldPath }} → </span></template>{{ target.path }}
+      </span>
+      <span class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">{{ sourceLabel }}</span>
+      <span v-if="diff && !loading" class="shrink-0 font-mono text-[11px]">
+        <span class="text-success">+{{ stats.add }}</span> <span class="text-danger">−{{ stats.del }}</span>
+      </span>
+      <Loader2 v-if="loading" :size="13" class="animate-spin text-faint" />
       <div class="flex-1" />
       <button
         v-if="selected.size > 0"
@@ -65,7 +106,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         class="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11px] font-semibold text-[#0b0e14] hover:brightness-110"
         @click="ui.notWired(`${stageVerb} ${selected.size} selected lines`); selected = new Set()"
       >
-        <component :is="ui.diffSource === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} {{ selected.size }} lines
+        <component :is="target.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} {{ selected.size }} lines
       </button>
       <div class="flex rounded-md border border-line p-0.5">
         <button
@@ -84,8 +125,17 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
       </button>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[20px]">
-      <div v-for="(hunk, hi) in diff.hunks" :key="hi" class="mb-3">
+    <div v-if="error" class="m-4 rounded-md border border-danger/30 bg-danger/10 p-3 text-[12px] text-danger select-text">{{ error }}</div>
+    <div v-else-if="diff?.binary" class="p-8 text-center text-[12px] text-muted">Binary file — no text diff to show.</div>
+    <div v-else-if="diff && !hunks.length && !loading" class="p-8 text-center text-[12px] text-muted">
+      No content changes{{ target.oldPath ? ' (pure rename)' : '' }}.
+    </div>
+
+    <div v-else class="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[20px]" :class="{ 'opacity-60': loading }">
+      <div v-if="diff?.truncated" class="border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[11px] text-warning">
+        Diff is very large; showing the first 20,000 lines.
+      </div>
+      <div v-for="(hunk, hi) in hunks" :key="hi" class="mb-3">
         <div class="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-surface-2 px-3 py-1 text-[11px] text-accent/80">
           <span class="truncate">{{ hunk.header }}</span>
           <div class="flex-1" />
@@ -95,7 +145,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
             class="flex items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[11px] text-fg hover:border-accent/60 hover:bg-accent/10"
             @click="ui.notWired(`${stageVerb} hunk ${hi + 1}`)"
           >
-            <component :is="ui.diffSource === 'staged' ? Minus : Plus" :size="11" />{{ stageVerb }} hunk
+            <component :is="target.source === 'staged' ? Minus : Plus" :size="11" />{{ stageVerb }} hunk
           </button>
         </div>
 
@@ -105,13 +155,13 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
             class="flex min-w-max" :class="lineClass(l, selected.has(key(hi, li)))"
           >
             <span
-              class="w-10 shrink-0 pr-2 text-right text-faint select-none"
+              class="w-12 shrink-0 pr-2 text-right text-faint select-none"
               :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
               :title="canStage && l.kind !== 'context' ? 'Click to select line (shift-click for range)' : undefined"
               @click="toggleLine($event, hi, li, l)"
             >{{ l.oldNo ?? '' }}</span>
             <span
-              class="w-10 shrink-0 pr-2 text-right text-faint select-none"
+              class="w-12 shrink-0 pr-2 text-right text-faint select-none"
               :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
               @click="toggleLine($event, hi, li, l)"
             >{{ l.newNo ?? '' }}</span>
@@ -130,7 +180,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
             >
               <template v-if="row[side]">
                 <span
-                  class="w-10 shrink-0 pr-2 text-right text-faint select-none"
+                  class="w-12 shrink-0 pr-2 text-right text-faint select-none"
                   :class="canStage && row[side]!.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
                   @click="toggleLine($event, hi, row[side]!.index, row[side]!)"
                 >{{ side === 'left' ? row[side]!.oldNo : row[side]!.newNo }}</span>
@@ -142,7 +192,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
           </div>
         </template>
       </div>
-      <div v-if="canStage" class="px-3 pb-4 font-sans text-[11px] text-faint">
+      <div v-if="canStage && hunks.length" class="px-3 pb-4 font-sans text-[11px] text-faint">
         Tip: click a line number to select lines (shift-click for a range), then {{ stageVerb.toLowerCase() }} only those lines.
       </div>
     </div>

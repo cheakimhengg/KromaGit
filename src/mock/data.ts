@@ -66,12 +66,12 @@ export function generateCommits(count: number, seed = 42): { commits: Commit[]; 
 
   const created: Commit[] = []
   let t = 1_600_000_000
-  const mk = (parents: string[], subject: string, body = ''): Commit => {
+  const mk = (parents: string[], subject: string, _body = ''): Commit => {
     t += 300 + Math.floor(rand() * 2400)
     const hash = hex()
     const c: Commit = {
       hash, shortHash: hash.slice(0, 7), parents, author: pick(AUTHORS), date: t,
-      subject, body, refs: [],
+      subject, refs: [],
     }
     created.push(c)
     return c
@@ -166,6 +166,8 @@ export function createMockRepo(name: string, path: string, commitCount = 5000): 
 
   return {
     name, path, currentBranch: CURRENT_BRANCH, commits, branches, remotes, tags, stashes, worktrees, submodules,
+    head: { branch: CURRENT_BRANCH, oid: branchTips.get(CURRENT_BRANCH) ?? null, detached: false, upstream: `origin/${CURRENT_BRANCH}`, ahead: 3, behind: 1 },
+    lastFetch: null,
     workingCopy: {
       unstaged: [
         { path: 'src/components/graph/GraphCell.vue', status: 'M', additions: 24, deletions: 6 },
@@ -192,7 +194,6 @@ function hashSeed(s: string): number {
 export function mockDiff(path: string): FileDiff {
   return {
     path,
-    language: 'typescript',
     hunks: [
       {
         header: '@@ -12,9 +12,13 @@ export function computeGraphLayout(commits: GraphInputCommit[]) {',

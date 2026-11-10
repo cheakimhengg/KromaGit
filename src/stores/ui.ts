@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Component } from 'vue'
+import type { DiffTarget } from '@/types/git'
 
 export type CenterView = 'graph' | 'diff'
 export type DiffMode = 'unified' | 'split'
-export type DiffSource = 'unstaged' | 'staged' | 'commit'
 
 export interface MenuItem {
   label?: string
@@ -28,30 +28,35 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarCollapsed = ref(false)
   const selectedCommit = ref<string | null>(null)
   const centerView = ref<CenterView>('graph')
-  const diffPath = ref<string | null>(null)
-  const diffSource = ref<DiffSource>('unstaged')
+  const diffTarget = ref<DiffTarget | null>(null)
   const diffMode = ref<DiffMode>('unified')
   const fileViewMode = ref<'list' | 'tree'>('list')
   const zoom = ref(100)
-  const fetchStatus = ref('Fetched 4 min ago')
-  const aiProvider = ref('Ollama · llama3.1')
+  const aiProvider = ref<string | null>(null)
 
   const menu = ref<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const toasts = ref<Toast[]>([])
+
+  const diffPath = computed(() => diffTarget.value?.path ?? null)
+  const diffSource = computed(() => diffTarget.value?.source ?? null)
 
   function selectCommit(hash: string | null) {
     selectedCommit.value = hash
   }
 
-  function openDiff(path: string, source: DiffSource) {
-    diffPath.value = path
-    diffSource.value = source
+  function openDiff(target: DiffTarget) {
+    diffTarget.value = target
     centerView.value = 'diff'
   }
 
   function closeDiff() {
     centerView.value = 'graph'
-    diffPath.value = null
+    diffTarget.value = null
+  }
+
+  function resetForRepoSwitch() {
+    selectedCommit.value = null
+    closeDiff()
   }
 
   function openMenu(event: MouseEvent, items: MenuItem[]) {
@@ -79,12 +84,12 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function notWired(action: string) {
-    toast({ kind: 'info', title: action, detail: 'Mock UI: wired up in a later phase.' })
+    toast({ kind: 'info', title: action, detail: 'Write actions arrive in Phase 3.' })
   }
 
   return {
-    sidebarCollapsed, selectedCommit, centerView, diffPath, diffSource, diffMode, fileViewMode, zoom,
-    fetchStatus, aiProvider, menu, toasts,
-    selectCommit, openDiff, closeDiff, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
+    sidebarCollapsed, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode, zoom,
+    aiProvider, menu, toasts,
+    selectCommit, openDiff, closeDiff, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
   }
 })

@@ -9,9 +9,10 @@ const styles: Record<FileStatus, string> = {
   D: 'bg-danger/15 text-danger',
   R: 'bg-accent/15 text-accent',
   '?': 'bg-info/15 text-info',
+  U: 'bg-danger/25 text-danger',
 }
 const titles: Record<FileStatus, string> = {
-  M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', '?': 'Untracked',
+  M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', '?': 'Untracked', U: 'Conflicted',
 }
 </script>
 

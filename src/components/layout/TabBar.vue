@@ -68,7 +68,7 @@ function tabMenu(e: MouseEvent, tab: RepoTab) {
       </button>
     </div>
 
-    <button type="button" class="mb-1 ml-1 rounded-md p-1.5 text-muted hover:bg-hover hover:text-fg" title="Open repository" @click="repos.openMockRepo()">
+    <button type="button" class="mb-1 ml-1 rounded-md p-1.5 text-muted hover:bg-hover hover:text-fg" title="Open repository" @click="repos.openRepo()">
       <Plus :size="14" />
     </button>
     <div class="h-full flex-1" data-tauri-drag-region />

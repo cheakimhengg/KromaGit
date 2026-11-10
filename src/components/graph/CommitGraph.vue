@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
-  Check, Cherry, Copy, GitBranchPlus, PanelLeftOpen, Pencil, RotateCcw, Search, Undo, User, X,
+  Check, Cherry, Copy, GitBranchPlus, Loader2, PanelLeftOpen, Pencil, RotateCcw, Search, Undo, User, X,
 } from 'lucide-vue-next'
 import GraphCell from './GraphCell.vue'
 import RefPill from './RefPill.vue'
@@ -58,14 +58,17 @@ watch(() => repos.activeTabId, () => {
   scrollEl.value?.scrollTo({ top: 0 })
 })
 
-const headIndex = computed(() => commits.value.findIndex((c) => c.refs.some((r) => r.current)))
+const headOid = computed(() => snapshot.value?.head.oid ?? null)
+const headIndex = computed(() => (headOid.value ? commits.value.findIndex((c) => c.hash === headOid.value) : -1))
+const loadingCommits = computed(() => !!repos.active?.loading.commits)
+const complete = computed(() => !!repos.active?.commitsComplete)
 const headLane = computed(() => (headIndex.value >= 0 ? layout.value?.rows[headIndex.value].lane ?? 0 : 0))
 const changeCount = computed(() => {
   const wc = snapshot.value?.workingCopy
   return wc ? wc.unstaged.length + wc.staged.length : 0
 })
 
-const columns = computed(() => `190px ${gWidth.value}px minmax(240px,1fr) 160px 76px 124px`)
+const columns = computed(() => `168px ${gWidth.value}px minmax(180px,1fr) 140px 72px 112px`)
 
 function displayRefs(c: Commit): { ref: RefLabel; hasRemote: boolean }[] {
   const remotes = new Set(c.refs.filter((r) => r.kind === 'remote').map((r) => r.name))
@@ -125,7 +128,10 @@ function rowIndex(virtualIndex: number) {
       </button>
       <div class="flex-1" />
       <span class="font-mono text-[11px] text-muted">
-        <template v-if="isFiltered">{{ rowCount.toLocaleString() }} of </template>{{ commits.length.toLocaleString() }} commits
+        <template v-if="isFiltered">{{ rowCount.toLocaleString() }} of </template>{{ commits.length.toLocaleString() }}{{ complete ? '' : '+' }} commits
+      </span>
+      <span v-if="loadingCommits" class="flex items-center gap-1 text-[11px] text-faint">
+        <Loader2 :size="12" class="animate-spin" />{{ commits.length ? 'loading full history' : 'loading' }}
       </span>
     </div>
 
@@ -153,10 +159,12 @@ function rowIndex(virtualIndex: number) {
         <circle :cx="laneX(headLane)" cy="17" r="8" fill="none" :stroke="laneColor(layout?.rows[headIndex]?.color ?? 0)" stroke-width="2" stroke-dasharray="3 2.5" />
       </svg>
       <span class="flex items-center gap-2 px-2 text-[12px] whitespace-nowrap">
-        <span class="text-muted italic">{{ changeCount }} uncommitted {{ changeCount === 1 ? 'change' : 'changes' }}</span>
+        <span v-if="changeCount" class="text-muted italic">{{ changeCount }} uncommitted {{ changeCount === 1 ? 'change' : 'changes' }}</span>
+        <span v-else class="text-faint italic">Working tree clean</span>
         <button
+          v-if="changeCount"
           type="button" class="rounded-md border border-line-strong px-2 py-0.5 text-[11px] text-fg hover:border-accent/60 hover:bg-accent/10"
-          @click="ui.selectCommit(null)"
+          @click="ui.selectCommit(null); ui.closeDiff()"
         >
           <Pencil :size="10" class="mr-1 inline" />View changes
         </button>
@@ -188,7 +196,7 @@ function rowIndex(virtualIndex: number) {
               :width="gWidth"
               :author-name="c.author.name"
               :author-email="c.author.email"
-              :is-head="c.refs.some((r) => r.current)"
+              :is-head="c.hash === headOid"
               :edges-hidden="isFiltered"
             />
             <span class="truncate px-2" :class="c.parents.length > 1 ? 'text-muted' : 'text-fg'">{{ c.subject }}</span>
@@ -202,6 +210,13 @@ function rowIndex(virtualIndex: number) {
         </template>
       </div>
       <div v-if="isFiltered && rowCount === 0" class="p-8 text-center text-[12px] text-faint">No commits match these filters.</div>
+      <div v-else-if="!commits.length && loadingCommits" class="space-y-3 p-4">
+        <div v-for="i in 8" :key="i" class="flex items-center gap-3">
+          <div class="h-4 w-4 animate-pulse rounded-full bg-surface-3" />
+          <div class="h-3 animate-pulse rounded bg-surface-3" :style="{ width: `${30 + ((i * 37) % 45)}%` }" />
+        </div>
+      </div>
+      <div v-else-if="!commits.length" class="p-8 text-center text-[12px] text-faint">No commits yet — make your first commit to see history here.</div>
     </div>
   </div>
 </template>
