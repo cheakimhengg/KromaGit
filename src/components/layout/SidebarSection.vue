@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { ref } from 'vue'
+import { computed } from 'vue'
 import { ChevronRight } from 'lucide-vue-next'
 import CountBadge from '@/components/common/CountBadge.vue'
+import { useUiStore } from '@/stores/ui'
 
 const props = withDefaults(defineProps<{ title: string; icon: Component; count: number; defaultOpen?: boolean }>(), { defaultOpen: true })
-const open = ref(props.defaultOpen)
+const ui = useUiStore()
+const open = computed({
+  get: () => ui.sidebarSections[props.title] ?? props.defaultOpen,
+  set: (v: boolean) => (ui.sidebarSections[props.title] = v),
+})
 </script>
 
 <template>
   <section class="mb-1">
     <button
       type="button"
-      class="flex h-8 w-full items-center gap-1.5 rounded px-1.5 text-[12px] font-semibold tracking-wide text-muted uppercase hover:text-fg"
+      class="flex h-8 w-full items-center gap-1.5 rounded px-1.5 text-[13px] font-semibold text-fg hover:text-fg"
       @click="open = !open"
     >
       <ChevronRight :size="14" class="transition-transform" :class="{ 'rotate-90': open }" />

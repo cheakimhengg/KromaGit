@@ -36,7 +36,7 @@ export const FIRST_PAGE = 1500
 export const MAX_COMMITS = 200_000
 const STORAGE_KEY = 'kromagit.workspace.v1'
 const RECENT_KEY = 'kromagit.recent.v1'
-const MAX_RECENT = 12
+const MAX_RECENT = 40
 
 export interface RecentRepo {
   name: string
@@ -256,6 +256,9 @@ export const useReposStore = defineStore('repos', () => {
 
   function activate(id: string) {
     activeTabId.value = id
+    useUiStore().home = false
+    const tab = tabs.value.find((t) => t.id === id)
+    if (tab) rememberRecent(tab.name, tab.path)
   }
 
   const recent = ref<RecentRepo[]>(readRecent())
@@ -270,6 +273,9 @@ export const useReposStore = defineStore('repos', () => {
     recent.value = [{ name, path, openedAt: Date.now() }, ...recent.value.filter((r) => r.path !== path)].slice(0, MAX_RECENT)
     saveRecent()
   }
+  for (const t of tabs.value) {
+    if (!recent.value.some((r) => r.path === t.path)) recent.value.push({ name: t.name, path: t.path, openedAt: Date.now() })
+  }
   function forgetRecent(path: string) {
     recent.value = recent.value.filter((r) => r.path !== path)
     saveRecent()
@@ -281,14 +287,12 @@ export const useReposStore = defineStore('repos', () => {
       const info = await gitApi.openRepo(path)
       const existing = tabs.value.find((t) => t.path === info.root)
       if (existing) {
-        rememberRecent(info.name, info.root)
-        activeTabId.value = existing.id
+        activate(existing.id)
         return
       }
-      rememberRecent(info.name, info.root)
       const tab: RepoTab = { id: newId(), name: info.name, path: info.root }
       tabs.value.push(tab)
-      activeTabId.value = tab.id
+      activate(tab.id)
     } catch (e) {
       ui.toast({ kind: 'error', title: 'Could not open repository', detail: errorMessage(e) }, 6000)
     }

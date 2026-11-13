@@ -121,3 +121,30 @@ fn standup_spans_repos_and_filters_by_author() {
     let none = history::standup_commits(&paths[..1], "1 week ago", "now", "someone-else@example.dev");
     assert!(none[0].commits.is_empty());
 }
+
+#[test]
+fn collects_a_single_commit_including_merges_and_root() {
+    let tmp = repo();
+    let d = tmp.path();
+    let g = Git::new(d);
+    let root = common::git(d, &["rev-parse", "HEAD"]);
+    let first = collect::collect(&g, &format!("commit:{root}"), 20_000).unwrap();
+    assert_eq!(first.files.len(), 1);
+    assert_eq!((first.files[0].path.as_str(), first.files[0].status), ("src/app.ts", "A"));
+
+    sh(d, &["checkout", "-qb", "feature"]);
+    write(d, "src/b.ts", "export const b = 1\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "feat: b"]);
+    sh(d, &["checkout", "-q", "main"]);
+    write(d, "README.md", "hi\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "docs"]);
+    sh(d, &["merge", "-q", "--no-ff", "feature", "-m", "merge feature"]);
+    let merge = common::git(d, &["rev-parse", "HEAD"]);
+    let m = collect::collect(&g, &format!("commit:{merge}"), 20_000).unwrap();
+    let paths: Vec<_> = m.files.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(paths, ["src/b.ts"], "a merge is shown against its first parent");
+
+    assert!(collect::collect(&g, "commit:HEAD; rm -rf /", 20_000).is_err());
+}

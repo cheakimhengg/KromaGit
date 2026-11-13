@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { ThemePref } from '@/types/ai'
+import type { AccentId, ThemePref } from '@/types/ai'
 
 export type ResolvedTheme = 'dark' | 'light'
 
@@ -31,6 +31,21 @@ export function applyTheme(pref: ThemePref) {
     media = window.matchMedia('(prefers-color-scheme: light)')
     media.addEventListener('change', () => currentPref === 'system' && paint(systemTheme()))
   }
+}
+
+/** Accent colours: [dark theme, light theme]. */
+export const ACCENTS: Record<AccentId, { name: string; dark: string; light: string }> = {
+  blue: { name: 'Blue', dark: '#7c9cff', light: '#3a5fd9' },
+  violet: { name: 'Violet', dark: '#a78bfa', light: '#7038d0' },
+  teal: { name: 'Teal', dark: '#2dd4bf', light: '#0b8178' },
+  pink: { name: 'Pink', dark: '#f472b6', light: '#c02a6c' },
+  amber: { name: 'Amber', dark: '#fbbf24', light: '#a45f0a' },
+  green: { name: 'Green', dark: '#4ade80', light: '#15803d' },
+}
+
+export function applyAccent(accent: AccentId) {
+  if (typeof document === 'undefined') return
+  document.documentElement.dataset.accent = accent in ACCENTS ? accent : 'blue'
 }
 
 export const ZOOM_MIN = 70

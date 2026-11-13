@@ -4,9 +4,9 @@ import { aiApi } from '@/api/ai'
 import { errorMessage, gitApi } from '@/api/git'
 import { AiCancelled, budgets, complete, diffChars, ensureConsent, ensureReady, previewOf, summarizeFiles } from '@/ai/engine'
 import {
-  buildCommitPrompt, buildReviewPrompt, buildSplitCatalog, buildSplitPrompt, buildStandupPrompt, COMMIT_SCHEMA, groupStandup,
+  buildCommitPrompt, buildExplainPrompt, buildReviewPrompt, EXPLAIN_SCHEMA, parseExplanation, buildSplitCatalog, buildSplitPrompt, buildStandupPrompt, COMMIT_SCHEMA, groupStandup,
   matchHunkHeader, parseCommit, parseReview, parseSplit, REVIEW_SCHEMA, SPLIT_SCHEMA, standupText,
-  type ReviewComment, type SplitCatalog, type SplitGroup, type StandupGroup,
+  type CommitExplanation, type ReviewComment, type SplitCatalog, type SplitGroup, type StandupGroup,
 } from '@/ai/prompts'
 import type { AiFileDiff, CleanupCandidate } from '@/types/ai'
 import type { GitAction } from '@/types/git'
@@ -20,7 +20,12 @@ type Status = 'idle' | 'running' | 'done' | 'error'
 export const useAiStore = defineStore('ai', () => {
   const progress = ref<string | null>(null)
 
-  const review = reactive({ status: 'idle' as Status, summary: '', comments: [] as ReviewComment[], files: [] as AiFileDiff[], error: '', model: '' })
+  const review = reactive({
+    status: 'idle' as Status, summary: '', comments: [] as ReviewComment[], files: [] as AiFileDiff[], error: '', model: '',
+    /** null = staged changes */
+    commit: null as { hash: string; parent?: string; subject: string } | null,
+  })
+  const explain = reactive({ hash: '', status: 'idle' as Status, result: null as CommitExplanation | null, error: '', model: '' })
   const split = reactive({ status: 'idle' as Status, groups: [] as SplitGroup[], catalog: null as SplitCatalog | null, error: '' })
   const standup = reactive({ status: 'idle' as Status, groups: [] as StandupGroup[], text: '', aiText: '', errors: [] as string[], rangeLabel: '' })
   const cleanup = reactive({ status: 'idle' as Status, candidates: [] as CleanupCandidate[], error: '' })
@@ -31,7 +36,7 @@ export const useAiStore = defineStore('ai', () => {
     useUiStore().toast({ kind: 'error', title: `${what} failed`, detail: e instanceof Error ? e.message : errorMessage(e) }, 9000)
   }
 
-  async function collect(scope: 'staged' | 'all') {
+  async function collect(scope: 'staged' | 'all' | `commit:${string}`) {
     const tab = repo()
     if (!tab) throw new Error('No repository open.')
     return aiApi.collectDiff(tab.path, scope, budgets().perFile)
@@ -76,21 +81,27 @@ export const useAiStore = defineStore('ai', () => {
 
   // ---------- review ----------
 
-  async function runReview() {
+  /** Reviews the staged changes, or one commit when `commit` is given (or kept from the last run with `again`). */
+  async function runReview(commit?: { hash: string; parent?: string; subject: string } | null, again = false) {
     if (!(await ensureReady('AI review'))) return
     const ui = useUiStore()
+    const target = again ? review.commit : (commit ?? null)
     ui.showPanel('review')
-    Object.assign(review, { status: 'running', summary: '', comments: [], error: '' })
-    progress.value = 'Reading staged changes…'
+    Object.assign(review, { status: 'running', summary: '', comments: [], error: '', commit: target })
+    progress.value = target ? 'Reading the commit…' : 'Reading staged changes…'
     try {
-      const bundle = await collect('staged')
-      if (!bundle.files.length) throw new Error('Nothing is staged. Stage the changes you want reviewed first.')
+      const bundle = await collect(target ? `commit:${target.hash}` : 'staged')
+      if (!bundle.files.length) throw new Error(target ? 'This commit has no file changes to review.' : 'Nothing is staged. Stage the changes you want reviewed first.')
       review.files = bundle.files
       const reviewable = bundle.files.filter((f) => f.patch)
       if (diffChars(reviewable) > budgets().total) {
-        throw new Error(`The staged diff is too large to review in one request (${Math.round(diffChars(reviewable) / 1000)}k characters). Stage fewer files and review in parts.`)
+        throw new Error(
+          target
+            ? `This commit is too large to review in one request (${Math.round(diffChars(reviewable) / 1000)}k characters).`
+            : `The staged diff is too large to review in one request (${Math.round(diffChars(reviewable) / 1000)}k characters). Stage fewer files and review in parts.`,
+        )
       }
-      const p = buildReviewPrompt(reviewable)
+      const p = buildReviewPrompt(reviewable, target?.subject)
       await ensureConsent(previewOf(p))
       progress.value = 'Reviewing…'
       const parsed = parseReview(await complete({ ...p, schema: REVIEW_SCHEMA, maxTokens: 8000, effort: 'medium' }), bundle.files.map((f) => f.path))
@@ -272,8 +283,31 @@ export const useAiStore = defineStore('ai', () => {
     await loadCleanup()
   }
 
+  // ---------- explain a commit ----------
+
+  async function explainCommit(c: { hash: string; subject: string; body: string }) {
+    if (!(await ensureReady('Explain with AI'))) return
+    Object.assign(explain, { hash: c.hash, status: 'running', result: null, error: '' })
+    progress.value = 'Reading the commit…'
+    try {
+      const bundle = await collect(`commit:${c.hash}`)
+      const ctx = { subject: c.subject, body: c.body, files: bundle.files }
+      const { summaries } = await diffOrSummaries(bundle.files, (files) => previewOf(buildExplainPrompt({ ...ctx, files })))
+      progress.value = 'Explaining…'
+      const text = await complete({ ...buildExplainPrompt({ ...ctx, summaries }), schema: EXPLAIN_SCHEMA, maxTokens: 3000, effort: 'low' })
+      if (explain.hash !== c.hash) return
+      Object.assign(explain, { status: 'done', result: parseExplanation(text), model: useSettingsStore().statusLabel ?? '' })
+    } catch (e) {
+      if (explain.hash !== c.hash) return
+      if (e instanceof AiCancelled) explain.status = 'idle'
+      else Object.assign(explain, { status: 'error', error: e instanceof Error ? e.message : errorMessage(e) })
+    } finally {
+      progress.value = null
+    }
+  }
+
   return {
-    progress, review, split, standup, cleanup,
-    generateCommitMessage, runReview, suggestSplit, applySplit, loadStandup, writeStandupWithAi, loadCleanup, deleteBranches,
+    progress, review, split, standup, cleanup, explain,
+    generateCommitMessage, runReview, explainCommit, suggestSplit, applySplit, loadStandup, writeStandupWithAi, loadCleanup, deleteBranches,
   }
 })

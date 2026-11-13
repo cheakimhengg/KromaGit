@@ -2,13 +2,14 @@
 import { computed } from 'vue'
 import {
   Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, Check, ChevronDown, CloudDownload, Code2, GitBranch,
-  GitBranchPlus, Redo2, RefreshCw, Settings, Tag, Terminal, Undo2, CalendarClock, Brush,
+  Command, GitBranchPlus, PanelLeft, Redo2, RefreshCw, Settings, Tag, Terminal, Undo2, CalendarClock, Brush,
 } from 'lucide-vue-next'
 import ToolButton from '@/components/common/ToolButton.vue'
 import { useReposStore } from '@/stores/repos'
 import { useOpsStore } from '@/stores/ops'
 import { useUiStore, type MenuItem } from '@/stores/ui'
 import * as git from '@/actions/git'
+import { formatCombo } from '@/lib/shortcuts'
 
 const repos = useReposStore()
 const ops = useOpsStore()
@@ -16,6 +17,8 @@ const ui = useUiStore()
 const snapshot = computed(() => repos.active?.snapshot ?? null)
 const busy = computed(() => !!ops.running)
 const hasRemote = computed(() => (snapshot.value?.remotes.length ?? 0) > 0)
+const ahead = computed(() => snapshot.value?.head.ahead ?? 0)
+const behind = computed(() => snapshot.value?.head.behind ?? 0)
 
 function branchMenu(e: MouseEvent) {
   if (!snapshot.value) return
@@ -48,44 +51,75 @@ function pushMenu(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="flex h-[58px] shrink-0 items-center gap-1 border-b border-line bg-surface px-3">
-    <div class="mr-3 flex min-w-0 flex-col justify-center">
-      <span class="truncate text-[14px] leading-tight font-semibold text-fg">{{ snapshot?.name ?? 'No repository' }}</span>
+  <div class="flex h-[52px] shrink-0 items-center gap-2 border-b border-line bg-surface px-3">
+    <ToolButton
+      :icon="PanelLeft" :active="!ui.sidebarCollapsed"
+      :title="`${ui.sidebarCollapsed ? 'Show' : 'Hide'} sidebar (${formatCombo('Mod+B')})`"
+      @click="ui.sidebarCollapsed = !ui.sidebarCollapsed"
+    />
+
+    <div v-if="snapshot" class="flex h-9 min-w-0 items-center rounded-full bg-surface-2/70 pr-1 pl-3.5">
+      <span class="max-w-[180px] truncate text-[14px] font-semibold text-fg">{{ snapshot.name }}</span>
       <button
-        v-if="snapshot"
         type="button"
-        class="-ml-1 flex items-center gap-1 rounded px-1 text-[12px] text-muted hover:bg-hover hover:text-fg disabled:opacity-50"
+        class="ml-2.5 flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-accent/15 px-2.5 text-[13px] font-medium text-accent hover:bg-accent/25 disabled:opacity-50"
         title="Switch branch"
         :disabled="busy"
         @click="branchMenu"
       >
-        <GitBranch :size="12" class="text-accent" />
+        <GitBranch :size="14" class="shrink-0" />
         <span class="max-w-[180px] truncate">{{ snapshot.currentBranch }}</span>
-        <ChevronDown :size="12" />
+        <ChevronDown :size="13" class="shrink-0 opacity-70" />
       </button>
     </div>
 
-    <div class="mx-1 h-8 w-px bg-line" />
-    <ToolButton :icon="Undo2" label="Undo" :title="ops.nextUndo ? `Undo: ${ops.nextUndo.label}` : 'Nothing to undo'" :disabled="busy || !ops.nextUndo" @click="ops.undo()" />
-    <ToolButton :icon="Redo2" label="Redo" :title="ops.nextRedo ? `Redo: ${ops.nextRedo.label}` : 'Nothing to redo'" :disabled="busy || !ops.nextRedo" @click="ops.redo()" />
-    <div class="mx-1 h-8 w-px bg-line" />
-    <ToolButton :icon="CloudDownload" label="Fetch" :disabled="busy || !hasRemote" :loading="ops.running === 'Fetch'" @click="git.fetchAll()" />
-    <ToolButton :icon="ArrowDownToLine" label="Pull" dropdown :disabled="busy || !hasRemote" @click="git.pull('merge')" @dropdown="pullMenu" />
-    <ToolButton :icon="ArrowUpFromLine" label="Push" dropdown :disabled="busy || !hasRemote" @click="git.push()" @dropdown="pushMenu" />
-    <div class="mx-1 h-8 w-px bg-line" />
-    <ToolButton :icon="GitBranchPlus" label="Branch" :disabled="busy" @click="git.createBranch()" />
-    <ToolButton :icon="Tag" label="Tag" :disabled="busy || !snapshot?.head.oid" @click="git.createTag()" />
-    <ToolButton :icon="Archive" label="Stash" :disabled="busy" @click="git.stashPush()" />
-    <ToolButton :icon="ArchiveRestore" label="Pop" :disabled="busy || !snapshot?.stashes.length" @click="git.stashPop(0)" />
+    <div class="island">
+      <ToolButton :icon="Undo2" :title="ops.nextUndo ? `Undo: ${ops.nextUndo.label} (${formatCombo('Mod+Z')})` : 'Nothing to undo'" :disabled="busy || !ops.nextUndo" @click="ops.undo()" />
+      <ToolButton :icon="Redo2" :title="ops.nextRedo ? `Redo: ${ops.nextRedo.label} (${formatCombo('Mod+Shift+Z')})` : 'Nothing to redo'" :disabled="busy || !ops.nextRedo" @click="ops.redo()" />
+    </div>
 
-    <div class="flex-1" />
+    <div class="island">
+      <ToolButton :icon="CloudDownload" label="Fetch" :title="`Fetch all remotes (${formatCombo('Mod+Shift+F')})`" :disabled="busy || !hasRemote" :loading="ops.running === 'Fetch'" @click="git.fetchAll()" />
+      <ToolButton
+        :icon="ArrowDownToLine" label="Pull" dropdown :disabled="busy || !hasRemote"
+        :title="`Pull (${formatCombo('Mod+Shift+L')})${behind ? ` — ${behind} new on the remote` : ''}`"
+        :count="behind" count-prefix="↓"
+        @click="git.pull('merge')" @dropdown="pullMenu"
+      />
+      <ToolButton
+        :icon="ArrowUpFromLine" label="Push" dropdown :disabled="busy || !hasRemote"
+        :title="`Push (${formatCombo('Mod+Shift+P')})${ahead ? ` — ${ahead} not pushed yet` : ''}`"
+        :count="ahead" count-prefix="↑"
+        @click="git.push()" @dropdown="pushMenu"
+      />
+    </div>
 
-    <ToolButton :icon="CalendarClock" label="Standup" :accent="ui.centerView === 'standup'" title="What did I do? Commits across all open repositories" @click="ui.showPanel('standup')" />
-    <ToolButton :icon="Brush" label="Cleanup" :accent="ui.centerView === 'cleanup'" title="Find merged, gone and stale branches" @click="ui.showPanel('cleanup')" />
-    <div class="mx-1 h-8 w-px bg-line" />
-    <ToolButton :icon="Terminal" label="Terminal" @click="git.openInTerminal()" />
-    <ToolButton :icon="Code2" label="Editor" @click="git.openInEditor()" />
-    <ToolButton :icon="RefreshCw" label="Refresh" :loading="repos.busy" :disabled="busy" @click="repos.load(repos.activeTabId)" />
-    <ToolButton :icon="Settings" label="Settings" @click="ui.settingsOpen = true" />
+    <div class="island">
+      <ToolButton :icon="GitBranchPlus" :title="`New branch (${formatCombo('Mod+Shift+B')})`" :disabled="busy" @click="git.createBranch()" />
+      <ToolButton :icon="Tag" title="New tag at HEAD" :disabled="busy || !snapshot?.head.oid" @click="git.createTag()" />
+      <ToolButton :icon="Archive" :title="`Stash changes (${formatCombo('Mod+Shift+S')})`" :disabled="busy" @click="git.stashPush()" />
+      <ToolButton :icon="ArchiveRestore" title="Pop latest stash" :disabled="busy || !snapshot?.stashes.length" @click="git.stashPop(0)" />
+    </div>
+
+    <div class="min-w-2 flex-1" />
+
+    <div class="island">
+      <ToolButton :icon="CalendarClock" :active="ui.centerView === 'standup'" title="Standup: what did I do?" @click="ui.showPanel('standup')" />
+      <ToolButton :icon="Brush" :active="ui.centerView === 'cleanup'" title="Branch cleanup: merged, gone and stale branches" @click="ui.showPanel('cleanup')" />
+    </div>
+    <div class="island">
+      <ToolButton :icon="Command" :title="`Command palette (${formatCombo('Mod+K')})`" @click="ui.paletteOpen = true" />
+      <ToolButton :icon="Terminal" title="Open in terminal" @click="git.openInTerminal()" />
+      <ToolButton :icon="Code2" title="Open in editor" @click="git.openInEditor()" />
+      <ToolButton :icon="RefreshCw" :title="`Refresh (${formatCombo('Mod+R')})`" :loading="repos.busy" :disabled="busy" @click="repos.load(repos.activeTabId)" />
+    </div>
+    <ToolButton :icon="Settings" :title="`Settings (${formatCombo('Mod+,')})`" @click="ui.settingsOpen = true" />
   </div>
 </template>
+
+<style scoped>
+@reference '../../styles/main.css';
+.island {
+  @apply flex items-center gap-px rounded-lg bg-surface-2/70 p-0.5;
+}
+</style>

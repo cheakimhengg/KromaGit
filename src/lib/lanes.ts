@@ -19,8 +19,8 @@ export const laneColor = (i: number) => {
 /** Avatar fill/text for a hue, tuned per theme. */
 export const avatarColors = (hue: number) =>
   resolvedTheme.value === 'light'
-    ? { bg: `hsl(${hue} 70% 88%)`, fg: `hsl(${hue} 55% 28%)` }
-    : { bg: `hsl(${hue} 45% 30%)`, fg: `hsl(${hue} 90% 88%)` }
+    ? { bg: `hsl(${hue} 60% 84%)`, fg: `hsl(${hue} 55% 26%)` }
+    : { bg: `hsl(${hue} 40% 36%)`, fg: `hsl(${hue} 90% 90%)` }
 
 export const ROW_HEIGHT = 34
 export const LANE_WIDTH = 19

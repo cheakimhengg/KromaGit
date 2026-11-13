@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import {
   Archive, ArchiveRestore, Boxes, Check, Cloud, Copy, FolderTree, GitBranch, GitBranchPlus, GitMerge, GitPullRequestArrow, Globe,
-  PanelLeftClose, Pencil, Search, Tag as TagIcon, Trash2, ArrowUpFromLine, CircleDot,
+  ChevronsDownUp, ChevronsUpDown, Pencil, Search, Tag as TagIcon, Trash2, ArrowUpFromLine, CircleDot,
 } from 'lucide-vue-next'
 import SidebarSection from './SidebarSection.vue'
 import RefTree from './RefTree.vue'
@@ -89,6 +89,15 @@ function stashMenu(e: MouseEvent, s: Stash) {
     { label: 'Drop…', icon: Trash2, danger: true, action: () => git.stashDrop(s.index, s.message) },
   ])
 }
+
+const SECTIONS: [string, boolean][] = [
+  ['Branches', true], ['Remotes', true], ['Tags', false], ['Stashes', true], ['Worktrees', false], ['Submodules', false],
+]
+const anySectionOpen = computed(() => SECTIONS.some(([t, d]) => ui.sidebarSections[t] ?? d))
+function toggleAllSections() {
+  const open = !anySectionOpen.value
+  for (const [t] of SECTIONS) ui.sidebarSections[t] = open
+}
 </script>
 
 <template>
@@ -98,8 +107,12 @@ function stashMenu(e: MouseEvent, s: Stash) {
         <Search :size="14" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
         <input v-model="filter" class="gw-input pl-6" placeholder="Filter refs…" spellcheck="false" />
       </div>
-      <button type="button" class="rounded p-1 text-faint hover:bg-hover hover:text-fg" title="Collapse sidebar" @click="ui.sidebarCollapsed = true">
-        <PanelLeftClose :size="16" />
+      <button
+        type="button" class="rounded p-1.5 text-faint hover:bg-hover hover:text-fg"
+        :title="anySectionOpen ? 'Collapse all sections' : 'Expand all sections'"
+        @click="toggleAllSections"
+      >
+        <component :is="anySectionOpen ? ChevronsDownUp : ChevronsUpDown" :size="16" />
       </button>
     </div>
 

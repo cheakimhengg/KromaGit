@@ -32,8 +32,25 @@ pub struct AiDiffBundle {
     pub redactions: u32,
 }
 
+/// `scope` is `"staged"`, `"all"` (staged + unstaged + untracked) or
+/// `"commit:<sha>"` (that commit against its first parent).
 pub fn collect(git: &Git, scope: &str, per_file_cap: usize) -> AppResult<AiDiffBundle> {
     let common = ["--no-color", "--no-ext-diff", "-U3", "-M", "--src-prefix=a/", "--dst-prefix=b/"];
+    if let Some(sha) = scope.strip_prefix("commit:") {
+        if !(4..=64).contains(&sha.len()) || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(crate::error::AppError::Internal(format!("Not a commit id: {sha}")));
+        }
+        let mut args = vec!["diff-tree", "-p", "-r", "--root", "--no-commit-id", "--diff-merges=first-parent"];
+        args.extend(common);
+        args.push(sha);
+        let raw = git.run(&args)?;
+        let mut bundle = AiDiffBundle::default();
+        for (path, patch) in split_patches(&String::from_utf8_lossy(&raw)) {
+            bundle.files.push(prepare(path, patch, per_file_cap));
+        }
+        bundle.redactions = bundle.files.iter().map(|f| f.redactions).sum();
+        return Ok(bundle);
+    }
     let has_head = !git.run_with_codes(&["rev-parse", "-q", "--verify", "HEAD"], &[0, 1])?.is_empty();
     let mut raw = Vec::new();
     if scope == "staged" || !has_head {

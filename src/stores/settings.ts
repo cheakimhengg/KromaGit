@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { aiApi, defaultSettings } from '@/api/ai'
 import { errorMessage, inTauri } from '@/api/git'
-import { applyTheme, applyZoom, clampZoom, resolvedTheme } from '@/lib/theme'
+import { applyAccent, applyTheme, applyZoom, clampZoom, resolvedTheme } from '@/lib/theme'
 import { clone } from '@/lib/clone'
 import { setAvatarsEnabled } from '@/lib/avatars'
 import type { CloudProvider, ProviderId, Settings, ThemePref } from '@/types/ai'
@@ -47,6 +47,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function applyAppearance() {
     applyTheme(settings.value.appearance.theme)
+    applyAccent(settings.value.appearance.accent)
     setAvatarsEnabled(settings.value.general.showAvatars !== false)
     void applyZoom(settings.value.appearance.zoom, inTauri).catch(() => {})
   }
@@ -68,6 +69,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const toggleTheme = () => setTheme(resolvedTheme.value === 'light' ? 'dark' : 'light')
   const zoomBy = (delta: number) => patchAppearance({ zoom: settings.value.appearance.zoom + delta })
   const resetZoom = () => patchAppearance({ zoom: 100 })
+  const setAccent = (accent: Settings['appearance']['accent']) => patchAppearance({ accent })
 
   async function refreshKeys() {
     keys.value = await aiApi.apiKeyStatus().catch(() => keys.value)
@@ -92,5 +94,5 @@ export const useSettingsStore = defineStore('settings', () => {
     return settings.value.repos[repoRoot]?.commitTemplate ?? ''
   }
 
-  return { settings, keys, loaded, load, save, refreshKeys, setTheme, toggleTheme, zoomBy, resetZoom, provider, model, providerInfo, notReadyReason, statusLabel, templateFor }
+  return { settings, keys, loaded, load, save, refreshKeys, setTheme, setAccent, toggleTheme, zoomBy, resetZoom, provider, model, providerInfo, notReadyReason, statusLabel, templateFor }
 })

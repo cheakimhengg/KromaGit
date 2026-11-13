@@ -6,12 +6,17 @@ import StatusBadge from '@/components/common/StatusBadge.vue'
 import { buildRefTree, type RefTreeNode } from '@/lib/ref-tree'
 import type { FileChange } from '@/types/git'
 
-const props = defineProps<{
-  files: FileChange[]
-  mode: 'list' | 'tree'
-  checked: boolean
-  activePath?: string | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    files: FileChange[]
+    mode: 'list' | 'tree'
+    checked?: boolean
+    activePath?: string | null
+    /** commit view: no stage checkboxes, stats always visible */
+    readonly?: boolean
+  }>(),
+  { checked: false, activePath: null, readonly: false },
+)
 const emit = defineEmits<{ open: [FileChange]; toggle: [FileChange]; menu: [MouseEvent, FileChange] }>()
 
 const ROW = 28
@@ -77,11 +82,12 @@ function split(path: string) {
           v-else
           class="group absolute left-0 flex w-full cursor-pointer items-center gap-1.5 pr-2 text-[13px]"
           :class="activePath === rows[v.index].file!.path ? 'bg-select' : 'hover:bg-hover'"
-          :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + (mode === 'tree' ? 22 : 8)}px` }"
+          :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + (mode === 'tree' ? 22 : 8)}px`, paddingRight: '10px' }"
           @click="emit('open', rows[v.index].file!)"
           @contextmenu="emit('menu', $event, rows[v.index].file!)"
         >
           <input
+            v-if="!readonly"
             type="checkbox"
             :checked="checked"
             class="h-3 w-3 shrink-0 cursor-pointer accent-[var(--gw-accent)]"
@@ -96,7 +102,7 @@ function split(path: string) {
             <span class="truncate text-fg" :class="{ 'line-through opacity-60': rows[v.index].file!.status === 'D' }">{{ split(rows[v.index].file!.path).name }}</span>
             <span v-if="mode === 'list'" class="truncate text-[11px] text-faint">{{ split(rows[v.index].file!.path).dir }}</span>
           </span>
-          <span class="hidden shrink-0 font-mono text-[11px] group-hover:inline">
+          <span class="shrink-0 font-mono text-[11px]" :class="readonly ? '' : 'hidden group-hover:inline'">
             <span class="text-success">+{{ rows[v.index].file!.additions }}</span>
             <span class="ml-1 text-danger">−{{ rows[v.index].file!.deletions }}</span>
           </span>

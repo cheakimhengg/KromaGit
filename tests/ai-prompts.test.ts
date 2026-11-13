@@ -155,3 +155,14 @@ describe('standup', () => {
     expect(standupText([], 'today')).toBe('No commits found for today.')
   })
 })
+
+describe('commit explanation', () => {
+  it('parses the JSON reply and drops empty items', async () => {
+    const { parseExplanation, buildExplainPrompt } = await import('@/ai/prompts')
+    const r = parseExplanation('```json\n{"summary":" Adds coupons. ","points":["New type 19","",null],"risks":["Check migration"]}\n```')
+    expect(r).toEqual({ summary: 'Adds coupons.', points: ['New type 19'], risks: ['Check migration'] })
+    expect(parseExplanation('{"summary":"x"}')).toEqual({ summary: 'x', points: [], risks: [] })
+    const p = buildExplainPrompt({ subject: 'feat: x', body: 'why', files: [] })
+    expect(p.user).toContain('feat: x\n\nwhy')
+  })
+})

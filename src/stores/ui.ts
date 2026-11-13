@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Component } from 'vue'
 import type { DiffTarget } from '@/types/git'
 
@@ -68,6 +68,18 @@ let toastSeq = 0
 
 export const useUiStore = defineStore('ui', () => {
   const sidebarCollapsed = ref(false)
+  const SECTIONS_KEY = 'kromagit.sections.v1'
+  /** sidebar section title → expanded; missing = the section's default */
+  const sidebarSections = ref<Record<string, boolean>>(
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') as Record<string, boolean>
+      } catch {
+        return {}
+      }
+    })(),
+  )
+  watch(sidebarSections, (v) => localStorage.setItem(SECTIONS_KEY, JSON.stringify(v)), { deep: true })
   const selectedCommit = ref<string | null>(null)
   const centerView = ref<CenterView>('graph')
   const diffTarget = ref<DiffTarget | null>(null)
@@ -75,10 +87,15 @@ export const useUiStore = defineStore('ui', () => {
   const fileViewMode = ref<'list' | 'tree'>('list')
   const settingsOpen = ref(false)
   const paletteOpen = ref(false)
+  const switcherOpen = ref(false)
+  /** the Home (welcome) page is showing instead of the active repository */
+  const home = ref(false)
   /** which Settings tab to show next time it opens */
-  const settingsTab = ref<'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts'>('general')
+  const settingsTab = ref<'appearance' | 'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts'>('appearance')
   /** bumped to ask components to act (commit box, AI generate, graph search) */
   const commitRequest = ref(0)
+  /** set to switch the commit box into amend mode; the commit box clears it */
+  const amendPending = ref(false)
   const generateRequest = ref(0)
   const searchRequest = ref(0)
   const previousView = ref<CenterView>('graph')
@@ -113,13 +130,14 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function resetForRepoSwitch() {
+    home.value = false
     selectedCommit.value = null
     diffTarget.value = null
     previousView.value = 'graph'
     if (centerView.value === 'diff' || centerView.value === 'review' || centerView.value === 'split' || centerView.value === 'cleanup') centerView.value = 'graph'
   }
 
-  function openSettings(tab: typeof settingsTab.value = 'general') {
+  function openSettings(tab: typeof settingsTab.value = 'appearance') {
     settingsTab.value = tab
     settingsOpen.value = true
   }
@@ -181,8 +199,8 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   return {
-    sidebarCollapsed, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode,
-    settingsOpen, settingsTab, paletteOpen, commitRequest, generateRequest, searchRequest, previousView, menu, toasts, dialog,
+    sidebarCollapsed, sidebarSections, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode,
+    settingsOpen, settingsTab, paletteOpen, switcherOpen, home, commitRequest, amendPending, generateRequest, searchRequest, previousView, menu, toasts, dialog,
     selectCommit, openDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
     openDialog, closeDialog, confirm, prompt,
   }

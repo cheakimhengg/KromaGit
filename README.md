@@ -30,7 +30,7 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 **History**
 - Commit graph with colored lanes, curved merges, author profile pictures and branch/tag pills
 - Opens 50,000-commit repositories in well under a second; every list is virtualized
-- Search by message or hash, filter by author, walk commits with ↑ / ↓
+- Search by message or hash, filter by author, walk commits with ↑ / ↓; show or hide any column
 - Commit details with full message, parents and changed files
 
 **Changes**
@@ -51,8 +51,8 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 
 **Workflow**
 - Multiple repositories as tabs, with named, colored, collapsible **tab groups** and drag-to-reorder
-- **⌘K command palette** for every action, branch and tab, plus keyboard shortcuts throughout
-- Dark and light themes (or follow the system), zoom, resizable panels, a welcome screen with recent repositories, open in your terminal or editor
+- **⌘K command palette** for every action, branch and tab; **⌘P** to jump to any recent repository; a Home page; keyboard shortcuts throughout (⌘W closes the tab, Esc closes whatever is open)
+- Dark and light themes (or follow the system) with six accent colours, zoom, resizable panels, a welcome screen with recent repositories, open in your terminal or editor
 
 **Profile pictures** are looked up by author email: GitHub no-reply addresses directly, other authors through the GitHub API (repositories hosted on GitHub) and Gravatar. Results are cached; authors without a picture keep their initials. Turn it off in **Settings → General** and no lookups are made.
 
@@ -61,7 +61,8 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 | | |
 |---|---|
 | **Commit messages** | Written from the staged diff, following your convention (`[{Feature}] {Type}: {summary}`, Conventional Commits, or learned from your last 20 commits) |
-| **Review** | Possible bugs, leftover debug code and committed secrets, linked to file and line |
+| **Review** | Possible bugs, leftover debug code and committed secrets in staged changes or any past commit, linked to file and line |
+| **Explain** | A plain-language summary of any commit: what changed, why, and what to double-check |
 | **Split suggestion** | Proposes how to split a big change into logical commits (by file or by hunk); edit the plan, then apply it in one click — and undo it in one click |
 | **Standup** | "What did I do?" across all open repositories for today, this week or any range — works without AI too |
 | **Branch cleanup** | Merged, `[gone]` and stale branches in a checklist; deletes locally and/or on the remote after you confirm |

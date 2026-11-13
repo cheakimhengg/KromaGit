@@ -12,7 +12,7 @@ export interface AiApi {
   apiKeyStatus(): Promise<Record<string, boolean>>
   complete(request: AiRequest): Promise<AiResponse>
   ollamaModels(url: string): Promise<string[]>
-  collectDiff(repo: string, scope: 'staged' | 'all', perFileCap: number): Promise<AiDiffBundle>
+  collectDiff(repo: string, scope: 'staged' | 'all' | `commit:${string}`, perFileCap: number): Promise<AiDiffBundle>
   recentMessages(repo: string, count: number): Promise<string[]>
   gitUserEmail(repo: string): Promise<string>
   standupCommits(paths: string[], since: string, until: string, author: string): Promise<StandupRepo[]>
@@ -21,7 +21,7 @@ export interface AiApi {
 
 export function defaultSettings(): Settings {
   return {
-    appearance: { theme: 'dark', zoom: 100 },
+    appearance: { theme: 'dark', zoom: 100, accent: 'blue' },
     general: { terminalApp: '', editorApp: '', showAvatars: true },
     ai: {
       provider: 'none',

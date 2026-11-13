@@ -174,16 +174,59 @@ export interface ReviewComment {
   message: string
 }
 
-export function buildReviewPrompt(files: AiFileDiff[]) {
+export function buildReviewPrompt(files: AiFileDiff[], commitSubject?: string) {
+  const what = commitSubject ? 'commit' : 'staged diff'
   const system = [
-    'You are a careful code reviewer. Review only the staged diff you are given.',
+    `You are a careful code reviewer. Review only the ${what} you are given.`,
     'Report real problems: likely bugs, leftover debug code (console.log, print, dbg!, debugger, commented-out code), committed secrets or credentials, and risky changes. Skip style nitpicks and praise.',
     'Lines are prefixed with their line number in the new file. Values shown as [REDACTED] were removed locally before sending — still flag that a secret was committed there.',
     'Respond with JSON only: {"summary": string, "comments": [{"file": string, "line": number, "severity": "bug"|"debug"|"secret"|"warning"|"suggestion", "message": string}]}.',
     'Use the new-file line number, or 0 when no single line applies. At most 25 comments. With nothing to report, return an empty list and a one-sentence summary.',
   ].join('\n')
-  const user = `Staged files:\n${files.map(fileLine).join('\n')}\n\nDiff:\n${diffBlock(files, true)}`
+  const head = commitSubject ? `Commit: ${commitSubject}\n\nFiles in this commit:` : 'Staged files:'
+  const user = `${head}\n${files.map(fileLine).join('\n')}\n\nDiff:\n${diffBlock(files, true)}`
   return { system, user }
+}
+
+// ---------- explain a commit ----------
+
+export const EXPLAIN_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: str,
+    points: { type: 'array', items: str },
+    risks: { type: 'array', items: str },
+  },
+  required: ['summary', 'points', 'risks'],
+  additionalProperties: false,
+}
+
+export interface CommitExplanation {
+  summary: string
+  points: string[]
+  risks: string[]
+}
+
+export function buildExplainPrompt(ctx: { subject: string; body: string; files: AiFileDiff[]; summaries?: Record<string, string> }) {
+  const system = [
+    'You explain a single git commit to a teammate who has not seen it.',
+    'Describe what the change does and why it was likely made, in plain language. Be concrete: name the behaviour, data or API that changed, not just the files.',
+    'Respond with JSON only: {"summary": string, "points": string[], "risks": string[]}.',
+    '"summary" is one or two sentences. "points" lists 2-6 key changes, each one short sentence. "risks" lists anything a reviewer or tester should double-check (behaviour changes, migrations, missing handling); return an empty list when there is nothing notable.',
+    'Values shown as [REDACTED] were removed locally before sending.',
+  ].join('\n')
+  const diff = ctx.summaries
+    ? `The diff is too large to include; per-file summaries:\n${Object.entries(ctx.summaries).map(([p, s]) => `### ${p}\n${s.trim()}`).join('\n\n')}`
+    : `Diff:\n${diffBlock(ctx.files)}`
+  const message = ctx.body ? `${ctx.subject}\n\n${ctx.body}` : ctx.subject
+  const user = `Commit message:\n${message}\n\nFiles:\n${ctx.files.map(fileLine).join('\n')}\n\n${diff}`
+  return { system, user }
+}
+
+export function parseExplanation(text: string): CommitExplanation {
+  const v = extractJson(text) as { summary?: unknown; points?: unknown; risks?: unknown }
+  const list = (x: unknown) => (Array.isArray(x) ? x.map((i) => String(i ?? '').trim()).filter(Boolean).slice(0, 8) : [])
+  return { summary: String(v.summary ?? '').trim(), points: list(v.points), risks: list(v.risks) }
 }
 
 const SEVERITIES: Severity[] = ['bug', 'secret', 'debug', 'warning', 'suggestion']

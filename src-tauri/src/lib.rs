@@ -3,13 +3,18 @@ pub mod avatars;
 pub mod commands;
 pub mod error;
 pub mod git;
+#[cfg(target_os = "macos")]
+mod menu;
 pub mod secrets;
 pub mod settings;
 pub mod system;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(menu::build);
+    builder
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,

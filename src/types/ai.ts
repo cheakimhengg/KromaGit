@@ -10,8 +10,10 @@ export interface AiSettings {
 
 export type ThemePref = 'dark' | 'light' | 'system'
 
+export type AccentId = 'blue' | 'violet' | 'teal' | 'pink' | 'amber' | 'green'
+
 export interface Settings {
-  appearance: { theme: ThemePref; zoom: number }
+  appearance: { theme: ThemePref; zoom: number; accent: AccentId }
   general: { terminalApp: string; editorApp: string; showAvatars: boolean }
   ai: AiSettings
   /** keyed by repository root */

@@ -23,7 +23,7 @@ const version = __APP_VERSION__
 
 <template>
   <div class="flex h-7 shrink-0 items-center gap-4 border-t border-line bg-bg px-3 text-[12px] text-muted">
-    <template v-if="snapshot && head">
+    <template v-if="snapshot && head && !ui.home">
       <span class="flex items-center gap-1">
         <GitBranch :size="14" class="text-accent" />
         {{ snapshot.currentBranch }}

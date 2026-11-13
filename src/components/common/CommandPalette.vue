@@ -92,7 +92,7 @@ function onKey(e: KeyboardEvent) {
           <component :is="c.icon" v-if="c.icon" :size="17" class="shrink-0 text-muted" />
           <span v-else class="w-[17px]" />
           <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
-          <span class="shrink-0 text-[11px] tracking-wide text-faint uppercase">{{ c.group }}</span>
+          <span class="shrink-0 text-[12px] text-faint">{{ c.group }}</span>
           <kbd v-if="c.shortcut" class="shrink-0 rounded border border-line bg-surface px-1.5 font-mono text-[12px] text-muted">{{ formatCombo(c.shortcut) }}</kbd>
           <CornerDownLeft v-if="i === active" :size="15" class="shrink-0 text-faint" />
         </button>

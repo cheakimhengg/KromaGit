@@ -61,7 +61,7 @@ const remoteCount = computed(() => chosen.value.filter((x) => x.remoteBranch).le
 
       <template v-else>
         <div class="overflow-hidden rounded-lg border border-line">
-          <label class="flex cursor-pointer items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-[12px] font-semibold tracking-wide text-muted uppercase">
+          <label class="flex cursor-pointer items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-[13px] font-semibold text-fg">
             <input type="checkbox" :checked="allChecked" class="h-3 w-3 accent-[var(--gw-accent)]" @change="toggleAll" />
             {{ c.candidates.length }} candidates
           </label>

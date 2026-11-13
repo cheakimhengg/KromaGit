@@ -25,18 +25,22 @@ const byFile = computed(() => {
 })
 const omitted = computed(() => r.value.files.filter((f) => f.omitted || f.truncated || f.redactions))
 
+const target = computed(() => (r.value.commit ? `commit ${r.value.commit.hash.slice(0, 7)}` : 'staged changes'))
+
 function open(c: ReviewComment) {
-  ui.openDiff({ path: c.file, source: 'staged', line: c.line || undefined })
+  const commit = r.value.commit
+  if (commit) ui.openDiff({ path: c.file, source: 'commit', commit: commit.hash, parent: commit.parent, line: c.line || undefined })
+  else ui.openDiff({ path: c.file, source: 'staged', line: c.line || undefined })
 }
 </script>
 
 <template>
-  <PanelShell title="AI review" :icon="ScanSearch" :subtitle="r.status === 'done' ? `${r.comments.length} comments · ${r.model}` : 'staged changes'">
+  <PanelShell title="AI review" :icon="ScanSearch" :subtitle="r.status === 'done' ? `${target} · ${r.comments.length} comments · ${r.model}` : target">
     <template #actions>
       <button
         type="button" :disabled="r.status === 'running'"
         class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1 rounded-md border border-line-strong px-2 text-[12px] hover:bg-hover disabled:opacity-40"
-        @click="ai.runReview()"
+        @click="ai.runReview(null, true)"
       ><RotateCw :size="12" />Review again</button>
     </template>
 
@@ -50,7 +54,7 @@ function open(c: ReviewComment) {
 
     <div v-else-if="r.status === 'done'" class="space-y-4 p-4">
       <div class="rounded-lg border border-line bg-surface p-3 text-[13px] leading-relaxed text-fg select-text">{{ r.summary || 'Review complete.' }}</div>
-      <div v-if="!r.comments.length" class="text-center text-[13px] text-success">No problems found in the staged changes.</div>
+      <div v-if="!r.comments.length" class="text-center text-[13px] text-success">No problems found in the {{ r.commit ? 'commit' : 'staged changes' }}.</div>
 
       <div v-for="[file, comments] in byFile" :key="file" class="overflow-hidden rounded-lg border border-line">
         <div class="border-b border-line bg-surface px-3 py-1.5 font-mono text-[13px] text-fg">{{ file }}</div>

@@ -9,6 +9,7 @@ import * as git from '@/actions/git'
 import { useAiStore } from '@/stores/ai'
 
 const props = defineProps<{ stagedCount: number }>()
+const emit = defineEmits<{ amending: [boolean] }>()
 const ui = useUiStore()
 const repos = useReposStore()
 const ops = useOpsStore()
@@ -32,6 +33,18 @@ watch(
   { immediate: true },
 )
 const draft = computed<Draft>(() => drafts.get(repos.activeTabId)!)
+watch(() => draft.value.amend, (on) => emit('amending', on), { immediate: true })
+watch(
+  () => ui.amendPending,
+  (pending) => {
+    if (!pending) return
+    ui.amendPending = false
+    if (!repos.active?.snapshot.head.oid) return
+    draft.value.amend = true
+    setTimeout(() => summaryInput.value?.focus(), 50)
+  },
+  { immediate: true },
+)
 
 const SOFT_LIMIT = 72
 const loadingAmend = ref(false)
@@ -139,7 +152,7 @@ watch(() => ui.generateRequest, () => void generate())
     </div>
     <textarea
       v-model="draft.description"
-      rows="4"
+      rows="3"
       class="gw-input mt-2 h-auto resize-none py-1.5 leading-relaxed"
       placeholder="Description"
       spellcheck="false"

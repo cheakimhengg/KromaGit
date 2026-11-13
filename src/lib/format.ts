@@ -75,3 +75,11 @@ export function formatBytes(n: number): string {
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|ico|avif)$/i
 export const isImagePath = (path: string) => IMAGE_EXT.test(path)
+
+export function shortPath(p: string): string {
+  return p.replace(/^\/(?:Users|home)\/[^/]+/, '~').replace(/^[A-Za-z]:\\Users\\[^\\]+/, '~')
+}
+
+export function shortDate(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}

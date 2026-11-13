@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
-  Check, Cherry, Copy, GitBranchPlus, Loader2, PanelLeftOpen, Pencil, RotateCcw, Search, Tag, Undo, User, X,
+  Check, Cherry, Copy, Columns3, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Undo, User, X,
 } from 'lucide-vue-next'
 import GraphCell from './GraphCell.vue'
 import RefPill from './RefPill.vue'
@@ -80,14 +80,62 @@ onMounted(() => {
 })
 onBeforeUnmount(() => resizeObs?.disconnect())
 
-const showHash = computed(() => paneWidth.value - gWidth.value >= 760)
-const fullAuthor = computed(() => paneWidth.value - gWidth.value >= 620)
-const refsWidth = computed(() => (paneWidth.value - gWidth.value >= 700 ? 180 : 150))
+type ColumnId = 'refs' | 'graph' | 'author' | 'hash' | 'date'
+const COLUMN_LABELS: Record<ColumnId, string> = { refs: 'Branches and tags', graph: 'Graph', author: 'Author', hash: 'Hash', date: 'Date' }
+const COLUMNS_KEY = 'kromagit.columns.v1'
+const visible = ref<Record<ColumnId | 'band', boolean>>({
+  refs: true, graph: true, author: true, hash: true, date: true, band: true,
+  ...(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COLUMNS_KEY) ?? '{}') as Partial<Record<ColumnId, boolean>>
+    } catch {
+      return {}
+    }
+  })(),
+})
+watch(visible, (v) => localStorage.setItem(COLUMNS_KEY, JSON.stringify(v)), { deep: true })
+
+const shownGraph = computed(() => (visible.value.graph ? gWidth.value : 0))
+const spare = computed(() => paneWidth.value - shownGraph.value)
+const show = computed(() => ({
+  refs: visible.value.refs,
+  graph: visible.value.graph,
+  author: visible.value.author,
+  hash: visible.value.hash && spare.value >= 760,
+  date: visible.value.date,
+}))
+const fullAuthor = computed(() => spare.value >= 620)
+const refsWidth = computed(() => (spare.value >= 700 ? 180 : 150))
 const columns = computed(() =>
-  [`${refsWidth.value}px`, `${gWidth.value}px`, 'minmax(160px,1fr)', fullAuthor.value ? '150px' : '40px', showHash.value ? '80px' : null, '110px']
+  [
+    show.value.refs ? `${refsWidth.value}px` : null,
+    show.value.graph ? `${gWidth.value}px` : null,
+    'minmax(160px,1fr)',
+    show.value.author ? (fullAuthor.value ? '150px' : '40px') : null,
+    show.value.hash ? '80px' : null,
+    show.value.date ? '110px' : null,
+  ]
     .filter(Boolean)
     .join(' '),
 )
+
+function columnsMenu(e: MouseEvent) {
+  e.preventDefault()
+  const items: MenuItem[] = (Object.keys(COLUMN_LABELS) as ColumnId[]).map((id) => ({
+    label: COLUMN_LABELS[id],
+    icon: visible.value[id] ? Check : undefined,
+    action: () => (visible.value[id] = !visible.value[id]),
+  }))
+  items.splice(2, 0, { label: 'Message (always on)' })
+  items.push(
+    { separator: true },
+    { label: 'Tint rows by lane', icon: visible.value.band ? Check : undefined, action: () => (visible.value.band = !visible.value.band) },
+    { separator: true },
+    { label: 'Show everything', action: () => (Object.keys(visible.value) as (ColumnId | 'band')[]).forEach((k) => (visible.value[k] = true)) },
+  )
+  if (e.type === 'contextmenu') ui.openMenu(e, items)
+  else ui.openMenuBelow(e.currentTarget as Element, items)
+}
 
 function displayRefs(c: Commit): { ref: RefLabel; hasRemote: boolean }[] {
   const remotes = new Set(c.refs.filter((r) => r.kind === 'remote').map((r) => r.name))
@@ -173,17 +221,11 @@ function rowIndex(virtualIndex: number) {
 <template>
   <div ref="rootEl" class="flex h-full min-w-0 flex-col bg-bg">
     <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
-      <button
-        v-if="ui.sidebarCollapsed" type="button" class="rounded p-1 text-faint hover:bg-hover hover:text-fg" title="Show sidebar"
-        @click="ui.sidebarCollapsed = false"
-      >
-        <PanelLeftOpen :size="16" />
-      </button>
-      <div class="relative w-64">
+      <div class="relative w-64 min-w-28 shrink">
         <Search :size="14" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
-        <input ref="searchInput" v-model="messageQuery" class="gw-input pl-6" placeholder="Search commits… (message or hash)" spellcheck="false" />
+        <input ref="searchInput" v-model="messageQuery" class="gw-input pl-6" placeholder="Search commits…" title="Search by message or commit hash" spellcheck="false" />
       </div>
-      <div class="relative w-44">
+      <div class="relative w-44 min-w-24 shrink">
         <User :size="14" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
         <input v-model="authorQuery" class="gw-input pl-6" placeholder="Find author…" spellcheck="false" />
       </div>
@@ -194,7 +236,11 @@ function rowIndex(virtualIndex: number) {
         <X :size="14" />Clear
       </button>
       <div class="flex-1" />
-      <span class="font-mono text-[12px] text-muted">
+      <button
+        type="button" class="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[12px] whitespace-nowrap text-muted hover:bg-hover hover:text-fg"
+        title="Choose columns" @click="columnsMenu"
+      ><Columns3 :size="15" />Columns</button>
+      <span class="shrink-0 font-mono text-[12px] whitespace-nowrap text-muted">
         <template v-if="isFiltered">{{ rowCount.toLocaleString() }} of </template>{{ commits.length.toLocaleString() }}{{ complete ? '' : '+' }} commits
       </span>
       <span v-if="loadingCommits" class="flex items-center gap-1 text-[12px] text-faint">
@@ -203,33 +249,33 @@ function rowIndex(virtualIndex: number) {
     </div>
 
     <div
-      class="grid h-8 shrink-0 items-center border-b border-line bg-surface text-[11px] font-semibold tracking-wider text-faint uppercase"
+      class="grid h-8 shrink-0 items-center border-b border-line bg-surface text-[12px] font-medium text-faint"
       :style="{ gridTemplateColumns: columns }"
+      title="Right-click to choose columns"
+      @contextmenu="columnsMenu"
     >
-      <span class="px-3">Branch / Tag</span>
-      <span class="px-2">Graph</span>
-      <span class="px-2">Message</span>
-      <span class="truncate px-2">{{ fullAuthor ? 'Author' : '' }}</span>
-      <span v-if="showHash" class="px-2">Hash</span>
-      <span class="px-2">Date</span>
+      <span v-if="show.refs" class="truncate px-3">Branch / Tag</span>
+      <span v-if="show.graph" class="px-2">Graph</span>
+      <span class="px-2" :class="{ 'pl-3': !show.refs && !show.graph }">Message</span>
+      <span v-if="show.author" class="truncate px-2">{{ fullAuthor ? 'Author' : '' }}</span>
+      <span v-if="show.hash" class="px-2">Hash</span>
+      <span v-if="show.date" class="px-2">Date</span>
     </div>
 
     <div
-      v-if="!isFiltered"
+      v-if="!isFiltered && changeCount"
       class="grid h-[38px] shrink-0 items-center border-b border-dashed border-line bg-surface/50"
       :style="{ gridTemplateColumns: columns }"
     >
-      <span class="px-3">
+      <span v-if="show.refs" class="px-3">
         <span class="inline-flex h-[21px] items-center rounded-full border border-dashed border-faint px-2 text-[12px] text-muted">WIP</span>
       </span>
-      <svg :width="gWidth" height="38" class="block">
+      <svg v-if="show.graph" :width="gWidth" height="38" class="block">
         <circle :cx="laneX(headLane)" cy="19" r="10" fill="none" :stroke="laneColor(layout?.rows[headIndex]?.color ?? 0)" stroke-width="2" stroke-dasharray="3 2.5" />
       </svg>
-      <span class="flex items-center gap-2 px-2 text-[13px] whitespace-nowrap">
-        <span v-if="changeCount" class="text-muted italic">{{ changeCount }} uncommitted {{ changeCount === 1 ? 'change' : 'changes' }}</span>
-        <span v-else class="text-faint italic">Working tree clean</span>
+      <span class="flex items-center gap-2 px-2 text-[13px] whitespace-nowrap" :class="{ 'pl-3': !show.refs && !show.graph }">
+        <span class="text-muted italic">{{ changeCount }} uncommitted {{ changeCount === 1 ? 'change' : 'changes' }}</span>
         <button
-          v-if="changeCount"
           type="button" class="rounded-md border border-line-strong px-2 py-0.5 text-[12px] text-fg hover:border-accent/60 hover:bg-accent/10"
           @click="ui.selectCommit(null); ui.closeDiff()"
         >
@@ -245,12 +291,12 @@ function rowIndex(virtualIndex: number) {
             v-for="c in [commits[rowIndex(v.index)]]"
             :key="c.hash"
             class="absolute left-0 grid w-full items-center text-[13px]"
-            :class="ui.selectedCommit === c.hash ? 'bg-select' : 'hover:bg-surface-2'"
-            :style="{ height: `${ROW_HEIGHT}px`, transform: `translateY(${v.start}px)`, gridTemplateColumns: columns }"
+            :class="ui.selectedCommit === c.hash ? 'bg-select' : ['hover:bg-surface-2', { 'row-tint': visible.band && !isFiltered }]"
+            :style="{ height: `${ROW_HEIGHT}px`, transform: `translateY(${v.start}px)`, gridTemplateColumns: columns, '--lane': laneColor(layout!.rows[rowIndex(v.index)].color) }"
             @click="ui.selectCommit(c.hash)"
             @contextmenu="commitMenu($event, c)"
           >
-            <span class="flex min-w-0 items-center gap-1 overflow-hidden pl-3">
+            <span v-if="show.refs" class="flex min-w-0 items-center gap-1 overflow-hidden pl-3">
               <template v-for="(r, i) in displayRefs(c)" :key="r.ref.name">
                 <RefPill v-if="i < 2" :ref-label="r.ref" :has-remote="r.hasRemote" :color="laneColor(layout!.rows[rowIndex(v.index)].color)" />
               </template>
@@ -258,27 +304,38 @@ function rowIndex(virtualIndex: number) {
                 +{{ displayRefs(c).length - 2 }}
               </span>
               <span
-                v-if="c.refs.length" class="h-[2px] min-w-[6px] flex-1"
+                v-if="c.refs.length && show.graph" class="h-[2px] min-w-[6px] flex-1"
                 :style="{ background: laneColor(layout!.rows[rowIndex(v.index)].color) }"
               />
             </span>
             <GraphCell
+              v-if="show.graph"
               :row="layout!.rows[rowIndex(v.index)]"
               :width="gWidth"
               :author-name="c.author.name"
               :author-email="c.author.email"
               :commit-hash="c.hash"
-              :has-refs="c.refs.length > 0"
+              :has-refs="c.refs.length > 0 && show.refs"
               :is-head="c.hash === headOid"
               :edges-hidden="isFiltered"
             />
-            <span class="truncate px-2" :class="c.parents.length > 1 ? 'text-muted' : 'text-fg'">{{ c.subject }}</span>
-            <span class="flex min-w-0 items-center gap-1.5 px-2 text-muted">
+            <span
+              class="flex h-full min-w-0 items-center gap-1.5 truncate px-2" :class="[c.parents.length > 1 ? 'text-muted' : 'text-fg', { 'pl-3': !show.refs && !show.graph }]"
+            >
+              <template v-if="!show.refs">
+                <RefPill
+                  v-for="r in displayRefs(c).slice(0, 2)" :key="r.ref.name" class="shrink-0"
+                  :ref-label="r.ref" :has-remote="r.hasRemote" :color="laneColor(layout!.rows[rowIndex(v.index)].color)"
+                />
+              </template>
+              <span class="truncate">{{ c.subject }}</span>
+            </span>
+            <span v-if="show.author" class="flex min-w-0 items-center gap-1.5 px-2 text-muted">
               <Avatar :name="c.author.name" :email="c.author.email" :size="20" />
               <span v-if="fullAuthor" class="truncate">{{ c.author.name }}</span>
             </span>
-            <span v-if="showHash" class="px-2 font-mono text-[12px] text-faint">{{ c.shortHash }}</span>
-            <span class="truncate px-2 text-muted" :title="fullDate(c.date)">{{ relativeTime(c.date) }}</span>
+            <span v-if="show.hash" class="px-2 font-mono text-[12px] text-faint">{{ c.shortHash }}</span>
+            <span v-if="show.date" class="truncate px-2 text-muted" :title="fullDate(c.date)">{{ relativeTime(c.date) }}</span>
           </div>
         </template>
       </div>

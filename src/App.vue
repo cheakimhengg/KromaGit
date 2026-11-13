@@ -23,9 +23,11 @@ import { useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 import CommandPalette from '@/components/common/CommandPalette.vue'
+import RepoSwitcher from '@/components/common/RepoSwitcher.vue'
 import { useCommands } from '@/commands/registry'
 import { isEditable, matchCombo } from '@/lib/shortcuts'
 import { setAvatarContext } from '@/lib/avatars'
+import { watchWindowChrome } from '@/lib/window-chrome'
 
 const repos = useReposStore()
 const ui = useUiStore()
@@ -53,13 +55,30 @@ watch(panes, (v) => localStorage.setItem(PANES_KEY, JSON.stringify(v)), { deep: 
 const { staticCommands } = useCommands()
 const shortcutCommands = staticCommands.filter((c) => c.shortcut)
 
-function onKey(e: KeyboardEvent) {
-  if (ui.dialog || ui.paletteOpen || ui.settingsOpen) return
-  if (e.key === 'Escape' && !ui.menu) {
-    if (ui.centerView === 'diff') ui.closeDiff()
-    else if (ui.centerView !== 'graph') ui.showPanel('graph')
+function onEscape(e: KeyboardEvent) {
+  e.preventDefault()
+  if (ui.dialog || ui.paletteOpen || ui.switcherOpen || ui.settingsOpen || ui.menu) return
+  if (isEditable(e.target)) {
+    const el = e.target as HTMLInputElement
+    if (el.value && el.type !== 'checkbox' && el.tagName === 'INPUT') {
+      el.value = ''
+      el.dispatchEvent(new Event('input'))
+    } else el.blur()
     return
   }
+  if (ui.home && repos.active) ui.home = false
+  else if (ui.centerView === 'diff') ui.closeDiff()
+  else if (ui.centerView !== 'graph') ui.showPanel('graph')
+  else if (ui.selectedCommit) ui.selectCommit(null)
+}
+
+function onEscapeCapture(e: KeyboardEvent) {
+  if (e.key === 'Escape') onEscape(e)
+}
+
+function onKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') return
+  if (ui.dialog || ui.paletteOpen || ui.switcherOpen || ui.settingsOpen) return
   const typing = isEditable(e.target)
   for (const c of shortcutCommands) {
     if (!matchCombo(e, c.shortcut!)) continue
@@ -80,11 +99,14 @@ function onFocus() {
 
 onMounted(() => {
   void settings.load()
+  void watchWindowChrome()
   void repos.openStartupPaths()
+  window.addEventListener('keydown', onEscapeCapture, true)
   window.addEventListener('keydown', onKey)
   window.addEventListener('focus', onFocus)
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onEscapeCapture, true)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('focus', onFocus)
 })
@@ -93,7 +115,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex h-full flex-col" @contextmenu.prevent>
     <TabBar />
-    <template v-if="repos.active && repos.activeTab">
+    <template v-if="repos.active && repos.activeTab && !ui.home">
       <div v-if="repos.active.error && !repos.active.loaded" class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
         <AlertTriangle :size="30" class="text-warning" />
         <div class="text-[15px] text-fg">Couldn't open {{ repos.activeTab.name }}</div>
@@ -139,6 +161,7 @@ onBeforeUnmount(() => {
     <Toaster />
     <SettingsDialog />
     <CommandPalette />
+    <RepoSwitcher />
     <Dialog />
   </div>
 </template>
