@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { CornerDownLeft, FolderGit2, FolderOpen, Search, X } from 'lucide-vue-next'
+import { CornerDownLeft, FolderGit2, FolderOpen, Search, X } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
 import { fuzzyFilter } from '@/lib/fuzzy'

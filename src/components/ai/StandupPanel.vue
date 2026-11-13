@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { CalendarClock, Copy, Loader2, Search, Sparkles } from 'lucide-vue-next'
+import { CalendarClock, Copy, Loader2, Search, Sparkles } from '@/lib/icons'
 import PanelShell from './PanelShell.vue'
 import { useAiStore } from '@/stores/ai'
 import { useReposStore } from '@/stores/repos'

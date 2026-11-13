@@ -1,7 +1,26 @@
 import { ref } from 'vue'
-import type { AccentId, ThemePref } from '@/types/ai'
+import type { AccentId, ThemeId, ThemePref } from '@/types/ai'
 
 export type ResolvedTheme = 'dark' | 'light'
+
+/** Swatches mirror the palettes in src/styles/main.css (used for previews). */
+export interface ThemeInfo {
+  id: ThemeId
+  name: string
+  kind: ResolvedTheme
+  blurb: string
+  swatch: { bg: string; surface: string; line: string; text: string; muted: string }
+}
+
+export const THEMES: ThemeInfo[] = [
+  { id: 'dark', name: 'Kroma Dark', kind: 'dark', blurb: 'Neutral graphite, the default', swatch: { bg: '#1b1d22', surface: '#212329', line: '#42464f', text: '#e4e6eb', muted: '#757b87' } },
+  { id: 'midnight', name: 'Midnight', kind: 'dark', blurb: 'Deep navy for dark rooms', swatch: { bg: '#0f1420', surface: '#141a28', line: '#313b52', text: '#e2e8f2', muted: '#646f87' } },
+  { id: 'dim', name: 'Dim', kind: 'dark', blurb: 'Soft, low contrast for long sessions', swatch: { bg: '#26272c', surface: '#2c2d33', line: '#4a4b53', text: '#dcdcdf', muted: '#7d7e86' } },
+  { id: 'light', name: 'Kroma Light', kind: 'light', blurb: 'Soft grey-white, no glare', swatch: { bg: '#f5f6f8', surface: '#eceef2', line: '#bcc2cc', text: '#1d222b', muted: '#767e8e' } },
+  { id: 'paper', name: 'Paper', kind: 'light', blurb: 'Warm cream, less blue light', swatch: { bg: '#f6f1e7', surface: '#eee7da', line: '#c4b8a2', text: '#2b2620', muted: '#8a806f' } },
+]
+
+export const themeInfo = (id: string) => THEMES.find((t) => t.id === id)
 
 /** The theme actually on screen; reactive so canvas-like colours (lanes, avatars) re-render. */
 export const resolvedTheme = ref<ResolvedTheme>('dark')
@@ -13,23 +32,32 @@ function systemTheme(): ResolvedTheme {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
-function paint(theme: ResolvedTheme) {
-  resolvedTheme.value = theme
-  const root = document.documentElement
-  root.classList.toggle('light', theme === 'light')
-  root.classList.toggle('dark', theme === 'dark')
+/** The palette to show: a theme id, with "system" mapped to Kroma Dark / Kroma Light. */
+export function resolvePalette(pref: ThemePref, system: ResolvedTheme = systemTheme()): ThemeId {
+  if (pref === 'system') return system
+  return themeInfo(pref) ? pref : 'dark'
 }
 
 export function resolveTheme(pref: ThemePref, system: ResolvedTheme = systemTheme()): ResolvedTheme {
-  return pref === 'system' ? system : pref
+  return themeInfo(resolvePalette(pref, system))!.kind
+}
+
+function paint(pref: ThemePref) {
+  const palette = resolvePalette(pref)
+  const kind = themeInfo(palette)!.kind
+  resolvedTheme.value = kind
+  const root = document.documentElement
+  root.classList.toggle('light', kind === 'light')
+  root.classList.toggle('dark', kind === 'dark')
+  root.dataset.theme = palette
 }
 
 export function applyTheme(pref: ThemePref) {
   currentPref = pref
-  paint(resolveTheme(pref))
+  paint(pref)
   if (!media && typeof window !== 'undefined' && window.matchMedia) {
     media = window.matchMedia('(prefers-color-scheme: light)')
-    media.addEventListener('change', () => currentPref === 'system' && paint(systemTheme()))
+    media.addEventListener('change', () => currentPref === 'system' && paint('system'))
   }
 }
 

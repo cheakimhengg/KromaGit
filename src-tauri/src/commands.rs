@@ -33,7 +33,7 @@ pub async fn app_info() -> AppInfo {
 /// Paths passed on the command line (`kromagit ~/code/app`), opened as tabs at startup.
 #[tauri::command]
 pub fn startup_paths() -> Vec<String> {
-    std::env::args().skip(1).filter(|a| !a.starts_with('-')).collect()
+    crate::system::startup_dirs(std::env::args().skip(1))
 }
 
 #[tauri::command]
@@ -64,6 +64,16 @@ pub async fn get_commit_details(repo: String, hash: String) -> AppResult<CommitD
 #[tauri::command]
 pub async fn get_file_diff(repo: String, request: DiffRequest) -> AppResult<FileDiff> {
     blocking(move || git::diff::get_file_diff(&Git::new(repo), &request)).await
+}
+
+#[tauri::command]
+pub async fn clone_repo(url: String, parent: String, name: String) -> AppResult<git::model::RepoInfo> {
+    blocking(move || git::clone_repo(&url, &parent, &name)).await
+}
+
+#[tauri::command]
+pub fn repo_name_from_url(url: String) -> String {
+    git::repo_name_from_url(&url)
 }
 
 #[tauri::command]
@@ -107,18 +117,31 @@ pub fn save_settings(app: tauri::AppHandle, settings: crate::settings::Settings)
 }
 
 #[tauri::command]
-pub async fn set_api_key(provider: String, key: String) -> AppResult<()> {
-    blocking(move || crate::secrets::set_key(&provider, &key)).await
+pub async fn set_api_key(app: tauri::AppHandle, provider: String, key: String) -> AppResult<()> {
+    let dir = config_dir(&app)?;
+    blocking(move || {
+        crate::secrets::set_key(&provider, &key)?;
+        crate::secrets::remember_key(&dir, &provider, true);
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]
-pub async fn delete_api_key(provider: String) -> AppResult<()> {
-    blocking(move || crate::secrets::delete_key(&provider)).await
+pub async fn delete_api_key(app: tauri::AppHandle, provider: String) -> AppResult<()> {
+    let dir = config_dir(&app)?;
+    blocking(move || {
+        crate::secrets::delete_key(&provider)?;
+        crate::secrets::remember_key(&dir, &provider, false);
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]
-pub async fn api_key_status() -> AppResult<std::collections::HashMap<String, bool>> {
-    blocking(|| Ok(crate::secrets::key_status())).await
+pub async fn api_key_status(app: tauri::AppHandle) -> AppResult<std::collections::HashMap<String, bool>> {
+    let dir = config_dir(&app)?;
+    blocking(move || Ok(crate::secrets::indexed_status(&dir))).await
 }
 
 #[tauri::command]
@@ -165,4 +188,36 @@ pub async fn cleanup_candidates(repo: String, bases: Vec<String>, stale_days: u3
 #[tauri::command]
 pub async fn github_commit_avatar(owner: String, repo: String, sha: String) -> AppResult<Option<String>> {
     crate::avatars::github_commit_avatar(&owner, &repo, &sha).await
+}
+
+// ---------- built-in terminal ----------
+
+#[tauri::command]
+pub fn terminal_open(app: tauri::AppHandle, state: tauri::State<'_, crate::terminal::Terminals>, cwd: String, cols: u16, rows: u16) -> AppResult<u32> {
+    state.open(&app, &cwd, cols, rows)
+}
+
+#[tauri::command]
+pub fn terminal_write(state: tauri::State<'_, crate::terminal::Terminals>, id: u32, data: String) -> AppResult<()> {
+    state.write(id, &data)
+}
+
+#[tauri::command]
+pub fn terminal_resize(state: tauri::State<'_, crate::terminal::Terminals>, id: u32, cols: u16, rows: u16) -> AppResult<()> {
+    state.resize(id, cols, rows)
+}
+
+#[tauri::command]
+pub fn terminal_close(state: tauri::State<'_, crate::terminal::Terminals>, id: u32) {
+    state.close(id)
+}
+
+#[tauri::command]
+pub async fn file_history(repo: String, path: String, limit: Option<usize>) -> AppResult<Vec<git::history::FileHistoryEntry>> {
+    blocking(move || git::history::file_history(&Git::new(repo), &path, limit.unwrap_or(500))).await
+}
+
+#[tauri::command]
+pub async fn blame_file(repo: String, path: String, rev: Option<String>) -> AppResult<Vec<git::history::BlameLine>> {
+    blocking(move || git::history::blame(&Git::new(repo), &path, rev.as_deref())).await
 }

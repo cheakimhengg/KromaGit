@@ -163,6 +163,8 @@ fn req(path: &str, source: &str, untracked: bool, commit: Option<&str>, parent: 
         untracked,
         commit: commit.map(Into::into),
         parent: parent.map(Into::into),
+        ignore_whitespace: false,
+        full_file: false,
     }
 }
 
@@ -180,6 +182,8 @@ fn image_req(path: &str, source: &str, untracked: bool, commit: Option<&str>) ->
         untracked,
         commit: commit.map(Into::into),
         parent: None,
+        ignore_whitespace: false,
+        full_file: false,
     }
 }
 
@@ -227,4 +231,76 @@ fn image_preview_reads_each_side_from_the_right_place() {
 
     let escape = get_file_image(&g, &image_req("../outside.png", "unstaged", true, None)).unwrap();
     assert!(escape.after.is_none(), "never reads outside the repository");
+}
+
+#[test]
+fn clones_a_repository_and_refuses_to_overwrite() {
+    use git::{clone_repo, repo_name_from_url};
+    assert_eq!(repo_name_from_url("https://github.com/cheakimhengg/KromaGit.git"), "KromaGit");
+    assert_eq!(repo_name_from_url("git@github.com:org/tools.git/"), "tools");
+    assert_eq!(repo_name_from_url("/tmp/local-repo"), "local-repo");
+
+    let src = sample_repo();
+    let dest = tempfile::tempdir().unwrap();
+    let parent = dest.path().to_string_lossy().to_string();
+    let url = src.path().to_string_lossy().to_string();
+    let info = clone_repo(&url, &parent, "copy").unwrap();
+    assert_eq!(info.name, "copy");
+    assert!(dest.path().join("copy/a.txt").exists());
+
+    assert!(clone_repo(&url, &parent, "copy").is_err(), "existing folder is never overwritten");
+    assert!(clone_repo(&url, &parent, "../escape").is_err());
+    assert!(clone_repo("--upload-pack=evil", &parent, "x").is_err());
+    assert!(clone_repo(&url, "/definitely/not/here", "x").is_err());
+}
+
+#[test]
+fn file_history_follows_renames_and_blame_reads_lines() {
+    use git::history::{blame, file_history};
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "old.txt", "one\ntwo\nthree\nfour\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "add old"]);
+    sh(d, &["mv", "old.txt", "new.txt"]);
+    sh(d, &["commit", "-qm", "rename"]);
+    write(d, "new.txt", "one\nTWO\nthree\nfour\n");
+    sh(d, &["commit", "-qam", "edit"]);
+    let g = Git::new(d);
+    let h = file_history(&g, "new.txt", 50).unwrap();
+    let subjects: Vec<_> = h.iter().map(|e| e.commit.subject.as_str()).collect();
+    assert_eq!(subjects, ["edit", "rename", "add old"]);
+    assert_eq!(h[2].path, "old.txt", "path before the rename");
+    assert_eq!(h[0].path, "new.txt");
+
+    let b = blame(&g, "new.txt", None).unwrap();
+    assert_eq!(b.len(), 4);
+    assert_eq!((b[1].content.as_str(), b[1].summary.as_str()), ("TWO", "edit"));
+    assert_eq!(b[0].summary, "add old");
+    let at = blame(&g, "new.txt", Some(&h[1].commit.hash)).unwrap();
+    assert_eq!(at[1].content, "two", "blame at an older commit");
+    assert!(file_history(&g, "--evil", 5).is_err());
+}
+
+#[test]
+fn diff_can_ignore_whitespace_and_show_the_whole_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    let body: String = (1..=20).map(|i| format!("line {i}\n")).collect();
+    write(d, "f.txt", &body);
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "base"]);
+    write(d, "f.txt", &body.replace("line 10\n", "line  10   \n").replace("line 15\n", "line fifteen\n"));
+    let g = Git::new(d);
+    let base = req("f.txt", "unstaged", false, None, None);
+    let normal = git::diff::get_file_diff(&g, &base).unwrap();
+    let changed = |f: &kromagit_lib::git::model::FileDiff| f.hunks.iter().flat_map(|h| &h.lines).filter(|l| l.kind != "context").count();
+    assert_eq!(changed(&normal), 4);
+    let ws = git::diff::get_file_diff(&g, &DiffRequest { ignore_whitespace: true, ..base.clone() }).unwrap();
+    assert_eq!(changed(&ws), 2, "whitespace-only change hidden");
+    let full = git::diff::get_file_diff(&g, &DiffRequest { full_file: true, ..base }).unwrap();
+    assert_eq!(full.hunks.len(), 1);
+    assert_eq!(full.hunks[0].lines.len(), 22, "every line of the file is shown");
 }

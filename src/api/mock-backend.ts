@@ -31,6 +31,7 @@ function mockImage(path: string) {
 
 export const mockApi: GitApi = {
   openRepo: (path) => delay({ root: path, name: path.split('/').pop() || path }),
+  cloneRepo: (_url, parent, name) => delay({ root: `${parent}/${name}`, name }, 900),
   getCommits: (path, limit) => {
     const all = repo(path).commits
     return delay(limit ? all.slice(0, limit) : all, limit ? 40 : 250)
@@ -64,6 +65,22 @@ export const mockApi: GitApi = {
   },
   getFileDiff: (_path, target) => delay({ ...mockDiff(target.path), path: target.path }),
   getFileImage: (_path, target) => delay(mockImage(target.path)),
+  fileHistory: (path, file) => {
+    const all = repo(path).commits
+    const picked = all.filter((_, i) => i % 7 === (file.length % 7)).slice(0, 14)
+    return delay(picked.map((commit, i) => ({ commit, path: i > 10 ? file.replace(/[^/]+$/, 'old-$&') : file })))
+  },
+  blame: (path, file) => {
+    const all = repo(path).commits
+    const d = mockDiff(file)
+    const lines = d.hunks.flatMap((h) => h.lines.filter((l) => l.kind !== 'del').map((l) => l.text))
+    return delay(
+      lines.map((content, i) => {
+        const c = all[Math.floor(i / 3) % 6]
+        return { line: i + 1, hash: c.hash, author: c.author.name, email: c.author.email, time: c.date, summary: c.subject, content }
+      }),
+    )
+  },
   runAction: (path, action) => delay(mockAction(path, action), 150),
   openInTerminal: () => delay(undefined),
   openInEditor: () => delay(undefined),

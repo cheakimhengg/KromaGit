@@ -8,7 +8,8 @@ export interface AiSettings {
   cloudConsent: Record<string, boolean>
 }
 
-export type ThemePref = 'dark' | 'light' | 'system'
+export type ThemeId = 'dark' | 'midnight' | 'dim' | 'light' | 'paper'
+export type ThemePref = ThemeId | 'system'
 
 export type AccentId = 'blue' | 'violet' | 'teal' | 'pink' | 'amber' | 'green'
 

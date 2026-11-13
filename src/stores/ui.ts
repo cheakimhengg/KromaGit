@@ -11,6 +11,7 @@ export interface MenuItem {
   icon?: Component
   danger?: boolean
   separator?: boolean
+  heading?: boolean
   shortcut?: string
   /** small colour swatch instead of an icon */
   swatch?: string
@@ -84,10 +85,31 @@ export const useUiStore = defineStore('ui', () => {
   const centerView = ref<CenterView>('graph')
   const diffTarget = ref<DiffTarget | null>(null)
   const diffMode = ref<DiffMode>('unified')
+  /** what the file viewer shows: the change, the file's history, or blame */
+  const diffView = ref<'diff' | 'history' | 'blame'>('diff')
+  const DIFF_OPTS_KEY = 'kromagit.diffOptions.v1'
+  const diffOptions = ref({
+    wordDiff: true,
+    ignoreWhitespace: false,
+    wrap: false,
+    fullFile: false,
+    ...(() => {
+      try {
+        return JSON.parse(localStorage.getItem(DIFF_OPTS_KEY) ?? '{}') as Record<string, boolean>
+      } catch {
+        return {}
+      }
+    })(),
+  })
+  watch(diffOptions, (v) => localStorage.setItem(DIFF_OPTS_KEY, JSON.stringify(v)), { deep: true })
   const fileViewMode = ref<'list' | 'tree'>('list')
   const settingsOpen = ref(false)
   const paletteOpen = ref(false)
   const switcherOpen = ref(false)
+  const repoMenuOpen = ref(false)
+  const terminalOpen = ref(false)
+  const terminalHeight = ref(Number(localStorage.getItem('kromagit.terminal.height')) || 280)
+  watch(terminalHeight, (h) => localStorage.setItem('kromagit.terminal.height', String(h)))
   /** the Home (welcome) page is showing instead of the active repository */
   const home = ref(false)
   /** which Settings tab to show next time it opens */
@@ -112,12 +134,16 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function openDiff(target: DiffTarget) {
-    if (centerView.value !== 'diff') previousView.value = centerView.value
+    if (centerView.value !== 'diff') {
+      previousView.value = centerView.value
+      diffView.value = 'diff'
+    }
     diffTarget.value = target
     centerView.value = 'diff'
   }
 
   function closeDiff() {
+    diffView.value = 'diff'
     centerView.value = previousView.value === 'diff' ? 'graph' : previousView.value
     previousView.value = 'graph'
     diffTarget.value = null
@@ -199,8 +225,8 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   return {
-    sidebarCollapsed, sidebarSections, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, fileViewMode,
-    settingsOpen, settingsTab, paletteOpen, switcherOpen, home, commitRequest, amendPending, generateRequest, searchRequest, previousView, menu, toasts, dialog,
+    sidebarCollapsed, sidebarSections, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, diffView, diffOptions, fileViewMode,
+    settingsOpen, settingsTab, paletteOpen, switcherOpen, repoMenuOpen, terminalOpen, terminalHeight, home, commitRequest, amendPending, generateRequest, searchRequest, previousView, menu, toasts, dialog,
     selectCommit, openDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
     openDialog, closeDialog, confirm, prompt,
   }

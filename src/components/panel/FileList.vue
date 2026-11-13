@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { ChevronRight, Folder } from 'lucide-vue-next'
+import { ChevronRight, Folder } from '@/lib/icons'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { buildRefTree, type RefTreeNode } from '@/lib/ref-tree'
 import type { FileChange } from '@/types/git'
@@ -19,7 +19,7 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ open: [FileChange]; toggle: [FileChange]; menu: [MouseEvent, FileChange] }>()
 
-const ROW = 28
+const ROW = 32
 const scrollEl = ref<HTMLElement | null>(null)
 
 interface Row {
@@ -90,7 +90,7 @@ function split(path: string) {
             v-if="!readonly"
             type="checkbox"
             :checked="checked"
-            class="h-3 w-3 shrink-0 cursor-pointer accent-[var(--gw-accent)]"
+            
             :title="checked ? 'Unstage' : 'Stage'"
             @click.stop.prevent="emit('toggle', rows[v.index].file!)"
           />

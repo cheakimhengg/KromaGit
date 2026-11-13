@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { CornerDownLeft, Search } from 'lucide-vue-next'
+import { CornerDownLeft, Search } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 import { useCommands, type Command } from '@/commands/registry'
 import { fuzzyFilter } from '@/lib/fuzzy'

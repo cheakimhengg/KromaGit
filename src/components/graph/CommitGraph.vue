@@ -2,15 +2,14 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
-  Check, Cherry, Copy, Columns3, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Undo, User, X,
-} from 'lucide-vue-next'
+  Check, Cherry, Copy, GitMerge, SlidersHorizontal, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Undo, User, X,
+} from '@/lib/icons'
 import GraphCell from './GraphCell.vue'
 import RefPill from './RefPill.vue'
-import Avatar from '@/components/common/Avatar.vue'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore, type MenuItem } from '@/stores/ui'
-import { ROW_HEIGHT, graphWidth, laneColor, laneX } from '@/lib/lanes'
-import { fullDate, relativeTime } from '@/lib/format'
+import { ROW_HEIGHT, graphWidth, laneColor, laneSpacing, laneX } from '@/lib/lanes'
+import { compactTime, fullDate } from '@/lib/format'
 import type { Commit, RefLabel } from '@/types/git'
 import * as git from '@/actions/git'
 
@@ -25,7 +24,6 @@ const searchInput = ref<HTMLInputElement | null>(null)
 const snapshot = computed(() => repos.active?.snapshot ?? null)
 const layout = computed(() => repos.active?.layout ?? null)
 const commits = computed(() => snapshot.value?.commits ?? [])
-const gWidth = computed(() => graphWidth(layout.value?.maxLanes ?? 1))
 const isFiltered = computed(() => messageQuery.value.trim() !== '' || authorQuery.value.trim() !== '')
 
 const visibleIndexes = computed<number[] | null>(() => {
@@ -54,6 +52,25 @@ const virtualizer = useVirtualizer(
   })),
 )
 
+const visibleLanes = computed(() => {
+  const rows = layout.value?.rows
+  if (!rows) return 1
+  let max = 1
+  const top = virtualizer.value.scrollOffset ?? 0
+  const bottom = top + (scrollEl.value?.clientHeight ?? 0)
+  for (const v of virtualizer.value.getVirtualItems()) {
+    if (v.end <= top || v.start >= bottom) continue
+    const r = rows[rowIndex(v.index)]
+    if (!r) continue
+    max = Math.max(max, r.lane + 1)
+    for (const e of r.upper) max = Math.max(max, e.from + 1, e.to + 1)
+    for (const e of r.lower) max = Math.max(max, e.from + 1, e.to + 1)
+  }
+  return max
+})
+const gWidth = computed(() => graphWidth(visibleLanes.value))
+const gSpacing = computed(() => laneSpacing(visibleLanes.value))
+
 watch(() => repos.activeTabId, () => {
   messageQuery.value = ''
   authorQuery.value = ''
@@ -65,6 +82,24 @@ const headIndex = computed(() => (headOid.value ? commits.value.findIndex((c) =>
 const loadingCommits = computed(() => !!repos.active?.loading.commits)
 const complete = computed(() => !!repos.active?.commitsComplete)
 const headLane = computed(() => (headIndex.value >= 0 ? layout.value?.rows[headIndex.value].lane ?? 0 : 0))
+const stagedCount = computed(() => snapshot.value?.workingCopy.staged.length ?? 0)
+const unstagedCount = computed(() => snapshot.value?.workingCopy.unstaged.length ?? 0)
+const wipActive = computed(() => !ui.selectedCommit && ui.centerView !== 'diff')
+function openWip() {
+  ui.selectCommit(null)
+  ui.closeDiff()
+}
+watch(
+  () => { const items = virtualizer.value.getVirtualItems(); return items.length ? items[items.length - 1].index : -1 },
+  (last) => {
+    if (isFiltered.value || complete.value || loadingCommits.value) return
+    if (last >= rowCount.value - 40) void repos.loadMoreCommits()
+  },
+)
+watch(isFiltered, (on) => {
+  if (on && !complete.value) void repos.loadAllCommits()
+})
+
 const changeCount = computed(() => {
   const wc = snapshot.value?.workingCopy
   return wc ? wc.unstaged.length + wc.staged.length : 0
@@ -81,7 +116,6 @@ onMounted(() => {
 onBeforeUnmount(() => resizeObs?.disconnect())
 
 type ColumnId = 'refs' | 'graph' | 'author' | 'hash' | 'date'
-const COLUMN_LABELS: Record<ColumnId, string> = { refs: 'Branches and tags', graph: 'Graph', author: 'Author', hash: 'Hash', date: 'Date' }
 const COLUMNS_KEY = 'kromagit.columns.v1'
 const visible = ref<Record<ColumnId | 'band', boolean>>({
   refs: true, graph: true, author: true, hash: true, date: true, band: true,
@@ -100,18 +134,17 @@ const spare = computed(() => paneWidth.value - shownGraph.value)
 const show = computed(() => ({
   refs: visible.value.refs,
   graph: visible.value.graph,
-  author: visible.value.author,
+  author: visible.value.author && spare.value >= 560,
   hash: visible.value.hash && spare.value >= 760,
   date: visible.value.date,
 }))
-const fullAuthor = computed(() => spare.value >= 620)
-const refsWidth = computed(() => (spare.value >= 700 ? 180 : 150))
+const refsWidth = computed(() => (spare.value >= 760 ? 170 : spare.value >= 640 ? 150 : 130))
 const columns = computed(() =>
   [
     show.value.refs ? `${refsWidth.value}px` : null,
     show.value.graph ? `${gWidth.value}px` : null,
     'minmax(160px,1fr)',
-    show.value.author ? (fullAuthor.value ? '150px' : '40px') : null,
+    show.value.author ? '110px' : null,
     show.value.hash ? '80px' : null,
     show.value.date ? '110px' : null,
   ]
@@ -121,31 +154,70 @@ const columns = computed(() =>
 
 function columnsMenu(e: MouseEvent) {
   e.preventDefault()
-  const items: MenuItem[] = (Object.keys(COLUMN_LABELS) as ColumnId[]).map((id) => ({
-    label: COLUMN_LABELS[id],
+  const toggle = (id: ColumnId | 'band', label: string): MenuItem => ({
+    label,
     icon: visible.value[id] ? Check : undefined,
     action: () => (visible.value[id] = !visible.value[id]),
-  }))
-  items.splice(2, 0, { label: 'Message (always on)' })
-  items.push(
-    { separator: true },
-    { label: 'Tint rows by lane', icon: visible.value.band ? Check : undefined, action: () => (visible.value.band = !visible.value.band) },
-    { separator: true },
-    { label: 'Show everything', action: () => (Object.keys(visible.value) as (ColumnId | 'band')[]).forEach((k) => (visible.value[k] = true)) },
-  )
+  })
+  const items: MenuItem[] = [
+    { heading: true, label: 'Show in graph' },
+    toggle('refs', 'Branches and tags'),
+    { label: 'Commit message', icon: Check },
+    toggle('author', 'Author'),
+    toggle('hash', 'Hash'),
+    toggle('date', 'Date'),
+    toggle('band', 'Lane color band'),
+  ]
   if (e.type === 'contextmenu') ui.openMenu(e, items)
   else ui.openMenuBelow(e.currentTarget as Element, items)
 }
 
-function displayRefs(c: Commit): { ref: RefLabel; hasRemote: boolean }[] {
-  const remotes = new Set(c.refs.filter((r) => r.kind === 'remote').map((r) => r.name))
+function displayRefs(c: Commit): { ref: RefLabel; hasRemote: boolean; label: string }[] {
+  const strip = (n: string) => n.replace(/^[^/]+\//, '')
   const locals = new Set(c.refs.filter((r) => r.kind === 'local').map((r) => r.name))
-  const out: { ref: RefLabel; hasRemote: boolean }[] = []
+  const remotes = c.refs.filter((r) => r.kind === 'remote' && !r.name.endsWith('/HEAD'))
+  const hasCurrentLocal = c.refs.some((r) => r.kind === 'local' && r.current)
+  const out: { ref: RefLabel; hasRemote: boolean; label: string }[] = []
+  const seenRemote = new Set<string>()
   for (const r of c.refs) {
-    if (r.kind === 'remote' && locals.has(r.name.replace(/^[^/]+\//, ''))) continue
-    out.push({ ref: r, hasRemote: r.kind === 'local' && [...remotes].some((n) => n.endsWith(`/${r.name}`)) })
+    if (r.kind === 'head' && hasCurrentLocal) continue
+    if (r.kind === 'remote') {
+      const short = strip(r.name)
+      if (locals.has(short) || seenRemote.has(short) || r.name.endsWith('/HEAD')) continue
+      seenRemote.add(short)
+      out.push({ ref: r, hasRemote: true, label: short })
+      continue
+    }
+    out.push({ ref: r, hasRemote: r.kind === 'local' && remotes.some((x) => strip(x.name) === r.name), label: r.kind === 'head' ? 'HEAD' : r.name })
   }
-  return out.sort((a, b) => Number(!!b.ref.current) - Number(!!a.ref.current))
+  const rank = (x: { ref: RefLabel }) => (x.ref.current ? 0 : x.ref.kind === 'local' ? 1 : x.ref.kind === 'remote' ? 2 : 3)
+  return out.sort((a, b) => rank(a) - rank(b))
+}
+
+/** Double-click: check out a branch at this commit (local first, else create a local branch from the remote one). */
+function checkoutRef(r: RefLabel) {
+  if (r.current || r.kind === 'tag') return
+  if (r.kind === 'local') return git.checkout(r.name)
+  if (r.kind === 'remote') {
+    const remote = r.name.split('/')[0]
+    return git.checkoutRemote(r.name, remote)
+  }
+}
+function refMenu(e: MouseEvent, r: RefLabel, label: string) {
+  const items: MenuItem[] = []
+  if (!r.current && r.kind !== 'tag' && r.kind !== 'head') {
+    items.push({ label: `Checkout ${label}`, icon: Check, action: () => checkoutRef(r) }, { separator: true })
+  }
+  items.push({ label: 'Copy name', icon: Copy, action: () => git.copyText(label, 'Copied name') })
+  if (r.kind === 'remote') items.push({ label: 'Copy full name', icon: Copy, shortcut: r.name, action: () => git.copyText(r.name, 'Copied name') })
+  ui.openMenu(e, items)
+}
+
+function onRowDblClick(c: Commit) {
+  if (c.hash === headOid.value) return
+  const refs = displayRefs(c).map((x) => x.ref)
+  const target = refs.find((r) => r.kind === 'local') ?? refs.find((r) => r.kind === 'remote')
+  if (target) void checkoutRef(target)
 }
 
 function commitMenu(e: MouseEvent, c: Commit) {
@@ -222,12 +294,12 @@ function rowIndex(virtualIndex: number) {
   <div ref="rootEl" class="flex h-full min-w-0 flex-col bg-bg">
     <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
       <div class="relative w-64 min-w-28 shrink">
-        <Search :size="14" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
-        <input ref="searchInput" v-model="messageQuery" class="gw-input pl-6" placeholder="Search commits…" title="Search by message or commit hash" spellcheck="false" />
+        <Search :size="13" class="gw-search-icon" />
+        <input ref="searchInput" v-model="messageQuery" class="gw-input gw-search" placeholder="Search commits…" title="Search by message or commit hash" spellcheck="false" />
       </div>
       <div class="relative w-44 min-w-24 shrink">
-        <User :size="14" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
-        <input v-model="authorQuery" class="gw-input pl-6" placeholder="Find author…" spellcheck="false" />
+        <User :size="13" class="gw-search-icon" />
+        <input v-model="authorQuery" class="gw-input gw-search" placeholder="Find author…" spellcheck="false" />
       </div>
       <button
         v-if="isFiltered" type="button" class="flex items-center gap-1 rounded px-1.5 py-1 text-[12px] text-muted hover:bg-hover hover:text-fg"
@@ -236,20 +308,20 @@ function rowIndex(virtualIndex: number) {
         <X :size="14" />Clear
       </button>
       <div class="flex-1" />
-      <button
-        type="button" class="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[12px] whitespace-nowrap text-muted hover:bg-hover hover:text-fg"
-        title="Choose columns" @click="columnsMenu"
-      ><Columns3 :size="15" />Columns</button>
       <span class="shrink-0 font-mono text-[12px] whitespace-nowrap text-muted">
         <template v-if="isFiltered">{{ rowCount.toLocaleString() }} of </template>{{ commits.length.toLocaleString() }}{{ complete ? '' : '+' }} commits
       </span>
       <span v-if="loadingCommits" class="flex items-center gap-1 text-[12px] text-faint">
-        <Loader2 :size="14" class="animate-spin" />{{ commits.length ? 'loading full history' : 'loading' }}
+        <Loader2 :size="14" class="animate-spin" />{{ !commits.length ? 'loading' : isFiltered ? 'searching full history' : 'loading more' }}
       </span>
+      <button
+        type="button" class="flex shrink-0 items-center rounded-md p-1 text-muted hover:bg-hover hover:text-fg"
+        title="Choose columns" @click="columnsMenu"
+      ><SlidersHorizontal :size="16" /></button>
     </div>
 
     <div
-      class="grid h-8 shrink-0 items-center border-b border-line bg-surface text-[12px] font-medium text-faint"
+      class="grid h-8 shrink-0 items-center overflow-y-hidden border-b border-line bg-surface [scrollbar-gutter:stable] text-[12px] font-medium text-faint"
       :style="{ gridTemplateColumns: columns }"
       title="Right-click to choose columns"
       @contextmenu="columnsMenu"
@@ -257,54 +329,57 @@ function rowIndex(virtualIndex: number) {
       <span v-if="show.refs" class="truncate px-3">Branch / Tag</span>
       <span v-if="show.graph" class="px-2">Graph</span>
       <span class="px-2" :class="{ 'pl-3': !show.refs && !show.graph }">Message</span>
-      <span v-if="show.author" class="truncate px-2">{{ fullAuthor ? 'Author' : '' }}</span>
+      <span v-if="show.author" class="truncate px-2">Author</span>
       <span v-if="show.hash" class="px-2">Hash</span>
-      <span v-if="show.date" class="px-2">Date</span>
+      <span v-if="show.date" class="px-3 text-right">Date</span>
     </div>
 
     <div
       v-if="!isFiltered && changeCount"
-      class="grid h-[38px] shrink-0 items-center border-b border-dashed border-line bg-surface/50"
+      role="button" tabindex="0"
+      class="grid h-8 shrink-0 cursor-pointer items-center overflow-y-hidden [scrollbar-gutter:stable] border-b border-dashed border-line transition-colors"
+      :class="wipActive ? 'bg-select' : 'bg-surface/50 hover:bg-surface-2'"
       :style="{ gridTemplateColumns: columns }"
+      title="Show uncommitted changes"
+      @click="openWip"
+      @keydown.enter="openWip"
     >
       <span v-if="show.refs" class="px-3">
         <span class="inline-flex h-[21px] items-center rounded-full border border-dashed border-faint px-2 text-[12px] text-muted">WIP</span>
       </span>
-      <svg v-if="show.graph" :width="gWidth" height="38" class="block">
-        <circle :cx="laneX(headLane)" cy="19" r="10" fill="none" :stroke="laneColor(layout?.rows[headIndex]?.color ?? 0)" stroke-width="2" stroke-dasharray="3 2.5" />
+      <svg v-if="show.graph" :width="gWidth" height="32" class="block">
+        <circle :cx="laneX(headLane, gSpacing)" cy="16" r="9" fill="none" :stroke="laneColor(layout?.rows[headIndex]?.color ?? 0)" stroke-width="2" stroke-dasharray="3 2.5" />
       </svg>
       <span class="flex items-center gap-2 px-2 text-[13px] whitespace-nowrap" :class="{ 'pl-3': !show.refs && !show.graph }">
-        <span class="text-muted italic">{{ changeCount }} uncommitted {{ changeCount === 1 ? 'change' : 'changes' }}</span>
-        <button
-          type="button" class="rounded-md border border-line-strong px-2 py-0.5 text-[12px] text-fg hover:border-accent/60 hover:bg-accent/10"
-          @click="ui.selectCommit(null); ui.closeDiff()"
-        >
-          <Pencil :size="11" class="mr-1 inline" />View changes
-        </button>
+        <Pencil :size="14" class="shrink-0 text-accent" />
+        <span class="text-fg">{{ changeCount }} uncommitted {{ changeCount === 1 ? 'change' : 'changes' }}</span>
+        <span v-if="stagedCount" class="rounded-full bg-success/15 px-2 py-px text-[12px] font-medium text-success">{{ stagedCount }} staged</span>
+        <span v-if="unstagedCount" class="rounded-full bg-accent/15 px-2 py-px text-[12px] font-medium text-accent">{{ unstagedCount }} modified</span>
       </span>
     </div>
 
-    <div ref="scrollEl" class="min-h-0 flex-1 overflow-auto outline-none" tabindex="0" @keydown="onListKey">
+    <div ref="scrollEl" class="min-h-0 flex-1 overflow-auto outline-none [scrollbar-gutter:stable]" tabindex="0" @keydown="onListKey">
       <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
         <template v-for="v in virtualizer.getVirtualItems()" :key="v.index">
           <div
             v-for="c in [commits[rowIndex(v.index)]]"
             :key="c.hash"
-            class="absolute left-0 grid w-full items-center text-[13px]"
-            :class="ui.selectedCommit === c.hash ? 'bg-select' : ['hover:bg-surface-2', { 'row-tint': visible.band && !isFiltered }]"
+            class="absolute left-0 grid w-full cursor-pointer items-center text-[13px]"
+            :class="ui.selectedCommit === c.hash ? 'bg-select' : 'hover:bg-surface-2'"
             :style="{ height: `${ROW_HEIGHT}px`, transform: `translateY(${v.start}px)`, gridTemplateColumns: columns, '--lane': laneColor(layout!.rows[rowIndex(v.index)].color) }"
             @click="ui.selectCommit(c.hash)"
+            @dblclick="onRowDblClick(c)"
             @contextmenu="commitMenu($event, c)"
           >
             <span v-if="show.refs" class="flex min-w-0 items-center gap-1 overflow-hidden pl-3">
               <template v-for="(r, i) in displayRefs(c)" :key="r.ref.name">
-                <RefPill v-if="i < 2" :ref-label="r.ref" :has-remote="r.hasRemote" :color="laneColor(layout!.rows[rowIndex(v.index)].color)" />
+                <RefPill v-if="i < 1" class="min-w-0 shrink cursor-pointer" :label="r.label" :title="r.ref.current ? `${r.ref.name} (checked out)` : `Double-click to check out ${r.ref.name}`" @dblclick.stop="checkoutRef(r.ref)" @contextmenu.stop.prevent="refMenu($event, r.ref, r.label)" :ref-label="r.ref" :has-remote="r.hasRemote" :color="laneColor(layout!.rows[rowIndex(v.index)].color)" />
               </template>
-              <span v-if="displayRefs(c).length > 2" class="shrink-0 text-[11px] text-faint" :title="displayRefs(c).slice(2).map((r) => r.ref.name).join(', ')">
-                +{{ displayRefs(c).length - 2 }}
+              <span v-if="displayRefs(c).length > 1" class="shrink-0 rounded-full bg-surface-3 px-1.5 text-[11px] leading-[18px] text-muted" :title="displayRefs(c).slice(1).map((r) => r.label).join(', ')">
+                +{{ displayRefs(c).length - 1 }}
               </span>
               <span
-                v-if="c.refs.length && show.graph" class="h-[2px] min-w-[6px] flex-1"
+                v-if="displayRefs(c).length && show.graph" class="ml-1 h-[1.5px] min-w-[6px] flex-1"
                 :style="{ background: laneColor(layout!.rows[rowIndex(v.index)].color) }"
               />
             </span>
@@ -312,30 +387,34 @@ function rowIndex(virtualIndex: number) {
               v-if="show.graph"
               :row="layout!.rows[rowIndex(v.index)]"
               :width="gWidth"
+              :lane-width="gSpacing"
               :author-name="c.author.name"
               :author-email="c.author.email"
               :commit-hash="c.hash"
-              :has-refs="c.refs.length > 0 && show.refs"
+              :has-refs="displayRefs(c).length > 0 && show.refs"
+              :band="visible.band && !isFiltered"
               :is-head="c.hash === headOid"
               :edges-hidden="isFiltered"
             />
             <span
-              class="flex h-full min-w-0 items-center gap-1.5 truncate px-2" :class="[c.parents.length > 1 ? 'text-muted' : 'text-fg', { 'pl-3': !show.refs && !show.graph }]"
+              :style="visible.band && !isFiltered ? { boxShadow: `inset 2px 0 0 ${laneColor(layout!.rows[rowIndex(v.index)].color)}` } : undefined"
+              class="flex h-full min-w-0 items-center gap-1.5 truncate px-2.5 text-[14px]" :class="[c.parents.length > 1 ? 'text-muted' : 'text-fg', { 'pl-3': !show.refs && !show.graph }]"
             >
               <template v-if="!show.refs">
                 <RefPill
-                  v-for="r in displayRefs(c).slice(0, 2)" :key="r.ref.name" class="shrink-0"
+                  v-for="r in displayRefs(c).slice(0, 2)" :key="r.ref.name" class="shrink-0" :label="r.label"
+                  @contextmenu.stop.prevent="refMenu($event, r.ref, r.label)"
                   :ref-label="r.ref" :has-remote="r.hasRemote" :color="laneColor(layout!.rows[rowIndex(v.index)].color)"
                 />
               </template>
+              <GitMerge v-if="c.parents.length > 1" :size="15" class="shrink-0 text-faint" />
               <span class="truncate">{{ c.subject }}</span>
             </span>
             <span v-if="show.author" class="flex min-w-0 items-center gap-1.5 px-2 text-muted">
-              <Avatar :name="c.author.name" :email="c.author.email" :size="20" />
-              <span v-if="fullAuthor" class="truncate">{{ c.author.name }}</span>
+              <span class="truncate" :title="`${c.author.name} <${c.author.email}>`">{{ c.author.name }}</span>
             </span>
             <span v-if="show.hash" class="px-2 font-mono text-[12px] text-faint">{{ c.shortHash }}</span>
-            <span v-if="show.date" class="truncate px-2 text-muted" :title="fullDate(c.date)">{{ relativeTime(c.date) }}</span>
+            <span v-if="show.date" class="truncate px-3 text-right font-mono text-[12px] text-muted tabular-nums" :title="fullDate(c.date)">{{ compactTime(c.date) }}</span>
           </div>
         </template>
       </div>

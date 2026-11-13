@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CloudCheck, CloudOff, FileDiff, GitBranch, Loader2, Moon, Sparkles, Sun, ZoomIn } from 'lucide-vue-next'
+import { CloudCheck, CloudOff, FileDiff, GitBranch, Loader2, Moon, Sparkles, Sun, ZoomIn } from '@/lib/icons'
 import { resolvedTheme } from '@/lib/theme'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'

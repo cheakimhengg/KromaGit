@@ -72,7 +72,7 @@ fn stages_unstages_and_discards_selected_lines() {
     let d = tmp.path();
     write(d, "f.txt", "ONE\n2\n3\n4\n5\n6\n7\n8\n9\nTEN\n");
     let g = Git::new(d);
-    let req = |source: &str| DiffRequest { path: "f.txt".into(), old_path: None, source: source.into(), untracked: false, commit: None, parent: None };
+    let req = |source: &str| DiffRequest { path: "f.txt".into(), old_path: None, source: source.into(), untracked: false, commit: None, parent: None, ignore_whitespace: false, full_file: false };
 
     let unstaged = diff::get_file_diff(&g, &req("unstaged")).unwrap();
     assert_eq!(unstaged.hunks.len(), 2);
@@ -262,4 +262,22 @@ fn first_commit_can_be_undone_in_an_unborn_repo() {
     let s = st(d);
     assert!(s.head.oid.is_none());
     assert_eq!(s.staged.len(), 1, "changes stay staged after undoing the first commit");
+}
+
+#[test]
+fn checks_out_a_remote_only_branch_and_reuses_an_existing_local_one() {
+    let upstream = repo();
+    sh(upstream.path(), &["branch", "Featrue/HmacEnhance"]);
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path().join("clone");
+    sh(tmp.path(), &["clone", "-q", &upstream.path().to_string_lossy(), "clone"]);
+
+    act(&d, serde_json::json!({ "type": "checkoutRemote", "remoteBranch": "origin/Featrue/HmacEnhance", "name": "Featrue/HmacEnhance" }));
+    assert_eq!(sh(&d, &["rev-parse", "--abbrev-ref", "HEAD"]), "Featrue/HmacEnhance");
+    assert_eq!(sh(&d, &["rev-parse", "--abbrev-ref", "@{upstream}"]), "origin/Featrue/HmacEnhance");
+
+    let main = sh(&d, &["rev-parse", "--abbrev-ref", "origin/HEAD"]).trim_start_matches("origin/").to_string();
+    sh(&d, &["switch", "-q", &main]);
+    act(&d, serde_json::json!({ "type": "checkoutRemote", "remoteBranch": "origin/Featrue/HmacEnhance", "name": "Featrue/HmacEnhance" }));
+    assert_eq!(sh(&d, &["rev-parse", "--abbrev-ref", "HEAD"]), "Featrue/HmacEnhance", "existing local branch is reused");
 }

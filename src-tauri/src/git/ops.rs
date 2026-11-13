@@ -117,8 +117,11 @@ fn nul_list(paths: &[String]) -> Vec<u8> {
     buf
 }
 
+/// Resolves `rev`, or returns an empty string when it doesn't exist
+/// (`--verify -q` exits 1 silently for a missing ref — that is not an error).
 fn rev_parse(git: &Git, rev: &str) -> AppResult<String> {
-    Ok(git.run_string(&["rev-parse", "--verify", "-q", rev])?.trim().to_string())
+    let out = git.run_with_codes(&["rev-parse", "--verify", "-q", rev], &[0, 1])?;
+    Ok(String::from_utf8_lossy(&out).trim().to_string())
 }
 
 /// Snapshot of tracked changes (index + worktree) without touching anything.
@@ -223,6 +226,8 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
                 untracked: false,
                 commit: None,
                 parent: None,
+                ignore_whitespace: false,
+                full_file: false,
             };
             let diff = get_file_diff(git, &req)?;
             let forward = !staged && !*discard;

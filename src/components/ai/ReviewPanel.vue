@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AlertOctagon, Bug, KeyRound, Lightbulb, Loader2, RotateCw, ScanSearch, Terminal, TriangleAlert } from 'lucide-vue-next'
+import { AlertOctagon, Bug, KeyRound, Lightbulb, Loader2, RotateCw, ScanSearch, Terminal, TriangleAlert } from '@/lib/icons'
 import PanelShell from './PanelShell.vue'
 import { useAiStore } from '@/stores/ai'
 import { useUiStore } from '@/stores/ui'

@@ -48,7 +48,7 @@ export const useSettingsStore = defineStore('settings', () => {
   function applyAppearance() {
     applyTheme(settings.value.appearance.theme)
     applyAccent(settings.value.appearance.accent)
-    setAvatarsEnabled(settings.value.general.showAvatars !== false)
+    setAvatarsEnabled(true)
     void applyZoom(settings.value.appearance.zoom, inTauri).catch(() => {})
   }
 

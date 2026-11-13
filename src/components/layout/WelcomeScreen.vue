@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Clock, Command, FolderGit2, FolderOpen, FolderSearch, Settings, X } from 'lucide-vue-next'
+import { Clock, Command, FolderGit2, FolderOpen, FolderSearch, GitBranchPlus, Settings, X } from '@/lib/icons'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 import { formatCombo } from '@/lib/shortcuts'
@@ -21,6 +21,7 @@ function open(r: { path: string; tabId?: string }) {
 const actions = computed(() => [
   { icon: FolderOpen, title: 'Open repository', sub: 'Pick a folder with a Git repo', combo: 'Mod+O', run: () => repos.openRepo(), primary: true },
   { icon: FolderSearch, title: 'Switch repository', sub: 'Jump to a recent or open repo', combo: 'Mod+P', run: () => (ui.switcherOpen = true) },
+  { icon: GitBranchPlus, title: 'Clone repository', sub: 'Copy a repo from GitHub or a URL', combo: '', run: () => repos.cloneRepo() },
   { icon: Command, title: 'Command palette', sub: 'Every action, searchable', combo: 'Mod+K', run: () => (ui.paletteOpen = true) },
 ])
 </script>
@@ -36,7 +37,7 @@ const actions = computed(() => [
         </div>
       </div>
 
-      <div class="mb-8 grid grid-cols-3 gap-3">
+      <div class="mb-8 grid grid-cols-2 gap-3">
         <button
           v-for="a in actions" :key="a.title"
           type="button"
@@ -46,7 +47,7 @@ const actions = computed(() => [
         >
           <span class="flex items-center justify-between">
             <component :is="a.icon" :size="22" :class="a.primary ? 'text-accent' : 'text-muted'" />
-            <kbd class="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[11px] text-faint">{{ formatCombo(a.combo) }}</kbd>
+            <kbd v-if="a.combo" class="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[11px] text-faint">{{ formatCombo(a.combo) }}</kbd>
           </span>
           <span>
             <span class="block text-[14px] font-semibold text-fg">{{ a.title }}</span>

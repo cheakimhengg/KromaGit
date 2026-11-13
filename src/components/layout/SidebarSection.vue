@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { computed } from 'vue'
-import { ChevronRight } from 'lucide-vue-next'
+import { ChevronRight } from '@/lib/icons'
 import CountBadge from '@/components/common/CountBadge.vue'
 import { useUiStore } from '@/stores/ui'
 

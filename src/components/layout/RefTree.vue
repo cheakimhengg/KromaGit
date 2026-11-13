@@ -1,13 +1,14 @@
 <script setup lang="ts" generic="T">
 import { computed, ref } from 'vue'
-import { ChevronRight, Folder, FolderOpen } from 'lucide-vue-next'
+import { ChevronRight, Folder, FolderOpen } from '@/lib/icons'
 import type { RefTreeNode } from '@/lib/ref-tree'
 
 const props = withDefaults(defineProps<{ nodes: RefTreeNode<T>[]; baseDepth?: number; forceOpen?: boolean }>(), { baseDepth: 0 })
 const emit = defineEmits<{ select: [item: T]; menu: [event: MouseEvent, item: T] }>()
 defineSlots<{ leaf(props: { item: T; label: string }): unknown }>()
 
-const collapsed = ref(new Set<string>())
+/** folders the user opened; everything starts collapsed */
+const expanded = ref(new Set<string>())
 
 interface Row {
   key: string
@@ -21,7 +22,7 @@ const rows = computed<Row[]>(() => {
   const walk = (nodes: RefTreeNode<T>[], depth: number) => {
     for (const node of nodes) {
       const isFolder = node.item === undefined
-      const open = props.forceOpen || !collapsed.value.has(node.path)
+      const open = props.forceOpen || expanded.value.has(node.path)
       out.push({ key: node.path + (isFolder ? '/' : ''), depth, node, open })
       if (isFolder && open) walk(node.children, depth + 1)
     }
@@ -31,10 +32,10 @@ const rows = computed<Row[]>(() => {
 })
 
 function toggle(path: string) {
-  const next = new Set(collapsed.value)
+  const next = new Set(expanded.value)
   if (next.has(path)) next.delete(path)
   else next.add(path)
-  collapsed.value = next
+  expanded.value = next
 }
 </script>
 

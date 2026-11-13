@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { AlertOctagon, Brush, Loader2, RotateCw, Trash2 } from 'lucide-vue-next'
+import { AlertOctagon, Brush, Loader2, RotateCw, Trash2 } from '@/lib/icons'
 import PanelShell from './PanelShell.vue'
 import { useAiStore } from '@/stores/ai'
 import { useOpsStore } from '@/stores/ops'
@@ -62,11 +62,11 @@ const remoteCount = computed(() => chosen.value.filter((x) => x.remoteBranch).le
       <template v-else>
         <div class="overflow-hidden rounded-lg border border-line">
           <label class="flex cursor-pointer items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-[13px] font-semibold text-fg">
-            <input type="checkbox" :checked="allChecked" class="h-3 w-3 accent-[var(--gw-accent)]" @change="toggleAll" />
+            <input type="checkbox" :checked="allChecked" @change="toggleAll" />
             {{ c.candidates.length }} candidates
           </label>
           <label v-for="b in c.candidates" :key="b.name" class="flex cursor-pointer items-center gap-2 border-b border-line px-3 py-1.5 text-[13px] last:border-b-0 hover:bg-surface-2">
-            <input type="checkbox" :checked="selected.has(b.name)" class="h-3 w-3 accent-[var(--gw-accent)]" @change="toggle(b.name)" />
+            <input type="checkbox" :checked="selected.has(b.name)" @change="toggle(b.name)" />
             <span class="min-w-0 flex-1 truncate font-mono text-fg">{{ b.name }}</span>
             <span v-for="m in b.mergedInto" :key="m" class="rounded bg-success/15 px-1.5 text-[11px] text-success">merged → {{ m }}</span>
             <span v-if="b.upstreamGone" class="rounded bg-danger/15 px-1.5 text-[11px] text-danger">remote gone</span>
@@ -77,8 +77,8 @@ const remoteCount = computed(() => chosen.value.filter((x) => x.remoteBranch).le
         </div>
 
         <div class="flex flex-wrap items-center gap-4">
-          <label class="flex items-center gap-1.5 text-[13px] text-muted"><input v-model="deleteLocal" type="checkbox" class="h-3 w-3 accent-[var(--gw-accent)]" />Delete local branch</label>
-          <label class="flex items-center gap-1.5 text-[13px] text-muted"><input v-model="deleteRemote" type="checkbox" class="h-3 w-3 accent-[var(--gw-accent)]" />Also delete on remote ({{ remoteCount }})</label>
+          <label class="flex items-center gap-1.5 text-[13px] text-muted"><input v-model="deleteLocal" type="checkbox" />Delete local branch</label>
+          <label class="flex items-center gap-1.5 text-[13px] text-muted"><input v-model="deleteRemote" type="checkbox" />Also delete on remote ({{ remoteCount }})</label>
           <div class="flex-1" />
           <button
             type="button" :disabled="!chosen.length || (!deleteLocal && !(deleteRemote && remoteCount)) || !!ops.running"

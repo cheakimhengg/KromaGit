@@ -161,6 +161,8 @@ export function checkout(branch: string) {
 
 export function checkoutRemote(remoteBranch: string, remote: string) {
   const name = remoteBranch.slice(remote.length + 1)
+  const local = useReposStore().active?.snapshot.branches.find((b) => b.name === name)
+  if (local) return local.current ? undefined : checkout(name)
   const action: GitAction = { type: 'checkoutRemote', remoteBranch, name }
   return ops().run(`Checkout ${remoteBranch}`, action, { success: `Switched to ${name}`, undo: checkoutUndo(action) })
 }

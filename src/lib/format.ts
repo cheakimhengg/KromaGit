@@ -20,6 +20,16 @@ export function relativeTime(unixSeconds: number, now = Date.now() / 1000): stri
   return 'just now'
 }
 
+export function compactTime(unixSeconds: number, now = Date.now() / 1000): string {
+  const s = Math.max(0, now - unixSeconds)
+  if (s < 60) return 'now'
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  if (s < 60 * 86400) return `${Math.floor(s / 86400)}d ago`
+  if (s < 365 * 86400) return `${Math.floor(s / (30 * 86400))}mo ago`
+  return `${Math.floor(s / (365 * 86400))}y ago`
+}
+
 const fullFmt = new Intl.DateTimeFormat('en', {
   year: 'numeric',
   month: 'short',
@@ -81,5 +91,35 @@ export function shortPath(p: string): string {
 }
 
 export function shortDate(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const d = new Date(unixSeconds * 1000)
+  const day = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  return `${day} at ${time}`
+}
+
+/** Joins git's hard-wrapped message lines back into paragraphs; keeps blank lines and list items. */
+export function reflowMessage(body: string): string[] {
+  const out: string[] = []
+  let prevBlank = true
+  for (const raw of body.split('\n')) {
+    const line = raw.trimEnd()
+    if (!line.trim()) {
+      if (!prevBlank) out.push('')
+      prevBlank = true
+      continue
+    }
+    const startsItem = /^\s*([-*•]|\d+[.)]|#)\s/.test(line)
+    if (!prevBlank && !startsItem && out.length) out[out.length - 1] += ` ${line.trim()}`
+    else out.push(line.trim())
+    prevBlank = false
+  }
+  while (out.length && !out[out.length - 1]) out.pop()
+  return out
+}
+
+/** Folder name git picks for a clone URL: last path segment without ".git". */
+export function repoNameFromUrl(url: string): string {
+  const trimmed = url.trim().replace(/[/\\]+$/, '')
+  const last = trimmed.split(/[/\\:]/).pop() ?? trimmed
+  return last.replace(/\.git$/, '')
 }

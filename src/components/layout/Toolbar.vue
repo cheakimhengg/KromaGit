@@ -3,8 +3,9 @@ import { computed } from 'vue'
 import {
   Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, Check, ChevronDown, CloudDownload, Code2, GitBranch,
   Command, GitBranchPlus, PanelLeft, Redo2, RefreshCw, Settings, Tag, Terminal, Undo2, CalendarClock, Brush,
-} from 'lucide-vue-next'
+} from '@/lib/icons'
 import ToolButton from '@/components/common/ToolButton.vue'
+import RepoMenu from './RepoMenu.vue'
 import { useReposStore } from '@/stores/repos'
 import { useOpsStore } from '@/stores/ops'
 import { useUiStore, type MenuItem } from '@/stores/ui'
@@ -58,11 +59,11 @@ function pushMenu(e: MouseEvent) {
       @click="ui.sidebarCollapsed = !ui.sidebarCollapsed"
     />
 
-    <div v-if="snapshot" class="flex h-9 min-w-0 items-center rounded-full bg-surface-2/70 pr-1 pl-3.5">
-      <span class="max-w-[180px] truncate text-[14px] font-semibold text-fg">{{ snapshot.name }}</span>
+    <div v-if="snapshot" class="flex h-9 min-w-0 items-center rounded-full bg-surface-2/70 px-1">
+      <RepoMenu />
       <button
         type="button"
-        class="ml-2.5 flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-accent/15 px-2.5 text-[13px] font-medium text-accent hover:bg-accent/25 disabled:opacity-50"
+        class="ml-1 flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-accent/15 px-2.5 text-[13px] font-medium text-accent hover:bg-accent/25 disabled:opacity-50"
         title="Switch branch"
         :disabled="busy"
         @click="branchMenu"
@@ -109,7 +110,7 @@ function pushMenu(e: MouseEvent) {
     </div>
     <div class="island">
       <ToolButton :icon="Command" :title="`Command palette (${formatCombo('Mod+K')})`" @click="ui.paletteOpen = true" />
-      <ToolButton :icon="Terminal" title="Open in terminal" @click="git.openInTerminal()" />
+      <ToolButton :icon="Terminal" :active="ui.terminalOpen" title="Terminal (⌃`)" @click="ui.terminalOpen = !ui.terminalOpen" />
       <ToolButton :icon="Code2" title="Open in editor" @click="git.openInEditor()" />
       <ToolButton :icon="RefreshCw" :title="`Refresh (${formatCombo('Mod+R')})`" :loading="repos.busy" :disabled="busy" @click="repos.load(repos.activeTabId)" />
     </div>

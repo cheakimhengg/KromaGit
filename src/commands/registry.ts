@@ -7,7 +7,7 @@ import { computed } from 'vue'
 import type { Component } from 'vue'
 import {
   Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, Brush, CalendarClock, Check, CloudDownload, Code2, FolderOpen, FolderSearch, GitBranch, GitBranchPlus, GitCommitHorizontal, House, Layers, LayoutList, Minus, Moon, PanelLeft, Plus, Redo2, RefreshCw, ScanSearch, Search, Settings, Sparkles, Split, Tag, Terminal, Undo2, X, ZoomIn, ZoomOut,
-} from 'lucide-vue-next'
+} from '@/lib/icons'
 import * as git from '@/actions/git'
 import { useAiStore } from '@/stores/ai'
 import { useOpsStore } from '@/stores/ops'
@@ -59,6 +59,7 @@ export function useCommands() {
     { id: 'search', title: 'Search commits', group: 'View', icon: Search, shortcut: 'Mod+F', enabled: hasRepo, run: () => ui.focusSearch() },
 
     { id: 'open', title: 'Open repository…', group: 'Repository', icon: FolderOpen, shortcut: 'Mod+O', global: true, run: () => repos.openRepo() },
+    { id: 'clone', title: 'Clone repository…', group: 'Repository', icon: GitBranchPlus, keywords: 'git clone url download', run: () => repos.cloneRepo() },
     { id: 'switch-repo', title: 'Switch repository…', group: 'Repository', icon: FolderSearch, keywords: 'recent project open quick', shortcut: 'Mod+P', global: true, run: () => (ui.switcherOpen = true) },
     { id: 'home', title: 'Home', group: 'Repository', icon: House, keywords: 'welcome start recent', shortcut: 'Mod+Shift+H', global: true, run: () => (ui.home = !!repos.activeTab && !ui.home) },
     { id: 'close-tab', title: 'Close tab', group: 'Repository', icon: X, shortcut: 'Mod+W', global: true, enabled: () => hasRepo() && !ui.home, run: () => repos.closeTab(repos.activeTabId) },
@@ -66,7 +67,8 @@ export function useCommands() {
     { id: 'prev-tab', title: 'Previous tab', group: 'Repository', shortcut: 'Mod+Shift+[', global: true, run: () => cycleTab(-1) },
     { id: 'new-group', title: 'New tab group…', group: 'Repository', icon: Layers, enabled: hasRepo, run: () => repos.promptNewGroup(repos.activeTabId) },
     { id: 'refresh', title: 'Refresh', group: 'Repository', icon: RefreshCw, shortcut: 'Mod+R', global: true, enabled: idle, run: () => repos.load(repos.activeTabId) },
-    { id: 'terminal', title: 'Open in terminal', group: 'Repository', icon: Terminal, enabled: hasRepo, run: () => git.openInTerminal() },
+    { id: 'terminal', title: 'Toggle terminal', group: 'Repository', icon: Terminal, keywords: 'shell console command line', shortcut: 'Ctrl+`', global: true, enabled: hasRepo, run: () => (ui.terminalOpen = !ui.terminalOpen) },
+    { id: 'external-terminal', title: 'Open in external terminal app', group: 'Repository', icon: Terminal, keywords: 'iterm warp shell', enabled: hasRepo, run: () => git.openInTerminal() },
     { id: 'editor', title: 'Open in editor', group: 'Repository', icon: Code2, enabled: hasRepo, run: () => git.openInEditor() },
 
     { id: 'commit', title: 'Commit staged changes', group: 'Changes', icon: GitCommitHorizontal, shortcut: 'Mod+Enter', global: true, enabled: idle, run: () => ui.requestCommit() },

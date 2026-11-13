@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { AlertTriangle } from 'lucide-vue-next'
+import { AlertTriangle } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 
 const ui = useUiStore()
@@ -46,7 +46,12 @@ function submit() {
   ui.closeDialog({ values: { ...values }, checks: { ...checks } })
 }
 
+/** a key press is handled once — otherwise Enter that confirms one dialog would also confirm the next one it opens */
+const handled = new WeakSet<KeyboardEvent>()
+
 function onKey(e: KeyboardEvent) {
+  if (handled.has(e)) return
+  handled.add(e)
   if (e.key === 'Escape') ui.closeDialog(null)
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || !(e.target instanceof HTMLTextAreaElement))) {
     e.preventDefault()
@@ -117,7 +122,7 @@ function setFirst(el: unknown, index: number) {
 
         <div v-if="ui.dialog.checkboxes?.length" class="space-y-1.5 px-5 pt-3">
           <label v-for="c in ui.dialog.checkboxes" :key="c.key" class="flex cursor-pointer items-center gap-2 text-[13px] text-muted select-none">
-            <input v-model="checks[c.key]" type="checkbox" class="h-3.5 w-3.5 accent-[var(--gw-accent)]" />{{ c.label }}
+            <input v-model="checks[c.key]" type="checkbox" />{{ c.label }}
           </label>
         </div>
 

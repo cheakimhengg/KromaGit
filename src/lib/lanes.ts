@@ -22,12 +22,22 @@ export const avatarColors = (hue: number) =>
     ? { bg: `hsl(${hue} 60% 84%)`, fg: `hsl(${hue} 55% 26%)` }
     : { bg: `hsl(${hue} 40% 36%)`, fg: `hsl(${hue} 90% 90%)` }
 
-export const ROW_HEIGHT = 34
-export const LANE_WIDTH = 19
-export const GRAPH_PADDING = 14
+export const ROW_HEIGHT = 32
+export const LANE_WIDTH = 26
+export const GRAPH_PADDING = 17
 
-export const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH
+export const MIN_LANE_WIDTH = 14
+export const MAX_GRAPH_WIDTH = 280
+
+export const laneX = (lane: number, spacing = LANE_WIDTH) => GRAPH_PADDING + lane * spacing
+
+export function laneSpacing(maxLanes: number): number {
+  if (maxLanes <= 1) return LANE_WIDTH
+  const fit = (MAX_GRAPH_WIDTH - GRAPH_PADDING * 2) / (maxLanes - 1)
+  return Math.max(MIN_LANE_WIDTH, Math.min(LANE_WIDTH, fit))
+}
 
 export function graphWidth(maxLanes: number): number {
-  return Math.min(Math.max(maxLanes * LANE_WIDTH + GRAPH_PADDING * 2, 84), 320)
+  const content = (maxLanes - 1) * laneSpacing(maxLanes) + GRAPH_PADDING * 2
+  return Math.ceil(Math.max(content, 72))
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AlertTriangle, RotateCw, X } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { AlertTriangle, RotateCw, X } from '@/lib/icons'
 import TabBar from '@/components/layout/TabBar.vue'
 import Toolbar from '@/components/layout/Toolbar.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
@@ -9,11 +9,13 @@ import CommitGraph from '@/components/graph/CommitGraph.vue'
 import DiffViewer from '@/components/diff/DiffViewer.vue'
 import RightPanel from '@/components/panel/RightPanel.vue'
 import ContextMenu from '@/components/common/ContextMenu.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import Toaster from '@/components/common/Toaster.vue'
 import Dialog from '@/components/common/Dialog.vue'
 import OperationBanner from '@/components/layout/OperationBanner.vue'
 import WelcomeScreen from '@/components/layout/WelcomeScreen.vue'
 import ResizeHandle from '@/components/layout/ResizeHandle.vue'
+import TerminalPanel from '@/components/terminal/TerminalPanel.vue'
 import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import ReviewPanel from '@/components/ai/ReviewPanel.vue'
 import SplitPanel from '@/components/ai/SplitPanel.vue'
@@ -40,6 +42,8 @@ watch(
   ([remotes, commits]) => setAvatarContext((remotes ?? []).map((r) => r.url), commits ?? []),
 )
 
+const historyMode = computed(() => ui.centerView === 'diff' && ui.diffView !== 'diff')
+
 const PANES_KEY = 'kromagit.panes.v1'
 const PANE_DEFAULTS = { sidebar: 280, right: 380 }
 function readPanes() {
@@ -57,7 +61,7 @@ const shortcutCommands = staticCommands.filter((c) => c.shortcut)
 
 function onEscape(e: KeyboardEvent) {
   e.preventDefault()
-  if (ui.dialog || ui.paletteOpen || ui.switcherOpen || ui.settingsOpen || ui.menu) return
+  if (ui.dialog || ui.paletteOpen || ui.switcherOpen || ui.settingsOpen || ui.menu || ui.repoMenuOpen) return
   if (isEditable(e.target)) {
     const el = e.target as HTMLInputElement
     if (el.value && el.type !== 'checkbox' && el.tagName === 'INPUT') {
@@ -72,8 +76,12 @@ function onEscape(e: KeyboardEvent) {
   else if (ui.selectedCommit) ui.selectCommit(null)
 }
 
+function inTerminal(e: KeyboardEvent) {
+  return e.target instanceof Element && !!e.target.closest('.xterm')
+}
+
 function onEscapeCapture(e: KeyboardEvent) {
-  if (e.key === 'Escape') onEscape(e)
+  if (e.key === 'Escape' && !inTerminal(e)) onEscape(e)
 }
 
 function onKey(e: KeyboardEvent) {
@@ -134,30 +142,35 @@ onBeforeUnmount(() => {
         <Toolbar />
         <OperationBanner />
         <div class="flex min-h-0 flex-1">
-          <Sidebar v-show="!ui.sidebarCollapsed" class="shrink-0" :style="{ width: `${panes.sidebar}px` }" />
+          <Sidebar v-show="!ui.sidebarCollapsed && ui.centerView !== 'diff'" class="shrink-0" :style="{ width: `${panes.sidebar}px` }" />
           <ResizeHandle
-            v-show="!ui.sidebarCollapsed" side="left" :width="panes.sidebar" :min="200" :max="440"
+            v-show="!ui.sidebarCollapsed && ui.centerView !== 'diff'" side="left" :width="panes.sidebar" :min="200" :max="440"
             @update:width="panes.sidebar = $event" @reset="panes.sidebar = PANE_DEFAULTS.sidebar"
           />
-          <main class="min-w-0 flex-1">
-            <DiffViewer v-if="ui.centerView === 'diff' && ui.diffTarget" :target="ui.diffTarget" />
-            <ReviewPanel v-else-if="ui.centerView === 'review'" />
-            <SplitPanel v-else-if="ui.centerView === 'split'" />
-            <StandupPanel v-else-if="ui.centerView === 'standup'" />
-            <CleanupPanel v-else-if="ui.centerView === 'cleanup'" />
-            <CommitGraph v-show="ui.centerView === 'graph'" />
+          <main class="flex min-w-0 flex-1 flex-col">
+            <div class="min-h-0 flex-1">
+              <DiffViewer v-if="ui.centerView === 'diff' && ui.diffTarget" :target="ui.diffTarget" />
+              <ReviewPanel v-else-if="ui.centerView === 'review'" />
+              <SplitPanel v-else-if="ui.centerView === 'split'" />
+              <StandupPanel v-else-if="ui.centerView === 'standup'" />
+              <CleanupPanel v-else-if="ui.centerView === 'cleanup'" />
+              <CommitGraph v-show="ui.centerView === 'graph'" />
+            </div>
+            <TerminalPanel />
           </main>
           <ResizeHandle
+            v-show="!historyMode"
             side="right" :width="panes.right" :min="320" :max="600"
             @update:width="panes.right = $event" @reset="panes.right = PANE_DEFAULTS.right"
           />
-          <RightPanel class="shrink-0" :style="{ width: `${panes.right}px` }" />
+          <RightPanel v-show="!historyMode" class="shrink-0" :style="{ width: `${panes.right}px` }" />
         </div>
       </template>
     </template>
     <WelcomeScreen v-else />
     <StatusBar />
     <ContextMenu />
+    <Tooltip />
     <Toaster />
     <SettingsDialog />
     <CommandPalette />

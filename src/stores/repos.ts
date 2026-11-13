@@ -4,6 +4,7 @@ import type { Commit, HeadInfo, RefsPayload, RepoSnapshot, StatusPayload } from 
 import { computeGraphLayout, type GraphLayout } from '@/lib/graph-layout'
 import { invoke } from '@tauri-apps/api/core'
 import { errorMessage, gitApi, inTauri } from '@/api/git'
+import { repoNameFromUrl } from '@/lib/format'
 import { useUiStore } from './ui'
 
 const groupId = () => `group-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`
@@ -27,12 +28,14 @@ export interface RepoState {
   layout: GraphLayout
   loading: { commits: boolean; refs: boolean; status: boolean }
   commitsComplete: boolean
+  /** how many commits are requested; grows as the user scrolls */
+  commitLimit: number
   loaded: boolean
   error: string | null
 }
 
 export const GROUP_COLORS = ['#7c9cff', '#5eead4', '#f472b6', '#fbbf24', '#a78bfa', '#34d399']
-export const FIRST_PAGE = 1500
+export const FIRST_PAGE = 200
 export const MAX_COMMITS = 200_000
 const STORAGE_KEY = 'kromagit.workspace.v1'
 const RECENT_KEY = 'kromagit.recent.v1'
@@ -132,6 +135,7 @@ export const useReposStore = defineStore('repos', () => {
         layout: markRaw({ rows: [], maxLanes: 1 }),
         loading: reactive({ commits: false, refs: false, status: false }),
         commitsComplete: false,
+        commitLimit: FIRST_PAGE,
         loaded: false,
         error: null,
       })
@@ -164,21 +168,34 @@ export const useReposStore = defineStore('repos', () => {
     const current = () => generations.get(tab.id)?.commits === gen
     state.loading.commits = true
     try {
-      const first = await gitApi.getCommits(tab.path, FIRST_PAGE)
+      const limit = Math.min(state.commitLimit, MAX_COMMITS)
+      const list = await gitApi.getCommits(tab.path, limit)
       if (!current()) return
-      setCommits(state, first)
-      state.commitsComplete = first.length < FIRST_PAGE
-      if (!state.commitsComplete) {
-        const all = await gitApi.getCommits(tab.path, MAX_COMMITS)
-        if (!current()) return
-        setCommits(state, all)
-        state.commitsComplete = true
-      }
+      setCommits(state, list)
+      state.commitsComplete = list.length < limit || limit >= MAX_COMMITS
     } catch (e) {
       if (current()) reportError(state, e, 'history')
     } finally {
       if (current()) state.loading.commits = false
     }
+  }
+
+  /** Next page of history (pages double: 200, 400, 800…). */
+  async function loadMoreCommits(tabId: string = activeTabId.value) {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    const state = states.get(tabId)
+    if (!tab || !state || state.loading.commits || state.commitsComplete) return
+    state.commitLimit = Math.min(state.commitLimit * 2, MAX_COMMITS)
+    await loadCommits(tab)
+  }
+
+  /** Whole history, e.g. so a search can find old commits. */
+  async function loadAllCommits(tabId: string = activeTabId.value) {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    const state = states.get(tabId)
+    if (!tab || !state || state.commitsComplete || state.commitLimit >= MAX_COMMITS) return
+    state.commitLimit = MAX_COMMITS
+    await loadCommits(tab)
   }
 
   async function loadRefs(tab: RepoTab) {
@@ -314,6 +331,46 @@ export const useReposStore = defineStore('repos', () => {
     if (typeof dir === 'string') await openRepoAt(dir)
   }
 
+  const cloning = ref<string | null>(null)
+
+  async function cloneRepo() {
+    const ui = useUiStore()
+    const first = await ui.prompt({
+      title: 'Clone repository',
+      message: 'Paste an HTTPS or SSH URL. You will choose where to put it next.',
+      fields: [{ key: 'url', label: 'Repository URL', placeholder: 'https://github.com/owner/repo.git', mono: true, validate: (v) => (v.trim() ? null : 'Enter a URL') }],
+      confirmLabel: 'Next',
+    })
+    if (!first) return
+    const url = first.values.url.trim()
+    let parent = '~/code'
+    if (inTauri) {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const dir = await open({ directory: true, multiple: false, title: 'Choose where to clone it' })
+      if (typeof dir !== 'string') return
+      parent = dir
+    }
+    const second = await ui.prompt({
+      title: 'Clone repository',
+      message: `Into ${parent}`,
+      fields: [{ key: 'name', label: 'Folder name', initial: repoNameFromUrl(url), mono: true, validate: (v) => (/^[^/\\]+$/.test(v.trim()) && !['.', '..'].includes(v.trim()) ? null : 'Use a plain folder name') }],
+      confirmLabel: 'Clone',
+    })
+    if (!second) return
+    const name = second.values.name.trim()
+    cloning.value = url
+    ui.toast({ kind: 'info', title: `Cloning ${name}…`, detail: url }, 4000)
+    try {
+      const info = await gitApi.cloneRepo(url, parent, name)
+      ui.toast({ kind: 'success', title: `Cloned ${info.name}` }, 2500)
+      await openRepoAt(info.root)
+    } catch (e) {
+      ui.toast({ kind: 'error', title: 'Clone failed', detail: errorMessage(e) }, 9000)
+    } finally {
+      cloning.value = null
+    }
+  }
+
   function closeTab(id: string) {
     const idx = tabs.value.findIndex((t) => t.id === id)
     if (idx === -1) return
@@ -358,6 +415,22 @@ export const useReposStore = defineStore('repos', () => {
     if (!r) return
     const gid = createGroup(r.values.name)
     if (tabId) setTabGroup(tabId, gid)
+  }
+
+  /** Display name only; the folder on disk is untouched. Empty = back to the folder name. */
+  async function renameTab(id: string) {
+    const tab = tabs.value.find((t) => t.id === id)
+    if (!tab) return
+    const folder = tab.path.split(/[\\/]/).filter(Boolean).pop() ?? tab.name
+    const r = await useUiStore().prompt({
+      title: 'Rename tab',
+      message: `Only changes how “${folder}” is shown in KromaGit. Leave empty to use the folder name.`,
+      fields: [{ key: 'name', label: 'Tab name', initial: tab.name }],
+      confirmLabel: 'Rename',
+    })
+    if (!r) return
+    tab.name = r.values.name.trim() || folder
+    rememberRecent(tab.name, tab.path)
   }
 
   async function renameGroup(gid: string) {
@@ -412,7 +485,7 @@ export const useReposStore = defineStore('repos', () => {
 
   return {
     groups, tabs, activeTabId, activeTab, active, busy, recent, forgetRecent,
-    activate, openRepo, openRepoAt, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh,
-    createGroup, promptNewGroup, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, closeOtherTabs,
+    activate, openRepo, openRepoAt, cloneRepo, cloning, loadMoreCommits, loadAllCommits, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh,
+    createGroup, promptNewGroup, renameTab, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, closeOtherTabs,
   }
 })

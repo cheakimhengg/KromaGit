@@ -250,3 +250,20 @@ export interface OpOutcome {
   data: string | null
   output: string
 }
+
+export interface FileHistoryEntry {
+  commit: Commit
+  /** the file's path in that commit (differs after a rename) */
+  path: string
+}
+
+export interface BlameLine {
+  line: number
+  hash: string
+  author: string
+  email: string
+  /** unix seconds */
+  time: number
+  summary: string
+  content: string
+}

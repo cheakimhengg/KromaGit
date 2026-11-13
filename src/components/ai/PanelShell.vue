@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 
 defineProps<{ title: string; icon: Component; subtitle?: string }>()

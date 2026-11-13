@@ -8,6 +8,7 @@ mod menu;
 pub mod secrets;
 pub mod settings;
 pub mod system;
+pub mod terminal;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +17,7 @@ pub fn run() {
     let builder = builder.menu(menu::build);
     builder
         .plugin(tauri_plugin_dialog::init())
+        .manage(terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::startup_paths,
@@ -26,6 +28,14 @@ pub fn run() {
             commands::get_commit_details,
             commands::get_file_diff,
             commands::get_file_image,
+            commands::clone_repo,
+            commands::file_history,
+            commands::blame_file,
+            commands::terminal_open,
+            commands::terminal_write,
+            commands::terminal_resize,
+            commands::terminal_close,
+            commands::repo_name_from_url,
             commands::git_action,
             commands::open_in_terminal,
             commands::open_in_editor,
@@ -43,6 +53,12 @@ pub fn run() {
             commands::cleanup_candidates,
             commands::github_commit_avatar,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running KromaGit");
+        .build(tauri::generate_context!())
+        .expect("error while building KromaGit")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                use tauri::Manager;
+                app.state::<terminal::Terminals>().close_all();
+            }
+        });
 }

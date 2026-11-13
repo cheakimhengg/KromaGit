@@ -3,16 +3,16 @@
 @custom-variant light (&:where(.light, .light *));
 
 :root {
-  --gw-bg: #1a1e26;
-  --gw-surface: #20242d;
-  --gw-surface-2: #262b35;
-  --gw-surface-3: #2e3440;
-  --gw-hover: #313845;
-  --gw-border: #323946;
-  --gw-border-strong: #434b5b;
-  --gw-text: #e9ecf3;
-  --gw-muted: #aab1c2;
-  --gw-faint: #7d8599;
+  --gw-bg: #1b1d22;
+  --gw-surface: #212329;
+  --gw-surface-2: #272a31;
+  --gw-surface-3: #30333b;
+  --gw-hover: #33363f;
+  --gw-border: #31343c;
+  --gw-border-strong: #42464f;
+  --gw-text: #e4e6eb;
+  --gw-muted: #a3a8b3;
+  --gw-faint: #757b87;
   --gw-accent: #7c9cff;
   --gw-accent-2: #b47cff;
   --gw-success: #3fcf8e;
@@ -24,21 +24,21 @@
   --gw-del-bg: rgba(242, 98, 111, 0.12);
   --gw-del-strong: rgba(242, 98, 111, 0.28);
   --gw-select: rgba(124, 156, 255, 0.22);
-  --gw-on-accent: #141821;
+  --gw-on-accent: #15171b;
   color-scheme: dark;
 }
 
 .light {
-  --gw-bg: #f3f4f7;
-  --gw-surface: #eaecf0;
-  --gw-surface-2: #e3e6ec;
-  --gw-surface-3: #d8dce4;
-  --gw-hover: #dde1e8;
-  --gw-border: #d0d5de;
-  --gw-border-strong: #b9c0cc;
-  --gw-text: #1b202b;
-  --gw-muted: #4c5568;
-  --gw-faint: #747d91;
+  --gw-bg: #f5f6f8;
+  --gw-surface: #eceef2;
+  --gw-surface-2: #e4e7ec;
+  --gw-surface-3: #d9dde4;
+  --gw-hover: #dfe2e8;
+  --gw-border: #d2d6de;
+  --gw-border-strong: #bcc2cc;
+  --gw-text: #1d222b;
+  --gw-muted: #4e5666;
+  --gw-faint: #767e8e;
   --gw-accent: #3a5fd9;
   --gw-accent-2: #8240e0;
   --gw-success: #17924f;
@@ -52,6 +52,46 @@
   --gw-select: rgba(58, 95, 217, 0.16);
   --gw-on-accent: #ffffff;
   color-scheme: light;
+}
+
+/* extra palettes — swatches mirror THEMES in src/lib/theme.ts */
+:root[data-theme='midnight'] {
+  --gw-bg: #0f1420;
+  --gw-surface: #141a28;
+  --gw-surface-2: #1a2131;
+  --gw-surface-3: #222a3c;
+  --gw-hover: #252e42;
+  --gw-border: #232b3d;
+  --gw-border-strong: #313b52;
+  --gw-text: #e2e8f2;
+  --gw-muted: #96a0b5;
+  --gw-faint: #646f87;
+  --gw-on-accent: #0f1420;
+}
+:root[data-theme='dim'] {
+  --gw-bg: #26272c;
+  --gw-surface: #2c2d33;
+  --gw-surface-2: #323339;
+  --gw-surface-3: #3a3b42;
+  --gw-hover: #3d3e46;
+  --gw-border: #3b3c43;
+  --gw-border-strong: #4a4b53;
+  --gw-text: #dcdcdf;
+  --gw-muted: #a6a7ae;
+  --gw-faint: #7d7e86;
+  --gw-on-accent: #1f2024;
+}
+:root[data-theme='paper'] {
+  --gw-bg: #f6f1e7;
+  --gw-surface: #eee7da;
+  --gw-surface-2: #e7dfd0;
+  --gw-surface-3: #ddd3c2;
+  --gw-hover: #e2d9c9;
+  --gw-border: #d9cfbd;
+  --gw-border-strong: #c4b8a2;
+  --gw-text: #2b2620;
+  --gw-muted: #5e5547;
+  --gw-faint: #8a806f;
 }
 
 /* accent choices — values mirror ACCENTS in src/lib/theme.ts */
@@ -114,12 +154,14 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
   user-select: none;
   cursor: default;
 }
 
 input,
 textarea {
+  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -154,6 +196,12 @@ a:focus-visible {
 @layer components {
   .gw-input {
     @apply h-8 w-full rounded-md border border-line bg-surface-2 px-2.5 text-[13px] text-fg outline-none placeholder:text-faint focus:border-accent/60 focus:ring-2 focus:ring-accent/15;
+  }
+  .gw-search {
+    @apply h-7 pl-7 text-[12px];
+  }
+  .gw-search-icon {
+    @apply pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-faint;
   }
 }
 
@@ -192,3 +240,69 @@ a:focus-visible {
 .light .hljs-params { color: #1a1e27; }
 .light .hljs-tag,
 .light .hljs-name { color: #c92a4b; }
+
+/* one checkbox style for the whole app (the native macOS box ignores sizing and overlaps its neighbours) */
+@layer components {
+  input[type='checkbox']:not(.toggle) {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1.5px solid var(--gw-border-strong);
+    border-radius: 5px;
+    background-color: var(--gw-surface);
+    cursor: pointer;
+    transition: background-color 120ms, border-color 120ms, box-shadow 120ms;
+  }
+  input[type='checkbox']:not(.toggle)::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    background-color: var(--gw-on-accent);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3l2.3 2.3 4.7-5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3l2.3 2.3 4.7-5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    transform: scale(0);
+    transition: transform 120ms ease-out;
+  }
+  input[type='checkbox']:not(.toggle):hover {
+    border-color: var(--gw-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--gw-accent) 18%, transparent);
+  }
+  input[type='checkbox']:not(.toggle):checked {
+    border-color: var(--gw-accent);
+    background-color: var(--gw-accent);
+  }
+  input[type='checkbox']:not(.toggle):checked::after {
+    transform: scale(1);
+  }
+  input[type='checkbox']:not(.toggle):focus-visible {
+    outline: 2px solid var(--gw-accent);
+    outline-offset: 2px;
+  }
+  input[type='checkbox']:not(.toggle):disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+    box-shadow: none;
+  }
+}
+
+/* Tailwind resets buttons to the default arrow; anything clickable shows the hand cursor */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='menuitem'],
+  [role='tab'],
+  summary,
+  select,
+  label:has(> input[type='checkbox']),
+  input[type='checkbox'],
+  input[type='range'] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}

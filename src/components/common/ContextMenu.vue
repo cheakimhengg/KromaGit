@@ -54,6 +54,7 @@ onBeforeUnmount(() => {
   >
     <template v-for="(item, i) in menu.items" :key="i">
       <div v-if="item.separator" class="my-1 h-px bg-line" />
+      <div v-else-if="item.heading" class="px-2 pt-1.5 pb-1 text-[12px] text-faint">{{ item.label }}</div>
       <button
         v-else
         type="button"

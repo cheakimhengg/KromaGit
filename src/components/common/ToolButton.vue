@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown } from '@/lib/icons'
 
 defineProps<{
   icon: Component

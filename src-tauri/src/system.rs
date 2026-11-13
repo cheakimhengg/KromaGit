@@ -117,3 +117,23 @@ mod tests {
         assert!(split_command("   ").is_empty());
     }
 }
+
+/// Folders passed on the command line. Stops at a shell comment marker and
+/// keeps only arguments that are existing directories, so a pasted example
+/// like `repo # or open…` doesn't try to open "#", "or", "open"…
+pub fn startup_dirs(args: impl Iterator<Item = String>) -> Vec<String> {
+    args.take_while(|a| !a.starts_with('#'))
+        .filter(|a| !a.starts_with('-'))
+        .filter(|a| std::path::Path::new(a).is_dir())
+        .collect()
+}
+
+#[cfg(test)]
+mod startup_tests {
+    #[test]
+    fn ignores_words_and_comments_after_the_folders() {
+        let dir = std::env::temp_dir().to_string_lossy().to_string();
+        let args = [dir.clone(), "--flag".into(), "/definitely/missing".into(), "#".into(), "or".into(), dir.clone()];
+        assert_eq!(super::startup_dirs(args.into_iter()), vec![dir]);
+    }
+}

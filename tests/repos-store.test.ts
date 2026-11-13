@@ -68,24 +68,38 @@ describe('repos store', () => {
     expect(s.loaded).toBe(true)
   })
 
-  it('shows the first page, then swaps in full history', async () => {
-    const full = deferred<Commit[]>()
-    api.getCommits.mockImplementation((_p: string, limit: number) =>
-      limit === FIRST_PAGE ? Promise.resolve(chain(FIRST_PAGE)) : full.promise,
-    )
+  it('loads one page, then more only when asked (scrolling)', async () => {
+    const total = 1000
+    api.getCommits.mockImplementation((_p: string, limit: number) => Promise.resolve(chain(Math.min(limit, total))))
     const repos = useReposStore()
     await flushPromises()
+    expect(api.getCommits).toHaveBeenCalledTimes(1)
     expect(repos.active!.snapshot.commits).toHaveLength(FIRST_PAGE)
     expect(repos.active!.commitsComplete).toBe(false)
-    expect(repos.active!.loading.commits).toBe(true)
-    expect(api.getCommits).toHaveBeenLastCalledWith(expect.any(String), MAX_COMMITS)
-
-    full.resolve(chain(4000))
-    await flushPromises()
-    expect(repos.active!.snapshot.commits).toHaveLength(4000)
-    expect(repos.active!.layout.rows).toHaveLength(4000)
-    expect(repos.active!.commitsComplete).toBe(true)
     expect(repos.active!.loading.commits).toBe(false)
+
+    await repos.loadMoreCommits()
+    expect(api.getCommits).toHaveBeenLastCalledWith(expect.any(String), FIRST_PAGE * 2)
+    expect(repos.active!.snapshot.commits).toHaveLength(FIRST_PAGE * 2)
+    expect(repos.active!.layout.rows).toHaveLength(FIRST_PAGE * 2)
+
+    await repos.loadMoreCommits()
+    await repos.loadMoreCommits()
+    expect(repos.active!.snapshot.commits).toHaveLength(total)
+    expect(repos.active!.commitsComplete).toBe(true)
+    const calls = api.getCommits.mock.calls.length
+    await repos.loadMoreCommits()
+    expect(api.getCommits.mock.calls.length).toBe(calls)
+  })
+
+  it('loads the whole history on demand (search)', async () => {
+    api.getCommits.mockImplementation((_p: string, limit: number) => Promise.resolve(chain(Math.min(limit, 3000))))
+    const repos = useReposStore()
+    await flushPromises()
+    await repos.loadAllCommits()
+    expect(api.getCommits).toHaveBeenLastCalledWith(expect.any(String), MAX_COMMITS)
+    expect(repos.active!.snapshot.commits).toHaveLength(3000)
+    expect(repos.active!.commitsComplete).toBe(true)
   })
 
   it('ignores a stale response that arrives after a newer load', async () => {

@@ -1,24 +1,34 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
-  Commit, CommitDetails, DiffTarget, FileDiff, GitAction, ImagePair, OpOutcome, RefLabel, RefsPayload, RepoInfo, StatusPayload,
+  BlameLine, Commit, CommitDetails, DiffTarget, FileDiff, FileHistoryEntry, GitAction, ImagePair, OpOutcome, RefLabel, RefsPayload, RepoInfo, StatusPayload,
 } from '@/types/git'
 import { mockApi } from './mock-backend'
 
 export interface GitApi {
   openRepo(path: string): Promise<RepoInfo>
+  cloneRepo(url: string, parent: string, name: string): Promise<RepoInfo>
   getCommits(repo: string, limit?: number): Promise<Commit[]>
   getRefs(repo: string): Promise<RefsPayload>
   getStatus(repo: string): Promise<StatusPayload>
   getCommitDetails(repo: string, hash: string): Promise<CommitDetails>
-  getFileDiff(repo: string, target: DiffTarget): Promise<FileDiff>
+  getFileDiff(repo: string, target: DiffTarget, opts?: DiffOptions): Promise<FileDiff>
   getFileImage(repo: string, target: DiffTarget): Promise<ImagePair>
+  fileHistory(repo: string, path: string, limit?: number): Promise<FileHistoryEntry[]>
+  blame(repo: string, path: string, rev?: string): Promise<BlameLine[]>
   runAction(repo: string, action: GitAction): Promise<OpOutcome>
   openInTerminal(path: string): Promise<void>
   openInEditor(path: string): Promise<void>
 }
 
-function diffRequest(target: DiffTarget) {
+export interface DiffOptions {
+  ignoreWhitespace?: boolean
+  fullFile?: boolean
+}
+
+function diffRequest(target: DiffTarget, opts: DiffOptions = {}) {
   return {
+    ignoreWhitespace: !!opts.ignoreWhitespace,
+    fullFile: !!opts.fullFile,
     path: target.path,
     oldPath: target.oldPath ?? null,
     source: target.source,
@@ -59,12 +69,19 @@ export function normalizeCommits(raw: RawCommit[]): Commit[] {
 
 const tauriApi: GitApi = {
   openRepo: (path) => invoke<RepoInfo>('open_repo', { path }),
+  cloneRepo: (url, parent, name) => invoke<RepoInfo>('clone_repo', { url, parent, name }),
   getCommits: async (repo, limit) => normalizeCommits(await invoke<RawCommit[]>('get_commits', { repo, limit })),
   getRefs: (repo) => invoke<RefsPayload>('get_refs', { repo }),
   getStatus: (repo) => invoke<StatusPayload>('get_status', { repo }),
   getCommitDetails: (repo, hash) => invoke<CommitDetails>('get_commit_details', { repo, hash }),
-  getFileDiff: (repo, target) => invoke<FileDiff>('get_file_diff', { repo, request: diffRequest(target) }),
+  getFileDiff: (repo, target, opts) => invoke<FileDiff>('get_file_diff', { repo, request: diffRequest(target, opts) }),
   getFileImage: (repo, target) => invoke<ImagePair>('get_file_image', { repo, request: diffRequest(target) }),
+  fileHistory: async (repo, path, limit) => {
+    const raw = await invoke<{ commit: RawCommit; path: string }[]>('file_history', { repo, path, limit: limit ?? null })
+    const commits = normalizeCommits(raw.map((r) => r.commit))
+    return raw.map((r, i) => ({ commit: commits[i], path: r.path }))
+  },
+  blame: (repo, path, rev) => invoke<BlameLine[]>('blame_file', { repo, path, rev: rev ?? null }),
   runAction: (repo, action) => invoke<OpOutcome>('git_action', { repo, action }),
   openInTerminal: (path) => invoke<void>('open_in_terminal', { path }),
   openInEditor: (path) => invoke<void>('open_in_editor', { path }),

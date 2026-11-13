@@ -34,7 +34,12 @@ pub fn get_file_diff(git: &Git, req: &DiffRequest) -> AppResult<FileDiff> {
     if let Some(old) = req.old_path.as_deref() {
         paths.push(old);
     }
-    let common = ["--no-color", "--no-ext-diff", "-U3", "-M", "--src-prefix=a/", "--dst-prefix=b/"];
+    let context = if req.full_file { "-U1000000" } else { "-U3" };
+    let mut common = vec!["--no-color", "--no-ext-diff", context, "-M", "--src-prefix=a/", "--dst-prefix=b/"];
+    if req.ignore_whitespace {
+        common.push("-w");
+    }
+    let common = common.as_slice();
     let raw = match (req.source.as_str(), req.untracked) {
         (_, true) => {
             let mut args = vec!["diff", "--no-index"];

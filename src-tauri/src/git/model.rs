@@ -194,4 +194,10 @@ pub struct DiffRequest {
     pub untracked: bool,
     pub commit: Option<String>,
     pub parent: Option<String>,
+    /// `git diff -w`; display only (the hunks can't be staged)
+    #[serde(default)]
+    pub ignore_whitespace: bool,
+    /// whole file as context; display only
+    #[serde(default)]
+    pub full_file: bool,
 }

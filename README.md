@@ -52,7 +52,7 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 **Workflow**
 - Multiple repositories as tabs, with named, colored, collapsible **tab groups** and drag-to-reorder
 - **⌘K command palette** for every action, branch and tab; **⌘P** to jump to any recent repository; a Home page; keyboard shortcuts throughout (⌘W closes the tab, Esc closes whatever is open)
-- Dark and light themes (or follow the system) with six accent colours, zoom, resizable panels, a welcome screen with recent repositories, open in your terminal or editor
+- Five eye-friendly themes — Kroma Dark, Midnight, Dim, Kroma Light, Paper — or follow the system, with six accent colours; zoom, resizable panels, a welcome screen with recent repositories, open in your terminal or editor
 
 **Profile pictures** are looked up by author email: GitHub no-reply addresses directly, other authors through the GitHub API (repositories hosted on GitHub) and Gravatar. Results are cached; authors without a picture keep their initials. Turn it off in **Settings → General** and no lookups are made.
 
@@ -173,3 +173,5 @@ Parser tests use output captured from a real repository; regenerate it with `bas
 ## License
 
 [MIT](LICENSE) © 2026 Chea KimHeng
+
+Icons: [Hugeicons](https://hugeicons.com) free set (MIT).

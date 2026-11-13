@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { ImageOff, Loader2 } from 'lucide-vue-next'
+import { ImageOff, Loader2 } from '@/lib/icons'
 import { errorMessage, gitApi } from '@/api/git'
 import { formatBytes } from '@/lib/format'
 import type { DiffTarget, ImagePair } from '@/types/git'

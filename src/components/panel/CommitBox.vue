@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { Check, Loader2, ScanSearch, Sparkles } from 'lucide-vue-next'
+import { Check, Loader2, ScanSearch, Sparkles } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
 import { useOpsStore } from '@/stores/ops'
@@ -159,7 +159,7 @@ watch(() => ui.generateRequest, () => void generate())
     />
     <div class="mt-2 flex items-center gap-2">
       <label class="flex cursor-pointer items-center gap-1.5 text-[13px] text-muted select-none" :class="{ 'opacity-40': !hasHead }" :title="hasHead ? 'Rewrite the last commit' : 'No commit to amend yet'">
-        <input v-model="draft.amend" type="checkbox" :disabled="!hasHead" class="h-3 w-3 accent-[var(--gw-accent)]" />Amend
+        <input v-model="draft.amend" type="checkbox" :disabled="!hasHead" />Amend
         <Loader2 v-if="loadingAmend" :size="12" class="animate-spin" />
       </label>
       <div class="flex-1" />

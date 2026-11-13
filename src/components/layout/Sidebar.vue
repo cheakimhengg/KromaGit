@@ -2,8 +2,8 @@
 import { computed, ref } from 'vue'
 import {
   Archive, ArchiveRestore, Boxes, Check, Cloud, Copy, FolderTree, GitBranch, GitBranchPlus, GitMerge, GitPullRequestArrow, Globe,
-  ChevronsDownUp, ChevronsUpDown, Pencil, Search, Tag as TagIcon, Trash2, ArrowUpFromLine, CircleDot,
-} from 'lucide-vue-next'
+  ChevronsDownUp, Pencil, Search, Tag as TagIcon, Trash2, ArrowUpFromLine,
+} from '@/lib/icons'
 import SidebarSection from './SidebarSection.vue'
 import RefTree from './RefTree.vue'
 import { buildRefTree, matchesFilter } from '@/lib/ref-tree'
@@ -94,25 +94,25 @@ const SECTIONS: [string, boolean][] = [
   ['Branches', true], ['Remotes', true], ['Tags', false], ['Stashes', true], ['Worktrees', false], ['Submodules', false],
 ]
 const anySectionOpen = computed(() => SECTIONS.some(([t, d]) => ui.sidebarSections[t] ?? d))
-function toggleAllSections() {
-  const open = !anySectionOpen.value
-  for (const [t] of SECTIONS) ui.sidebarSections[t] = open
+function collapseAllSections() {
+  for (const [t] of SECTIONS) ui.sidebarSections[t] = false
 }
 </script>
 
 <template>
   <aside class="flex h-full flex-col border-r border-line bg-surface">
-    <div class="flex items-center gap-1 p-2">
+    <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
       <div class="relative flex-1">
-        <Search :size="14" class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-faint" />
-        <input v-model="filter" class="gw-input pl-6" placeholder="Filter refs…" spellcheck="false" />
+        <Search :size="13" class="gw-search-icon" />
+        <input v-model="filter" class="gw-input gw-search" placeholder="Filter refs…" spellcheck="false" />
       </div>
       <button
-        type="button" class="rounded p-1.5 text-faint hover:bg-hover hover:text-fg"
-        :title="anySectionOpen ? 'Collapse all sections' : 'Expand all sections'"
-        @click="toggleAllSections"
+        type="button" class="rounded p-1.5 text-faint hover:bg-hover hover:text-fg disabled:opacity-30 disabled:hover:bg-transparent"
+        :disabled="!anySectionOpen"
+        title="Collapse all sections"
+        @click="collapseAllSections"
       >
-        <component :is="anySectionOpen ? ChevronsDownUp : ChevronsUpDown" :size="16" />
+        <ChevronsDownUp :size="16" />
       </button>
     </div>
 
@@ -125,7 +125,7 @@ function toggleAllSections() {
           @menu="(e: MouseEvent, b: Branch) => branchMenu(e, b)"
         >
           <template #leaf="{ item, label }">
-            <CircleDot v-if="item.current" :size="14" class="shrink-0 text-accent" />
+            <Check v-if="item.current" :size="14" :stroke-width="2.25" class="shrink-0 text-accent" />
             <GitBranch v-else :size="14" class="shrink-0 text-faint" />
             <span class="flex-1 truncate" :class="item.current ? 'font-semibold text-fg' : 'text-fg/85'">{{ label }}</span>
             <span v-if="item.upstreamGone" class="rounded bg-danger/15 px-1 text-[10px] text-danger" title="Upstream branch was deleted">gone</span>

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import {
-  AlertTriangle, ChevronDown, Copy, FolderTree, GitCommitHorizontal, List, Loader2, Pencil, ScanSearch, Search, Sparkles, X,
-} from 'lucide-vue-next'
+  AlertTriangle, ChevronDown, Copy, FolderTree, List, Loader2, Pencil, ScanSearch, Search, Sparkles, X,
+} from '@/lib/icons'
 import Avatar from '@/components/common/Avatar.vue'
 import RefPill from '@/components/graph/RefPill.vue'
 import FileList from './FileList.vue'
-import { fullDate, relativeTime, shortDate } from '@/lib/format'
+import { fullDate, reflowMessage, relativeTime, shortDate } from '@/lib/format'
 import { laneColor } from '@/lib/lanes'
 import { errorMessage, gitApi } from '@/api/git'
 import { useReposStore } from '@/stores/repos'
-import { useUiStore } from '@/stores/ui'
+import { useUiStore, type MenuItem } from '@/stores/ui'
 import { useAiStore } from '@/stores/ai'
 import type { CommitDetails, FileChange, FileStatus } from '@/types/git'
 
@@ -22,7 +22,6 @@ const ai = useAiStore()
 const details = ref<CommitDetails | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const expanded = ref(false)
 const statusFilter = ref<FileStatus | 'all'>('all')
 const searching = ref(false)
 const fileQuery = ref('')
@@ -36,7 +35,6 @@ watch(
     onCleanup(() => (cancelled = true))
     loading.value = true
     error.value = null
-    expanded.value = false
     statusFilter.value = 'all'
     try {
       const d = await gitApi.getCommitDetails(path, hash)
@@ -58,15 +56,20 @@ const sameCommitter = computed(() => {
   const d = shown.value
   return !d || (d.committer.email === d.author.email && d.commitDate === d.authorDate)
 })
+const expanded = ref(false)
+watch(() => props.hash, () => (expanded.value = false))
 const longBody = computed(() => {
   const b = shown.value?.body ?? ''
-  return b.split('\n').length > 4 || b.length > 280
+  return paragraphs.value.length > 6 || b.length > 420
 })
+
+const paragraphs = computed(() => reflowMessage(shown.value?.body ?? ''))
 
 const rowIndex = computed(() => repos.active?.snapshot.commits.findIndex((c) => c.hash === props.hash) ?? -1)
 const refs = computed(() => (rowIndex.value >= 0 ? repos.active!.snapshot.commits[rowIndex.value].refs : []))
 const refColor = computed(() => laneColor(rowIndex.value >= 0 ? repos.active!.layout.rows[rowIndex.value]?.color ?? 0 : 0))
 
+const STATUS_COLOR: Record<string, string> = { M: 'var(--gw-accent)', A: 'var(--gw-success)', D: 'var(--gw-danger)', R: 'var(--gw-info)' }
 const STATUS_LABEL: Record<string, string> = { M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', C: 'Copied', T: 'Type changed', U: 'Conflicted', '?': 'Untracked' }
 const statusCounts = computed(() => {
   const m = new Map<FileStatus, number>()
@@ -102,6 +105,15 @@ function copy(text: string, what = 'Copied') {
 }
 
 const isHead = computed(() => !!shown.value && shown.value.hash === repos.active?.snapshot.head.oid)
+function fileMenu(e: MouseEvent, f: FileChange) {
+  const name = f.path.split('/').pop() ?? f.path
+  const items: MenuItem[] = [
+    { label: 'Copy file name', icon: Copy, action: () => copy(name, 'Copied file name') },
+    { label: 'Copy path', icon: Copy, action: () => copy(f.path, 'Copied path') },
+  ]
+  ui.openMenu(e, items)
+}
+
 function editMessage() {
   ui.selectCommit(null)
   ui.amendPending = true
@@ -120,18 +132,15 @@ function review() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
-      <GitCommitHorizontal :size="17" class="text-accent" />
-      <span class="text-[13px] font-semibold text-fg">Commit</span>
-      <button
-        type="button" class="flex items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[12px] text-muted hover:bg-surface-3 hover:text-fg"
-        :title="`Copy ${hash}`" @click="copy(hash, 'Commit id copied')"
-      >{{ hash.slice(0, 7) }}<Copy :size="12" /></button>
-      <Loader2 v-if="loading" :size="15" class="animate-spin text-faint" />
+    <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line pr-2 pl-4">
+      <span class="text-[12px] font-semibold tracking-wider text-muted uppercase">Commit</span>
+      <Loader2 v-if="loading" :size="14" class="ml-1 animate-spin text-faint" />
       <div class="flex-1" />
-      <button type="button" class="rounded-md p-1.5 text-faint hover:bg-hover hover:text-fg" title="Close (Esc)" @click="ui.selectCommit(null)">
-        <X :size="16" />
-      </button>
+      <button type="button" class="hbtn" :class="{ on: searching }" title="Filter files" @click="toggleSearch"><Search :size="16" /></button>
+      <button type="button" class="hbtn" :class="{ on: ui.fileViewMode === 'list' }" title="List view" @click="ui.fileViewMode = 'list'"><List :size="16" /></button>
+      <button type="button" class="hbtn" :class="{ on: ui.fileViewMode === 'tree' }" title="Tree view" @click="ui.fileViewMode = 'tree'"><FolderTree :size="16" /></button>
+      <div class="mx-1 h-5 w-px bg-line" />
+      <button type="button" class="hbtn" title="Close (Esc)" @click="ui.selectCommit(null)"><X :size="16" /></button>
     </div>
 
     <div v-if="error" class="m-3 rounded-md border border-danger/30 bg-danger/10 p-3 text-[13px] text-danger select-text">{{ error }}</div>
@@ -143,7 +152,7 @@ function review() {
     </div>
 
     <template v-else>
-      <div class="max-h-[60%] shrink-0 overflow-y-auto border-b border-line px-4 pt-3.5 pb-4">
+      <div class="max-h-[60%] shrink-0 overflow-y-auto border-b border-line px-4 pt-3.5 pb-3">
         <div class="flex items-start gap-2">
           <div class="min-w-0 flex-1 text-[15px] leading-snug font-semibold text-fg select-text">{{ shown.subject }}</div>
           <button
@@ -153,11 +162,14 @@ function review() {
             @click="editMessage"
           ><Pencil :size="15" /></button>
         </div>
-        <template v-if="shown.body">
-          <pre
-            class="mt-2 font-sans text-[13px] leading-relaxed break-words whitespace-pre-wrap text-fg/80 select-text"
-            :class="{ 'line-clamp-3': longBody && !expanded }"
-          >{{ shown.body }}</pre>
+
+        <template v-if="paragraphs.length">
+          <div
+            class="mt-2 space-y-1.5 text-[13px] leading-relaxed break-words text-muted select-text"
+            :class="{ 'line-clamp-4': longBody && !expanded }"
+          >
+            <p v-for="(para, i) in paragraphs" :key="i" :class="{ 'h-1': !para }">{{ para }}</p>
+          </div>
           <button
             v-if="longBody" type="button"
             class="mt-1 flex items-center gap-1 text-[12px] font-medium text-accent hover:underline"
@@ -167,44 +179,39 @@ function review() {
           </button>
         </template>
 
-        <dl class="meta mt-4">
-          <dt>Author</dt>
-          <dd class="flex min-w-0 items-center gap-2">
-            <Avatar :name="shown.author.name" :email="shown.author.email" :size="22" />
-            <span class="truncate text-fg">{{ shown.author.name }}</span>
-            <span class="truncate text-[12px] text-faint select-text">{{ shown.author.email }}</span>
-          </dd>
-          <dt>Date</dt>
-          <dd :title="fullDate(shown.authorDate)">{{ shortDate(shown.authorDate) }} <span class="text-faint">· {{ relativeTime(shown.authorDate) }}</span></dd>
-          <template v-if="!sameCommitter">
-            <dt>Committer</dt>
-            <dd class="truncate" :title="fullDate(shown.commitDate)">{{ shown.committer.name }} <span class="text-faint">· {{ relativeTime(shown.commitDate) }}</span></dd>
-          </template>
-          <dt>{{ shown.parents.length > 1 ? 'Parents' : 'Parent' }}</dt>
-          <dd class="flex flex-wrap gap-1">
+        <div class="mt-3 rounded-xl border border-line bg-surface-2/50">
+          <div class="flex items-center gap-2.5 px-3 py-2.5">
+            <Avatar :name="shown.author.name" :email="shown.author.email" :size="32" />
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-[13px] font-medium text-fg" :title="`${shown.author.name} <${shown.author.email}>`">{{ shown.author.name }}</div>
+              <div class="truncate text-[12px] text-faint" :title="fullDate(shown.authorDate)">{{ relativeTime(shown.authorDate) }} · {{ shortDate(shown.authorDate) }}</div>
+            </div>
+            <button
+              type="button" class="flex shrink-0 items-center gap-1 rounded-md border border-line-strong px-1.5 py-0.5 font-mono text-[12px] text-muted hover:border-accent/50 hover:text-fg"
+              :title="`Copy ${shown.hash}`" @click="copy(shown.hash, 'Commit id copied')"
+            >{{ shown.hash.slice(0, 7) }}<Copy :size="12" /></button>
+          </div>
+          <div v-if="!sameCommitter" class="px-3 pb-2 text-[12px] text-faint" :title="fullDate(shown.commitDate)">
+            Committed by <span class="text-muted">{{ shown.committer.name }}</span> · {{ relativeTime(shown.commitDate) }}
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 border-t border-line px-3 py-2 text-[12px]">
+            <span class="mr-0.5 text-faint">{{ shown.parents.length > 1 ? 'Parents' : 'Parent' }}</span>
             <button
               v-for="p in shown.parents" :key="p" type="button"
-              class="rounded-md bg-surface-2 px-1.5 font-mono text-[12px] leading-[22px] text-accent hover:bg-accent/15"
+              class="rounded-md border border-line bg-surface px-1.5 font-mono leading-[20px] text-muted hover:border-accent/50 hover:text-accent"
               :title="`Go to ${p.slice(0, 7)}`" @click="ui.selectCommit(p)"
             >{{ p.slice(0, 7) }}</button>
             <span v-if="!shown.parents.length" class="text-faint">none — first commit</span>
-          </dd>
-          <template v-if="refs.length">
-            <dt>On</dt>
-            <dd class="flex flex-wrap gap-1"><RefPill v-for="r in refs" :key="r.name" :ref-label="r" :color="refColor" class="max-w-[180px]" /></dd>
-          </template>
-        </dl>
+            <RefPill v-for="r in refs" :key="r.name" :ref-label="r" :color="refColor" class="max-w-[180px]" />
+          </div>
+        </div>
 
-        <div class="mt-4 flex rounded-lg bg-surface-2/70 p-0.5">
-          <button
-            type="button" class="seg flex-1"
-            :disabled="explanation?.status === 'running'" @click="explain"
-          >
+        <div class="mt-2.5 flex gap-1">
+          <button type="button" class="aibtn" :disabled="explanation?.status === 'running'" @click="explain">
             <Loader2 v-if="explanation?.status === 'running'" :size="15" class="animate-spin text-accent-2" />
-            <Sparkles v-else :size="15" class="text-accent-2" />Explain
+            <Sparkles v-else :size="15" class="text-accent-2" />Explain with AI
           </button>
-          <div class="my-1 w-px bg-line" />
-          <button type="button" class="seg flex-1" @click="review"><ScanSearch :size="15" class="text-accent" />AI review</button>
+          <button type="button" class="aibtn" @click="review"><ScanSearch :size="15" class="text-accent" />Review with AI</button>
         </div>
 
         <div v-if="explanation && explanation.status !== 'idle'" class="mt-3 rounded-xl border border-accent-2/30 bg-accent-2/5 p-3 text-[13px] select-text">
@@ -226,38 +233,30 @@ function review() {
         </div>
       </div>
 
-      <div class="flex shrink-0 items-center gap-2 px-3 pt-3 pb-2">
-        <span class="text-[13px] font-semibold text-fg">Files</span>
+      <div class="flex shrink-0 items-center gap-1.5 border-b border-line px-4 py-2">
+        <span class="text-[12px] font-semibold tracking-wider text-muted uppercase">Files</span>
         <span class="text-[12px] text-faint" :title="shown.parents.length > 1 ? 'Compared with the first parent' : undefined">{{ shown.files.length }}</span>
         <div class="flex-1" />
-        <div v-if="statusCounts.length > 1" class="flex shrink-0 rounded-md bg-surface-2 p-0.5">
-          <button
-            type="button" class="chip" :class="{ on: statusFilter === 'all' }"
-            @click="statusFilter = 'all'"
-          >All</button>
-          <button
-            v-for="[st, n] in statusCounts" :key="st" type="button"
-            class="chip font-mono" :class="{ on: statusFilter === st }"
-            :title="STATUS_LABEL[st] ?? st"
-            @click="statusFilter = statusFilter === st ? 'all' : st"
-          >{{ st }} {{ n }}</button>
-        </div>
-        <div class="flex shrink-0 rounded-md bg-surface-2 p-0.5">
-          <button type="button" class="chip" :class="{ on: searching }" title="Filter files" @click="toggleSearch"><Search :size="14" /></button>
-          <button type="button" class="chip" :class="{ on: ui.fileViewMode === 'list' }" title="List view" @click="ui.fileViewMode = 'list'"><List :size="14" /></button>
-          <button type="button" class="chip" :class="{ on: ui.fileViewMode === 'tree' }" title="Tree view" @click="ui.fileViewMode = 'tree'"><FolderTree :size="14" /></button>
-        </div>
+        <button type="button" class="chip" :class="{ on: statusFilter === 'all' }" @click="statusFilter = 'all'">All</button>
+        <button
+          v-for="[st, n] in statusCounts" :key="st" type="button"
+          class="chip font-mono" :class="{ on: statusFilter === st }" :style="{ color: STATUS_COLOR[st] }"
+          :title="STATUS_LABEL[st] ?? st"
+          @click="statusFilter = statusFilter === st ? 'all' : st"
+        >{{ st }} {{ n }}</button>
       </div>
-      <div v-if="searching" class="shrink-0 px-3 pb-1.5">
-        <input ref="searchInput" v-model="fileQuery" class="gw-input" placeholder="Filter by path…" spellcheck="false" />
+      <div v-if="searching" class="relative shrink-0 px-3 pt-2">
+        <Search :size="13" class="gw-search-icon left-5.5 mt-1" />
+        <input ref="searchInput" v-model="fileQuery" class="gw-input gw-search" placeholder="Filter by path…" spellcheck="false" />
       </div>
-      <div class="min-h-0 flex-1">
+      <div class="min-h-0 flex-1 pt-1">
         <FileList
           :files="files"
           :mode="ui.fileViewMode"
           readonly
           :active-path="ui.centerView === 'diff' && ui.diffSource === 'commit' ? ui.diffPath : null"
           @open="openFile"
+          @menu="fileMenu"
         >
           <template #empty>
             <div class="px-4 py-2 text-[12px] text-faint italic">{{ shown.files.length ? 'No files match' : 'No file changes' }}</div>
@@ -270,19 +269,19 @@ function review() {
 
 <style scoped>
 @reference '../../styles/main.css';
-.meta {
-  @apply grid grid-cols-[76px_1fr] items-center gap-x-3 gap-y-2 text-[13px] text-muted;
+.hbtn {
+  @apply flex h-7 w-7 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-fg;
 }
-.meta dt {
-  @apply text-[12px] text-faint;
+.hbtn.on {
+  @apply bg-surface-3 text-fg;
 }
-.seg {
-  @apply flex h-8 items-center justify-center gap-1.5 rounded-md text-[13px] font-medium whitespace-nowrap text-fg hover:bg-hover disabled:opacity-50;
+.aibtn {
+  @apply flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] whitespace-nowrap text-fg hover:bg-hover disabled:opacity-50;
 }
 .chip {
-  @apply flex h-6 min-w-6 items-center justify-center rounded px-1.5 text-[12px] whitespace-nowrap text-muted hover:text-fg;
+  @apply flex h-6 items-center rounded px-1.5 text-[12px] whitespace-nowrap text-muted hover:bg-hover hover:text-fg;
 }
 .chip.on {
-  @apply bg-surface-3 text-fg shadow-sm;
+  @apply bg-surface-3 text-fg;
 }
 </style>

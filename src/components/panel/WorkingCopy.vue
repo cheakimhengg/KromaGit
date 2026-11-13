@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Check, FolderTree, List, Loader2, Minus, Pencil, Plus, Split, Trash2, Undo2 } from 'lucide-vue-next'
+import { Check, FolderTree, List, Loader2, Minus, Pencil, Plus, Split, Trash2, Undo2 } from '@/lib/icons'
 import { useAiStore } from '@/stores/ai'
 import FileList from './FileList.vue'
 import CommitBox from './CommitBox.vue'

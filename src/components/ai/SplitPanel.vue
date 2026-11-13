@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { clone } from '@/lib/clone'
-import { AlertOctagon, ArrowDown, ArrowUp, GitCommitHorizontal, Loader2, RotateCw, Split, Trash2 } from 'lucide-vue-next'
+import { AlertOctagon, ArrowDown, ArrowUp, GitCommitHorizontal, Loader2, RotateCw, Split, Trash2 } from '@/lib/icons'
 import PanelShell from './PanelShell.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { useAiStore } from '@/stores/ai'

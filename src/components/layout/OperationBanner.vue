@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AlertTriangle, Play, X } from 'lucide-vue-next'
+import { AlertTriangle, Play, X } from '@/lib/icons'
 import { useReposStore } from '@/stores/repos'
 import { useOpsStore } from '@/stores/ops'
 import * as git from '@/actions/git'

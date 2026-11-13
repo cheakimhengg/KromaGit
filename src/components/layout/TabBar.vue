@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronRight, FolderGit2, House, Layers, Pencil, Plus, Tag, Ungroup, X } from 'lucide-vue-next'
+import { ChevronRight, FolderGit2, House, Layers, Pencil, Plus, Tag, Ungroup, X } from '@/lib/icons'
 import { GROUP_COLORS, useReposStore, type RepoTab, type TabGroup } from '@/stores/repos'
 import { useUiStore, type MenuItem } from '@/stores/ui'
 import { formatCombo } from '@/lib/shortcuts'
@@ -31,6 +31,7 @@ function tabMenu(e: MouseEvent, tab: RepoTab) {
   }
   if (tab.groupId) items.push({ label: 'Remove from group', icon: Ungroup, action: () => repos.setTabGroup(tab.id, undefined) })
   items.push(
+    { label: 'Rename tab…', icon: Pencil, action: () => repos.renameTab(tab.id) },
     { separator: true },
     { label: 'Close tab', icon: X, shortcut: formatCombo('Mod+W'), action: () => repos.closeTab(tab.id) },
     ...(repos.tabs.length > 1 ? [{ label: 'Close other tabs', action: () => repos.closeOtherTabs(tab.id) }] : []),
