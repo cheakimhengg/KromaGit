@@ -92,7 +92,7 @@ Download the installer for your platform from [**Releases**](https://github.com/
 
 For local AI, install [Ollama](https://ollama.com) and pull a coding model, e.g. `ollama pull qwen2.5-coder`, then pick it in **Settings → AI**.
 
-You can also open a repository from the command line: `kromagit ~/code/my-project`.
+You can also open a repository from the command line: `KromaGit ~/code/my-project`.
 
 ## Keyboard shortcuts
 

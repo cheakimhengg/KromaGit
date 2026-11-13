@@ -74,7 +74,7 @@ let seq = 0
 const newId = () => `tab-${Date.now().toString(36)}-${++seq}`
 
 const DEMO_TABS: RepoTab[] = [
-  { id: 'demo-1', name: 'kromagit', path: '~/Documents/Projects/kromagit' },
+  { id: 'demo-1', name: 'KromaGit', path: '~/Documents/Projects/kromagit' },
   { id: 'demo-2', name: 'payments-api', path: '~/code/payments-api', groupId: 'backend' },
   { id: 'demo-3', name: 'auth-service', path: '~/code/auth-service', groupId: 'backend' },
   { id: 'demo-4', name: 'web-portal', path: '~/code/web-portal', groupId: 'frontend' },

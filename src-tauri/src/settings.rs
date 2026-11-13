@@ -75,13 +75,13 @@ pub struct AppearanceSettings {
     pub theme: String,
     /// percent, 70-150
     pub zoom: u32,
-    /// "blue" | "violet" | "teal" | "pink" | "amber" | "green"
+    /// "theme" | "blue" | "violet" | "teal" | "pink" | "amber" | "green"
     pub accent: String,
 }
 
 impl Default for AppearanceSettings {
     fn default() -> Self {
-        Self { theme: "dark".into(), zoom: 100, accent: "blue".into() }
+        Self { theme: "dark".into(), zoom: 100, accent: "theme".into() }
     }
 }
 

@@ -26,15 +26,15 @@ const clean = computed(() => repos.active?.loaded !== false && !wc.value.staged.
 const showClean = computed(() => clean.value && !amending.value)
 const activePath = (source: 'staged' | 'unstaged') => (ui.centerView === 'diff' && ui.diffSource === source ? ui.diffPath : null)
 
-function open(file: FileChange, staged: boolean) {
+function open(file: FileChange, staged: boolean, toggle = true) {
   ui.selectCommit(null)
-  ui.openDiff({ path: file.path, oldPath: file.oldPath, source: staged ? 'staged' : 'unstaged', untracked: file.status === '?' })
+  ;(toggle ? ui.toggleDiff : ui.openDiff)({ path: file.path, oldPath: file.oldPath, source: staged ? 'staged' : 'unstaged', untracked: file.status === '?' })
 }
 
 function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
   ui.openMenu(e, [
     { label: staged ? 'Unstage file' : 'Stage file', icon: staged ? Minus : Plus, action: () => (staged ? git.unstage([file]) : git.stage([file])) },
-    { label: 'Open diff', action: () => open(file, staged) },
+    { label: 'Open diff', action: () => open(file, staged, false) },
     { label: 'Copy path', action: () => git.copyText(file.path) },
     ...(staged ? [] : [{ separator: true }, { label: 'Discard changes…', icon: Undo2, danger: true, action: () => git.discard([file]) }]),
   ])

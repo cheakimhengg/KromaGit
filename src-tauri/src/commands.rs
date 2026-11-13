@@ -30,7 +30,7 @@ pub async fn app_info() -> AppInfo {
     }
 }
 
-/// Paths passed on the command line (`kromagit ~/code/app`), opened as tabs at startup.
+/// Paths passed on the command line (`KromaGit ~/code/app`), opened as tabs at startup.
 #[tauri::command]
 pub fn startup_paths() -> Vec<String> {
     crate::system::startup_dirs(std::env::args().skip(1))

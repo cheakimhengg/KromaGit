@@ -8,10 +8,23 @@ export interface AiSettings {
   cloudConsent: Record<string, boolean>
 }
 
-export type ThemeId = 'dark' | 'midnight' | 'dim' | 'light' | 'paper'
+export type ThemeId =
+  | 'dark' | 'midnight' | 'dim' | 'light' | 'paper'
+  | 'vscode-dark'
+  | 'vscode-light'
+  | 'github-dark'
+  | 'github-light'
+  | 'one-dark'
+  | 'tokyo-night'
+  | 'catppuccin-mocha'
+  | 'catppuccin-latte'
+  | 'dracula'
+  | 'nord'
+  | 'ayu-dark'
+  | 'ayu-light'
 export type ThemePref = ThemeId | 'system'
 
-export type AccentId = 'blue' | 'violet' | 'teal' | 'pink' | 'amber' | 'green'
+export type AccentId = 'theme' | 'blue' | 'violet' | 'teal' | 'pink' | 'amber' | 'green'
 
 export interface Settings {
   appearance: { theme: ThemePref; zoom: number; accent: AccentId }

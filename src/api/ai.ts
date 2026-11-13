@@ -21,7 +21,7 @@ export interface AiApi {
 
 export function defaultSettings(): Settings {
   return {
-    appearance: { theme: 'dark', zoom: 100, accent: 'blue' },
+    appearance: { theme: 'dark', zoom: 100, accent: 'theme' },
     general: { terminalApp: '', editorApp: '', showAvatars: true },
     ai: {
       provider: 'none',

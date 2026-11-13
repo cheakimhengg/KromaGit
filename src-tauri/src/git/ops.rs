@@ -127,7 +127,7 @@ fn rev_parse(git: &Git, rev: &str) -> AppResult<String> {
 /// Snapshot of tracked changes (index + worktree) without touching anything.
 /// Returns `None` when there is nothing to back up.
 fn backup_stash(git: &Git) -> AppResult<Option<String>> {
-    let oid = git.run_string(&["stash", "create", "kromagit backup"])?.trim().to_string();
+    let oid = git.run_string(&["stash", "create", "KromaGit backup"])?.trim().to_string();
     Ok(Some(oid).filter(|o| !o.is_empty()))
 }
 

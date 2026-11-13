@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { clone } from '@/lib/clone'
 import {
-  AppWindow, CalendarClock, Check, FolderGit2, Keyboard, KeyRound, Loader2, Palette, RefreshCw, Search, ShieldCheck, Sparkles, X,
+  AppWindow, CalendarClock, Check, FolderGit2, Keyboard, KeyRound, Loader2, Monitor, Moon, Palette, RefreshCw, Search, ShieldCheck, Sparkles, Sun, X,
 } from '@/lib/icons'
 import { aiApi } from '@/api/ai'
 import { errorMessage } from '@/api/git'
@@ -12,7 +12,8 @@ import { useUiStore } from '@/stores/ui'
 import { TEMPLATE_PRESETS } from '@/ai/prompts'
 import { useCommands } from '@/commands/registry'
 import { formatCombo, isMac } from '@/lib/shortcuts'
-import { ACCENTS, THEMES, ZOOM_MAX, ZOOM_MIN, resolvedTheme } from '@/lib/theme'
+import { ACCENTS, THEMES, ZOOM_MAX, ZOOM_MIN, resolvePalette, resolvedTheme, themeInfo } from '@/lib/theme'
+import ThemePreview from '@/components/settings/ThemePreview.vue'
 import type { AccentId, CloudProvider, ProviderId, Settings } from '@/types/ai'
 
 const ui = useUiStore()
@@ -40,7 +41,7 @@ watch(visibleSections, (list) => {
 })
 const current = computed(() => SECTIONS.find((x) => x.id === tab.value)!)
 const themeCards = [...THEMES.map((t) => ({ ...t, system: false })), { id: 'system' as const, name: 'System', kind: 'dark' as const, blurb: 'Follows your OS', swatch: THEMES[0].swatch, system: true }]
-const LANE_DOTS = ['#7c9cff', '#5eead4', '#f472b6']
+const themeAccent = computed(() => themeInfo(resolvePalette(store.settings.appearance.theme))!.swatch.accent)
 function setAccent(a: AccentId) {
   store.setAccent(a)
   draft.value.appearance.accent = a
@@ -213,7 +214,7 @@ function onKey(e: KeyboardEvent) {
           <template v-if="tab === 'appearance'">
             <div class="card">
               <div class="card-title">Theme</div>
-              <p class="card-desc">Every palette avoids pure black and pure white to reduce glare. Pick what feels easiest on your eyes.</p>
+              <p class="card-desc">Kroma palettes are tuned for low glare; the rest follow popular editor themes. Pick what feels easiest on your eyes.</p>
               <div class="mt-3 grid grid-cols-3 gap-3">
                 <button
                   v-for="t in themeCards" :key="t.id" type="button"
@@ -221,21 +222,17 @@ function onKey(e: KeyboardEvent) {
                   :class="store.settings.appearance.theme === t.id ? 'border-accent' : 'border-line hover:border-line-strong'"
                   @click="store.setTheme(t.id); draft.appearance.theme = t.id"
                 >
-                  <div v-if="!t.system" class="flex h-[74px] gap-1.5 p-2" :style="{ background: t.swatch.bg }">
-                    <div class="w-1/4 rounded" :style="{ background: t.swatch.surface }" />
-                    <div class="flex flex-1 flex-col gap-1.5 pt-1">
-                      <div class="h-1.5 w-3/4 rounded-full" :style="{ background: t.swatch.text }" />
-                      <div class="h-1.5 w-1/2 rounded-full" :style="{ background: t.swatch.muted }" />
-                      <div class="mt-auto flex gap-1">
-                        <span v-for="c in LANE_DOTS" :key="c" class="h-2 w-2 rounded-full" :style="{ background: c }" />
-                      </div>
+                  <div class="relative h-[80px]">
+                    <ThemePreview :swatch="t.swatch" />
+                    <div v-if="t.system" class="absolute inset-0" style="clip-path: polygon(100% 0, 100% 100%, 0 100%)">
+                      <ThemePreview :swatch="THEMES[3].swatch" />
                     </div>
                   </div>
-                  <div v-else class="h-[74px]" :style="{ background: `linear-gradient(135deg, ${THEMES[0].swatch.bg} 50%, ${THEMES[3].swatch.bg} 50%)` }" />
                   <div class="bg-surface px-3 py-2">
                     <div class="flex items-center justify-between text-[13px]">
-                      <span class="font-medium text-fg">{{ t.name }}</span>
-                      <Check v-if="store.settings.appearance.theme === t.id" :size="15" class="text-accent" />
+                      <span class="truncate font-medium" :class="store.settings.appearance.theme === t.id ? 'text-accent' : 'text-fg'">{{ t.name }}</span>
+                      <Check v-if="store.settings.appearance.theme === t.id" :size="15" class="shrink-0 text-accent" />
+                      <component :is="t.system ? Monitor : t.kind === 'light' ? Sun : Moon" v-else :size="14" class="shrink-0 text-faint" />
                     </div>
                     <div class="truncate text-[11px] text-faint">{{ t.blurb }}</div>
                   </div>
@@ -245,7 +242,7 @@ function onKey(e: KeyboardEvent) {
 
             <div class="card">
               <div class="card-title">Accent colour</div>
-              <p class="card-desc">Used for selection, buttons and highlights.</p>
+              <p class="card-desc">Used for selection, buttons and highlights. “Theme” uses the palette’s own colour.</p>
               <div class="mt-3 flex flex-wrap gap-2">
                 <button
                   v-for="(a, id) in ACCENTS" :key="id" type="button"
@@ -253,7 +250,7 @@ function onKey(e: KeyboardEvent) {
                   :class="store.settings.appearance.accent === id ? 'border-accent bg-accent/10 text-fg' : 'border-line text-muted hover:border-line-strong hover:text-fg'"
                   @click="setAccent(id)"
                 >
-                  <span class="flex h-5 w-5 items-center justify-center rounded-full" :style="{ background: resolvedTheme === 'light' ? a.light : a.dark }">
+                  <span class="flex h-5 w-5 items-center justify-center rounded-full" :style="{ background: id === 'theme' ? themeAccent : resolvedTheme === 'light' ? a.light : a.dark }">
                     <Check v-if="store.settings.appearance.accent === id" :size="12" class="text-on-accent" :stroke-width="3" />
                   </span>{{ a.name }}
                 </button>

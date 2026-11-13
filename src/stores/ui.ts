@@ -142,6 +142,13 @@ export const useUiStore = defineStore('ui', () => {
     centerView.value = 'diff'
   }
 
+  /** Opens the file's diff, or closes it when that same diff is already showing. */
+  function toggleDiff(target: DiffTarget) {
+    const t = diffTarget.value
+    if (centerView.value === 'diff' && t && t.path === target.path && t.source === target.source && t.commit === target.commit) closeDiff()
+    else openDiff(target)
+  }
+
   function closeDiff() {
     diffView.value = 'diff'
     centerView.value = previousView.value === 'diff' ? 'graph' : previousView.value
@@ -227,7 +234,7 @@ export const useUiStore = defineStore('ui', () => {
   return {
     sidebarCollapsed, sidebarSections, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, diffView, diffOptions, fileViewMode,
     settingsOpen, settingsTab, paletteOpen, switcherOpen, repoMenuOpen, terminalOpen, terminalHeight, home, commitRequest, amendPending, generateRequest, searchRequest, previousView, menu, toasts, dialog,
-    selectCommit, openDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
+    selectCommit, openDiff, toggleDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
     openDialog, closeDialog, confirm, prompt,
   }
 })

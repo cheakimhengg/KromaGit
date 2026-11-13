@@ -96,7 +96,7 @@ async function toggleSearch() {
 function openFile(f: FileChange) {
   const d = shown.value
   if (!d) return
-  ui.openDiff({ path: f.path, oldPath: f.oldPath, source: 'commit', commit: d.hash, parent: d.parents[0] })
+  ui.toggleDiff({ path: f.path, oldPath: f.oldPath, source: 'commit', commit: d.hash, parent: d.parents[0] })
 }
 
 function copy(text: string, what = 'Copied') {
