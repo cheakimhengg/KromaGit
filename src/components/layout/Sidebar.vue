@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import {
   Archive, ArchiveRestore, Boxes, Check, Cloud, Copy, FolderTree, GitBranch, GitBranchPlus, GitMerge, GitPullRequestArrow, Globe,
-  ChevronsDownUp, Pencil, Search, Tag as TagIcon, Trash2, ArrowUpFromLine,
+  ChevronsDownUp, Pencil, Search, Tag as TagIcon, Trash2, ArrowUpFromLine, ArrowDownToLine, FolderOpen,
 } from '@/lib/icons'
 import SidebarSection from './SidebarSection.vue'
 import RefTree from './RefTree.vue'
@@ -10,7 +10,7 @@ import { buildRefTree, matchesFilter } from '@/lib/ref-tree'
 import { relativeTime } from '@/lib/format'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore, type MenuItem } from '@/stores/ui'
-import type { Branch, Stash, Tag } from '@/types/git'
+import type { Branch, Stash, Submodule, Tag, Worktree } from '@/types/git'
 import * as git from '@/actions/git'
 
 const repos = useReposStore()
@@ -78,6 +78,37 @@ function tagMenu(e: MouseEvent, t: Tag) {
     { label: 'Copy name', icon: Copy, action: () => git.copyText(t.name) },
     { separator: true },
     { label: `Delete ${t.name}…`, icon: Trash2, danger: true, action: () => git.deleteTag(t.name) },
+  ])
+}
+
+const inRepo = (rel: string) => `${(repos.activeTab?.path ?? '').replace(/[\\/]+$/, '')}/${rel}`
+
+async function copyText(text: string) {
+  await navigator.clipboard.writeText(text).catch(() => undefined)
+  ui.toast({ kind: 'success', title: 'Path copied' }, 1500)
+}
+
+function openSubmodule(s: Submodule) {
+  if (s.status === 'uninitialized') void git.updateSubmodule(s.path)
+  else void repos.openRepoAt(inRepo(s.path))
+}
+
+function submoduleMenu(e: MouseEvent, s: Submodule) {
+  const uninit = s.status === 'uninitialized'
+  ui.openMenu(e, [
+    { heading: true, mono: true, label: s.path },
+    { label: 'Open as repository', icon: FolderOpen, disabled: uninit, action: () => repos.openRepoAt(inRepo(s.path)) },
+    { label: uninit ? 'Initialize and check out' : 'Update (checkout recorded commit)', icon: ArrowDownToLine, action: () => git.updateSubmodule(s.path) },
+    { separator: true },
+    { label: 'Copy path', icon: Copy, action: () => copyText(inRepo(s.path)) },
+  ])
+}
+
+function worktreeMenu(e: MouseEvent, w: Worktree) {
+  ui.openMenu(e, [
+    { heading: true, mono: true, label: w.path },
+    { label: 'Open as repository', icon: FolderOpen, disabled: w.isMain, action: () => repos.openRepoAt(w.path) },
+    { label: 'Copy path', icon: Copy, action: () => copyText(w.path) },
   ])
 }
 
@@ -175,7 +206,13 @@ function collapseAllSections() {
       </SidebarSection>
 
       <SidebarSection title="Worktrees" :icon="FolderTree" :count="worktrees.length" :default-open="false">
-        <div v-for="w in worktrees" :key="w.path" class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover" :title="w.path">
+        <div
+          v-for="w in worktrees" :key="w.path"
+          class="flex h-7 shrink-0 cursor-pointer items-center whitespace-nowrap gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover"
+          :title="w.isMain ? w.path : `${w.path} — double-click to open`"
+          @dblclick="!w.isMain && repos.openRepoAt(w.path)"
+          @contextmenu="worktreeMenu($event, w)"
+        >
           <FolderTree :size="14" class="shrink-0 text-faint" />
           <span class="flex-1 truncate text-fg/85">{{ w.path.split('/').pop() }}</span>
           <span class="truncate text-[11px] text-faint">{{ w.branch }}</span>
@@ -183,10 +220,17 @@ function collapseAllSections() {
       </SidebarSection>
 
       <SidebarSection title="Submodules" :icon="Boxes" :count="submodules.length" :default-open="false">
-        <div v-for="s in submodules" :key="s.path" class="flex h-7 shrink-0 items-center whitespace-nowrap gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover">
+        <div
+          v-for="s in submodules" :key="s.path"
+          class="flex h-7 shrink-0 cursor-pointer items-center whitespace-nowrap gap-1.5 rounded pr-2 pl-5 text-[13px] hover:bg-hover"
+          :title="s.status === 'uninitialized' ? `${s.path} — not checked out yet; double-click to initialize` : `${s.path} — double-click to open`"
+          @dblclick="openSubmodule(s)"
+          @contextmenu="submoduleMenu($event, s)"
+        >
           <Boxes :size="14" class="shrink-0 text-faint" />
-          <span class="flex-1 truncate text-fg/85">{{ s.path }}</span>
-          <span v-if="s.status === 'modified'" class="h-1.5 w-1.5 rounded-full bg-warning" title="Modified" />
+          <span class="flex-1 truncate" :class="s.status === 'uninitialized' ? 'text-faint' : 'text-fg/85'">{{ s.path }}</span>
+          <span v-if="s.status === 'modified'" class="h-1.5 w-1.5 rounded-full bg-warning" title="Points to a different commit than recorded" />
+          <span v-else-if="s.status === 'uninitialized'" class="text-[11px] text-faint">not checked out</span>
         </div>
       </SidebarSection>
     </div>

@@ -21,6 +21,8 @@ const MAP = {
   FolderGit2: 'folder-git',
   FileDiff: 'file-diff',
   CircleDot: 'radio-button',
+  FoldHorizontal: 'fold-horizontal',
+  UnfoldHorizontal: 'arrow-horizontal',
   // sync & stash
   CloudDownload: 'cloud-download',
   ArrowDownToLine: 'download-04',

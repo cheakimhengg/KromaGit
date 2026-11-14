@@ -3,7 +3,7 @@ export interface Person {
   email: string
 }
 
-export type RefKind = 'head' | 'local' | 'remote' | 'tag'
+export type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'stash'
 
 export interface RefLabel {
   name: string
@@ -20,6 +20,8 @@ export interface Commit {
   date: number
   subject: string
   refs: RefLabel[]
+  /** set on the stash rows mixed into the graph: the stash@{n} index */
+  stash?: number
 }
 
 export interface Branch {
@@ -47,6 +49,11 @@ export interface Stash {
   index: number
   message: string
   date: number
+  oid: string
+  /** the commit it was made on */
+  parent?: string | null
+  authorName: string
+  authorEmail: string
 }
 
 export interface Worktree {
@@ -220,6 +227,7 @@ export type GitAction =
   | { type: 'renameBranch'; old: string; new: string }
   | { type: 'createTag'; name: string; target: string | null; message: string | null }
   | { type: 'deleteTag'; name: string }
+  | { type: 'submoduleUpdate'; path: string }
   | { type: 'restoreRef'; refname: string; oid: string }
   | { type: 'deleteHeadRef' }
   | { type: 'fetch'; remote: string | null }

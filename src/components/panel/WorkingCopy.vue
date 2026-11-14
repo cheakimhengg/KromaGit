@@ -43,27 +43,20 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
-      <span class="text-[13px] font-semibold">Working Copy</span>
-      <Loader2 v-if="loading" :size="15" class="animate-spin text-faint" />
+    <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line pr-2 pl-4">
+      <span class="text-[12px] font-semibold tracking-wider text-muted uppercase">Working copy</span>
+      <Loader2 v-if="loading" :size="14" class="ml-1 animate-spin text-faint" />
       <div class="flex-1" />
-      <button
-        v-if="!showClean"
-        type="button" :disabled="totalFiles < 2 || !!ops.running || ai.split.status === 'running'"
-        class="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] whitespace-nowrap text-muted hover:bg-hover hover:text-fg disabled:opacity-30"
-        title="AI: suggest how to split these changes into several commits"
-        @click="ai.suggestSplit()"
-      ><Split :size="12" class="text-accent-2" />Split…</button>
-      <div v-if="!showClean" class="flex rounded-md bg-surface-2/70 p-0.5">
+      <template v-if="!showClean">
         <button
-          type="button" class="rounded p-1" :class="ui.fileViewMode === 'list' ? 'bg-surface-3 text-fg' : 'text-faint hover:text-fg'"
-          title="List view" @click="ui.fileViewMode = 'list'"
-        ><List :size="14" /></button>
-        <button
-          type="button" class="rounded p-1" :class="ui.fileViewMode === 'tree' ? 'bg-surface-3 text-fg' : 'text-faint hover:text-fg'"
-          title="Tree view" @click="ui.fileViewMode = 'tree'"
-        ><FolderTree :size="14" /></button>
-      </div>
+          type="button" class="hbtn" :disabled="totalFiles < 2 || !!ops.running || ai.split.status === 'running'"
+          title="AI: suggest how to split these changes into several commits"
+          @click="ai.suggestSplit()"
+        ><Split :size="16" /></button>
+        <div class="mx-1 h-5 w-px bg-line" />
+        <button type="button" class="hbtn" :class="{ on: ui.fileViewMode === 'list' }" title="List view" @click="ui.fileViewMode = 'list'"><List :size="16" /></button>
+        <button type="button" class="hbtn" :class="{ on: ui.fileViewMode === 'tree' }" title="Tree view" @click="ui.fileViewMode = 'tree'"><FolderTree :size="16" /></button>
+      </template>
     </div>
 
     <div v-if="showClean" class="flex min-h-0 flex-1 flex-col items-center justify-center px-8 pb-16 text-center">
@@ -141,3 +134,13 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
     <CommitBox v-show="!showClean" :staged-count="wc.staged.length" @amending="amending = $event" />
   </div>
 </template>
+
+<style scoped>
+@reference '../../styles/main.css';
+.hbtn {
+  @apply flex h-7 w-7 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-fg disabled:pointer-events-none disabled:opacity-30;
+}
+.hbtn.on {
+  @apply bg-surface-3 text-fg;
+}
+</style>

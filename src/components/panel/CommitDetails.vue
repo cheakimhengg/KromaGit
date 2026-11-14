@@ -65,8 +65,8 @@ const longBody = computed(() => {
 
 const paragraphs = computed(() => reflowMessage(shown.value?.body ?? ''))
 
-const rowIndex = computed(() => repos.active?.snapshot.commits.findIndex((c) => c.hash === props.hash) ?? -1)
-const refs = computed(() => (rowIndex.value >= 0 ? repos.active!.snapshot.commits[rowIndex.value].refs : []))
+const rowIndex = computed(() => repos.active?.graphCommits.findIndex((c) => c.hash === props.hash) ?? -1)
+const refs = computed(() => (rowIndex.value >= 0 ? repos.active!.graphCommits[rowIndex.value].refs : []))
 const refColor = computed(() => laneColor(rowIndex.value >= 0 ? repos.active!.layout.rows[rowIndex.value]?.color ?? 0 : 0))
 
 const STATUS_COLOR: Record<string, string> = { M: 'var(--gw-accent)', A: 'var(--gw-success)', D: 'var(--gw-danger)', R: 'var(--gw-info)' }

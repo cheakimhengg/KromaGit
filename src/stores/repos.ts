@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, markRaw, reactive, ref, shallowReactive, watch } from 'vue'
-import type { Commit, HeadInfo, RefsPayload, RepoSnapshot, StatusPayload } from '@/types/git'
+import type { Commit, HeadInfo, RefsPayload, RepoSnapshot, Stash, StatusPayload } from '@/types/git'
 import { computeGraphLayout, type GraphLayout } from '@/lib/graph-layout'
+import { withStashRows } from '@/lib/stash-rows'
 import { invoke } from '@tauri-apps/api/core'
 import { errorMessage, gitApi, inTauri } from '@/api/git'
 import { repoNameFromUrl } from '@/lib/format'
@@ -14,6 +15,8 @@ export interface TabGroup {
   name: string
   color: string
   collapsed?: boolean
+  /** every repo that belongs to the group, open or not, so closed ones can be reopened */
+  members?: { name: string; path: string }[]
 }
 
 export interface RepoTab {
@@ -25,6 +28,8 @@ export interface RepoTab {
 
 export interface RepoState {
   snapshot: RepoSnapshot
+  /** commits plus stash rows, in the order the graph shows them; `layout.rows` line up with this */
+  graphCommits: Commit[]
   layout: GraphLayout
   loading: { commits: boolean; refs: boolean; status: boolean }
   commitsComplete: boolean
@@ -70,6 +75,10 @@ function emptySnapshot(tab: RepoTab): RepoSnapshot {
   }
 }
 
+export const WIP_HASH = '__wip__'
+/** what each state's layout was computed from, so it is only rebuilt when that changes */
+const layoutInputs = new WeakMap<object, { commits: Commit[]; stashes: Stash[]; wipParent: string | null }>()
+
 let seq = 0
 const newId = () => `tab-${Date.now().toString(36)}-${++seq}`
 
@@ -81,7 +90,7 @@ const DEMO_TABS: RepoTab[] = [
 ]
 const DEFAULT_GROUPS: TabGroup[] = [
   { id: 'backend', name: 'Backend', color: GROUP_COLORS[0] },
-  { id: 'frontend', name: 'Frontend', color: GROUP_COLORS[2] },
+  { id: 'frontend', name: 'Frontend', color: GROUP_COLORS[2], members: [{ name: 'design-system', path: '~/code/design-system' }] },
 ]
 
 interface Workspace {
@@ -91,7 +100,7 @@ interface Workspace {
 }
 
 function loadWorkspace(): Workspace {
-  if (!inTauri) return { tabs: DEMO_TABS.map((t) => ({ ...t })), groups: DEFAULT_GROUPS, activeTabId: DEMO_TABS[0].id }
+  if (!inTauri) return { tabs: DEMO_TABS.map((t) => ({ ...t })), groups: structuredClone(DEFAULT_GROUPS), activeTabId: DEMO_TABS[0].id }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
@@ -101,13 +110,17 @@ function loadWorkspace(): Workspace {
   } catch {
     /* corrupted workspace: start fresh */
   }
-  return { tabs: [], groups: DEFAULT_GROUPS, activeTabId: '' }
+  return { tabs: [], groups: DEFAULT_GROUPS.map(({ members: _, ...g }) => ({ ...g })), activeTabId: '' }
 }
 
 export const useReposStore = defineStore('repos', () => {
   const ws = loadWorkspace()
   const groups = ref<TabGroup[]>(ws.groups)
   const tabs = ref<RepoTab[]>(ws.tabs)
+  for (const t of tabs.value) {
+    const g = groups.value.find((x) => x.id === t.groupId)
+    if (g && !g.members?.some((m) => m.path === t.path)) (g.members ??= []).push({ name: t.name, path: t.path })
+  }
   const activeTabId = ref<string>(ws.tabs.some((t) => t.id === ws.activeTabId) ? ws.activeTabId : (ws.tabs[0]?.id ?? ''))
   const states = shallowReactive(new Map<string, RepoState>())
   const generations = new Map<string, { commits: number; refs: number; status: number }>()
@@ -132,6 +145,7 @@ export const useReposStore = defineStore('repos', () => {
     if (!s) {
       s = shallowReactive<RepoState>({
         snapshot: markRaw(emptySnapshot(tab)),
+        graphCommits: markRaw([]),
         layout: markRaw({ rows: [], maxLanes: 1 }),
         loading: reactive({ commits: false, refs: false, status: false }),
         commitsComplete: false,
@@ -148,11 +162,30 @@ export const useReposStore = defineStore('repos', () => {
   function patch(state: RepoState, partial: Partial<RepoSnapshot>) {
     const next = { ...state.snapshot, ...partial }
     next.currentBranch = describeHead(next.head)
+    relayout(state, next)
     state.snapshot = markRaw(next)
   }
 
+  /** With uncommitted changes, WIP is laid out as a commit on top of HEAD so it gets its own lane and a line down to HEAD. */
+  function relayout(state: RepoState, snap: RepoSnapshot) {
+    const wc = snap.workingCopy
+    const dirty = !!wc && wc.staged.length + wc.unstaged.length > 0
+    const oid = snap.head.oid
+    const wipParent = dirty && oid && snap.commits.some((c) => c.hash === oid) ? oid : null
+    const prev = layoutInputs.get(state)
+    if (prev && prev.commits === snap.commits && prev.stashes === snap.stashes && prev.wipParent === wipParent) return
+    layoutInputs.set(state, { commits: snap.commits, stashes: snap.stashes, wipParent })
+    const list = withStashRows(snap.commits, snap.stashes ?? [])
+    state.graphCommits = markRaw(list)
+    if (!wipParent) {
+      state.layout = markRaw(computeGraphLayout(list))
+      return
+    }
+    const full = computeGraphLayout([{ hash: WIP_HASH, parents: [wipParent] }, ...list])
+    state.layout = markRaw({ rows: full.rows.slice(1), maxLanes: full.maxLanes, wipRow: full.rows[0] })
+  }
+
   function setCommits(state: RepoState, commits: Commit[]) {
-    state.layout = markRaw(computeGraphLayout(commits))
     patch(state, { commits: markRaw(commits) })
   }
 
@@ -309,6 +342,8 @@ export const useReposStore = defineStore('repos', () => {
       }
       const tab: RepoTab = { id: newId(), name: info.name, path: info.root }
       tabs.value.push(tab)
+      const home = groups.value.find((g) => g.members?.some((m) => m.path === info.root))
+      if (home) setTabGroup(tab.id, home.id)
       activate(tab.id)
     } catch (e) {
       ui.toast({ kind: 'error', title: 'Could not open repository', detail: errorMessage(e) }, 6000)
@@ -386,7 +421,7 @@ export const useReposStore = defineStore('repos', () => {
   function setTabGroup(tabId: string, gid: string | undefined) {
     const tab = tabs.value.find((t) => t.id === tabId)
     if (!tab) return
-    tab.groupId = gid
+    assignGroup(tab, gid)
     // keep group members next to each other in tab order
     if (gid) {
       const idx = tabs.value.indexOf(tab)
@@ -397,6 +432,39 @@ export const useReposStore = defineStore('repos', () => {
       })
       tabs.value.splice(last === -1 ? idx : last + 1, 0, tab)
     }
+  }
+
+  /** Moves a tab into a group (or out of all groups), keeping each group's member list in sync. */
+  function assignGroup(tab: RepoTab, gid: string | undefined) {
+    for (const g of groups.value) {
+      if (g.id !== gid && g.members) g.members = g.members.filter((m) => m.path !== tab.path)
+    }
+    tab.groupId = gid
+    const g = gid ? groups.value.find((x) => x.id === gid) : undefined
+    if (g && !g.members?.some((m) => m.path === tab.path)) (g.members ??= []).push({ name: tab.name, path: tab.path })
+  }
+
+  const groupMembers = (gid: string) => {
+    const g = groups.value.find((x) => x.id === gid)
+    const open = tabs.value.filter((t) => t.groupId === gid)
+    const openPaths = new Set(open.map((t) => t.path))
+    return { open, closed: (g?.members ?? []).filter((m) => !openPaths.has(m.path)) }
+  }
+
+  async function openRestOfGroup(gid: string) {
+    const first = activeTabId.value
+    for (const m of groupMembers(gid).closed) await openRepoAt(m.path)
+    const g = groups.value.find((x) => x.id === gid)
+    if (g) g.collapsed = false
+    if (first) activate(tabs.value.find((t) => t.groupId === gid)?.id ?? first)
+  }
+
+  function collapseOtherGroups(gid: string) {
+    for (const g of groups.value) g.collapsed = g.id !== gid
+  }
+
+  function expandAllGroups() {
+    for (const g of groups.value) g.collapsed = false
   }
 
   function createGroup(name: string, color?: string): string {
@@ -440,6 +508,18 @@ export const useReposStore = defineStore('repos', () => {
     if (r) g.name = r.values.name.trim() || g.name
   }
 
+  /** Name and colour in one dialog. */
+  async function editGroup(gid: string) {
+    const g = groups.value.find((x) => x.id === gid)
+    if (!g) return
+    const r = await useUiStore().prompt({
+      title: 'Edit group',
+      fields: [{ key: 'name', label: 'Group name', initial: g.name, validate: (v) => (v.trim().length > 24 ? 'Keep it under 24 characters' : null) }],
+      confirmLabel: 'Save',
+    })
+    if (r) g.name = r.values.name.trim() || g.name
+  }
+
   function setGroupColor(gid: string, color: string) {
     const g = groups.value.find((x) => x.id === gid)
     if (g) g.color = color
@@ -461,11 +541,10 @@ export const useReposStore = defineStore('repos', () => {
     const g = groups.value.find((x) => x.id === gid)
     if (!g) return
     if (members.length) {
-      const ok = await useUiStore().confirm({ title: `Close ${members.length} ${members.length === 1 ? 'tab' : 'tabs'} in “${g.name}”?`, message: 'The repositories are not changed; you can reopen them any time.', confirmLabel: 'Close tabs' })
+      const ok = await useUiStore().confirm({ title: `Close ${members.length} ${members.length === 1 ? 'tab' : 'tabs'} in “${g.name}”?`, message: 'The repositories are not changed. The group stays, so you can reopen them with “Open the rest in tabs”.', confirmLabel: 'Close tabs' })
       if (!ok) return
     }
     for (const t of members) closeTab(t.id)
-    groups.value = groups.value.filter((x) => x.id !== gid)
   }
 
   /** Drag-and-drop: put `tabId` before `beforeId` (or at the end) and adopt the target's group. */
@@ -476,7 +555,17 @@ export const useReposStore = defineStore('repos', () => {
     const to = beforeId ? tabs.value.findIndex((t) => t.id === beforeId) : -1
     if (to === -1) tabs.value.push(tab)
     else tabs.value.splice(to, 0, tab)
-    if (gid !== undefined) tab.groupId = gid ?? undefined
+    if (gid !== undefined) assignGroup(tab, gid ?? undefined)
+  }
+
+  /** Moves a whole group's tabs so they sit before `beforeId` (or at the end). */
+  function moveGroup(gid: string, beforeId: string | null) {
+    const members = tabs.value.filter((t) => t.groupId === gid)
+    if (!members.length || (beforeId && members.some((t) => t.id === beforeId))) return
+    const rest = tabs.value.filter((t) => t.groupId !== gid)
+    const at = beforeId ? rest.findIndex((t) => t.id === beforeId) : -1
+    rest.splice(at === -1 ? rest.length : at, 0, ...members)
+    tabs.value = rest
   }
 
   function closeOtherTabs(keepId: string) {
@@ -486,6 +575,6 @@ export const useReposStore = defineStore('repos', () => {
   return {
     groups, tabs, activeTabId, activeTab, active, busy, recent, forgetRecent,
     activate, openRepo, openRepoAt, cloneRepo, cloning, loadMoreCommits, loadAllCommits, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh,
-    createGroup, promptNewGroup, renameTab, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, closeOtherTabs,
+    createGroup, promptNewGroup, editGroup, groupMembers, openRestOfGroup, collapseOtherGroups, expandAllGroups, renameTab, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, moveGroup, closeOtherTabs,
   }
 })

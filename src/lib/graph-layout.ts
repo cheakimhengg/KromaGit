@@ -1,6 +1,8 @@
 export interface GraphInputCommit {
   hash: string
   parents: string[]
+  /** stash rows always open a new lane on the right instead of reusing a free one */
+  stash?: number
 }
 
 /** A segment within one half of a row. Columns are lane indexes. */
@@ -23,6 +25,8 @@ export interface GraphRow {
 export interface GraphLayout {
   rows: GraphRow[]
   maxLanes: number
+  /** the uncommitted-changes row drawn above the list, laid out as a child of HEAD */
+  wipRow?: GraphRow
 }
 
 /**
@@ -39,8 +43,8 @@ export function computeGraphLayout(commits: GraphInputCommit[], paletteSize = 10
   let maxLanes = 0
   const rows: GraphRow[] = new Array(commits.length)
 
-  const allocate = (hash: string): number => {
-    let idx = lanes.indexOf(null)
+  const allocate = (hash: string, atEnd = false): number => {
+    let idx = atEnd ? -1 : lanes.indexOf(null)
     if (idx === -1) {
       idx = lanes.length
       lanes.push(null)
@@ -51,7 +55,7 @@ export function computeGraphLayout(commits: GraphInputCommit[], paletteSize = 10
   }
 
   for (let i = 0; i < commits.length; i++) {
-    const { hash, parents } = commits[i]
+    const { hash, parents, stash } = commits[i]
     const upper: GraphEdge[] = []
     const lower: GraphEdge[] = []
 
@@ -66,7 +70,7 @@ export function computeGraphLayout(commits: GraphInputCommit[], paletteSize = 10
       upper.push({ from: j, to: j, color: laneColors[j] })
     }
 
-    const lane = incoming.length > 0 ? incoming[0] : allocate(hash)
+    const lane = incoming.length > 0 ? incoming[0] : allocate(hash, stash !== undefined)
     const color = laneColors[lane]
     for (const j of incoming) upper.push({ from: j, to: lane, color: laneColors[j] })
 
@@ -78,14 +82,8 @@ export function computeGraphLayout(commits: GraphInputCommit[], paletteSize = 10
     if (parents.length === 0) {
       lanes[lane] = null
     } else {
-      const existing = lanes.indexOf(parents[0])
-      if (existing !== -1 && existing !== lane) {
-        lanes[lane] = null
-        lower.push({ from: lane, to: existing, color: laneColors[existing] })
-      } else {
-        lanes[lane] = parents[0]
-        lower.push({ from: lane, to: lane, color })
-      }
+      lanes[lane] = parents[0]
+      lower.push({ from: lane, to: lane, color })
       for (let p = 1; p < parents.length; p++) {
         const parent = parents[p]
         let target = lanes.indexOf(parent)

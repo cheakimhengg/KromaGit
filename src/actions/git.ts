@@ -273,6 +273,12 @@ export async function deleteTag(name: string) {
   })
 }
 
+// ---------- submodules ----------
+
+export function updateSubmodule(path: string) {
+  return ops().run(`Update ${path}`, { type: 'submoduleUpdate', path }, { success: `Checked out the recorded commit in ${path}` })
+}
+
 // ---------- remotes ----------
 
 export function fetchAll() {

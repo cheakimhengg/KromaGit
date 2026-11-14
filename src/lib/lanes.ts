@@ -27,7 +27,7 @@ export const LANE_WIDTH = 26
 export const GRAPH_PADDING = 17
 
 export const MIN_LANE_WIDTH = 14
-export const MAX_GRAPH_WIDTH = 280
+export const MAX_GRAPH_WIDTH = 380
 
 export const laneX = (lane: number, spacing = LANE_WIDTH) => GRAPH_PADDING + lane * spacing
 

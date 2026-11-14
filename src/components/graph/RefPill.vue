@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Check, Cloud, GitBranch, Monitor, Tag } from '@/lib/icons'
+import { Archive, Check, Cloud, GitBranch, Monitor, Tag } from '@/lib/icons'
 import type { RefLabel } from '@/types/git'
 
 const props = defineProps<{ refLabel: RefLabel; color: string; hasRemote?: boolean; label?: string }>()
@@ -8,12 +8,15 @@ const props = defineProps<{ refLabel: RefLabel; color: string; hasRemote?: boole
 const icon = computed(() => {
   switch (props.refLabel.kind) {
     case 'tag': return Tag
+    case 'stash': return Archive
     case 'remote': return Cloud
     default: return props.refLabel.current ? Monitor : GitBranch
   }
 })
 const style = computed(() =>
-  props.refLabel.current
+  props.refLabel.kind === 'stash'
+    ? { background: 'var(--gw-surface-3)', color: 'var(--gw-muted)', borderColor: 'var(--gw-border-strong)' }
+    : props.refLabel.current
     ? { background: props.color, color: 'var(--gw-on-accent)', borderColor: props.color }
     : { background: `${props.color}22`, color: props.color, borderColor: `${props.color}55` },
 )

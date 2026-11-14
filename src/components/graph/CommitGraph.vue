@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
-  Check, Cherry, Copy, GitMerge, SlidersHorizontal, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Undo, User, X,
+  Archive, ArchiveRestore, Check, Cherry, Copy, GitMerge, SlidersHorizontal, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Trash2, Undo, User, X,
 } from '@/lib/icons'
 import GraphCell from './GraphCell.vue'
 import RefPill from './RefPill.vue'
@@ -23,7 +23,7 @@ const searchInput = ref<HTMLInputElement | null>(null)
 
 const snapshot = computed(() => repos.active?.snapshot ?? null)
 const layout = computed(() => repos.active?.layout ?? null)
-const commits = computed(() => snapshot.value?.commits ?? [])
+const commits = computed(() => repos.active?.graphCommits ?? [])
 const isFiltered = computed(() => messageQuery.value.trim() !== '' || authorQuery.value.trim() !== '')
 
 const visibleIndexes = computed<number[] | null>(() => {
@@ -66,9 +66,14 @@ const visibleLanes = computed(() => {
     for (const e of r.upper) max = Math.max(max, e.from + 1, e.to + 1)
     for (const e of r.lower) max = Math.max(max, e.from + 1, e.to + 1)
   }
+  const w = layout.value?.wipRow
+  if (w && !isFiltered.value && changeCount.value) {
+    max = Math.max(max, w.lane + 1)
+    for (const e of w.lower) max = Math.max(max, e.from + 1, e.to + 1)
+  }
   return max
 })
-const gWidth = computed(() => graphWidth(visibleLanes.value))
+const gWidth = computed(() => Math.max(graphWidth(visibleLanes.value), paneWidth.value >= 1100 ? 220 : paneWidth.value >= 850 ? 150 : 0))
 const gSpacing = computed(() => laneSpacing(visibleLanes.value))
 
 watch(() => repos.activeTabId, () => {
@@ -82,6 +87,18 @@ const headIndex = computed(() => (headOid.value ? commits.value.findIndex((c) =>
 const loadingCommits = computed(() => !!repos.active?.loading.commits)
 const complete = computed(() => !!repos.active?.commitsComplete)
 const headLane = computed(() => (headIndex.value >= 0 ? layout.value?.rows[headIndex.value].lane ?? 0 : 0))
+const wipRow = computed(() => layout.value?.wipRow ?? null)
+/** WIP row edges: leave the node sideways if needed, then run down out of the 32px row */
+const wipPaths = computed(() => {
+  const w = wipRow.value
+  if (!w) return []
+  return w.lower.map((e) => {
+    const x1 = laneX(e.from, gSpacing.value)
+    const x2 = laneX(e.to, gSpacing.value)
+    const d = x1 === x2 ? `M${x1} 16V32` : `M${x1} 16H${x2 - Math.sign(x2 - x1) * 6}Q${x2} 16 ${x2} 22V32`
+    return { d, color: laneColor(e.color) }
+  })
+})
 const stagedCount = computed(() => snapshot.value?.workingCopy.staged.length ?? 0)
 const unstagedCount = computed(() => snapshot.value?.workingCopy.unstaged.length ?? 0)
 const wipActive = computed(() => !ui.selectedCommit && ui.centerView !== 'diff')
@@ -134,8 +151,8 @@ const spare = computed(() => paneWidth.value - shownGraph.value)
 const show = computed(() => ({
   refs: visible.value.refs,
   graph: visible.value.graph,
-  author: visible.value.author && spare.value >= 560,
-  hash: visible.value.hash && spare.value >= 760,
+  author: visible.value.author && spare.value >= 520,
+  hash: visible.value.hash && spare.value >= 700,
   date: visible.value.date,
 }))
 const refsWidth = computed(() => (spare.value >= 760 ? 170 : spare.value >= 640 ? 150 : 130))
@@ -144,9 +161,9 @@ const columns = computed(() =>
     show.value.refs ? `${refsWidth.value}px` : null,
     show.value.graph ? `${gWidth.value}px` : null,
     'minmax(160px,1fr)',
-    show.value.author ? '110px' : null,
-    show.value.hash ? '80px' : null,
-    show.value.date ? '110px' : null,
+    show.value.author ? '92px' : null,
+    show.value.hash ? '68px' : null,
+    show.value.date ? '84px' : null,
   ]
     .filter(Boolean)
     .join(' '),
@@ -188,6 +205,10 @@ function displayRefs(c: Commit): { ref: RefLabel; hasRemote: boolean; label: str
       out.push({ ref: r, hasRemote: true, label: short })
       continue
     }
+    if (r.kind === 'stash') {
+      out.push({ ref: r, hasRemote: false, label: c.subject })
+      continue
+    }
     out.push({ ref: r, hasRemote: r.kind === 'local' && remotes.some((x) => strip(x.name) === r.name), label: r.kind === 'head' ? 'HEAD' : r.name })
   }
   const rank = (x: { ref: RefLabel }) => (x.ref.current ? 0 : x.ref.kind === 'local' ? 1 : x.ref.kind === 'remote' ? 2 : 3)
@@ -196,7 +217,7 @@ function displayRefs(c: Commit): { ref: RefLabel; hasRemote: boolean; label: str
 
 /** Double-click: check out a branch at this commit (local first, else create a local branch from the remote one). */
 function checkoutRef(r: RefLabel) {
-  if (r.current || r.kind === 'tag') return
+  if (r.current || r.kind === 'tag' || r.kind === 'stash') return
   if (r.kind === 'local') return git.checkout(r.name)
   if (r.kind === 'remote') {
     const remote = r.name.split('/')[0]
@@ -204,6 +225,11 @@ function checkoutRef(r: RefLabel) {
   }
 }
 function refMenu(e: MouseEvent, r: RefLabel, label: string) {
+  if (r.kind === 'stash') {
+    const c = commits.value.find((x) => x.refs.includes(r))
+    if (c) stashMenu(e, c)
+    return
+  }
   const items: MenuItem[] = []
   if (!r.current && r.kind !== 'tag' && r.kind !== 'head') {
     items.push({ label: `Checkout ${label}`, icon: Check, action: () => checkoutRef(r) }, { separator: true })
@@ -214,13 +240,28 @@ function refMenu(e: MouseEvent, r: RefLabel, label: string) {
 }
 
 function onRowDblClick(c: Commit) {
+  if (c.stash !== undefined) return
   if (c.hash === headOid.value) return
   const refs = displayRefs(c).map((x) => x.ref)
   const target = refs.find((r) => r.kind === 'local') ?? refs.find((r) => r.kind === 'remote')
   if (target) void checkoutRef(target)
 }
 
+function stashMenu(e: MouseEvent, c: Commit) {
+  const index = c.stash!
+  ui.openMenu(e, [
+    { heading: true, label: c.subject },
+    { label: 'Pop (apply and remove)', icon: ArchiveRestore, action: () => git.stashPop(index) },
+    { label: 'Apply (keep stash)', icon: Archive, action: () => git.stashApply(index) },
+    { separator: true },
+    { label: 'Copy hash', icon: Copy, shortcut: c.shortHash, action: () => git.copyText(c.hash, 'Copied hash') },
+    { separator: true },
+    { label: 'Drop…', icon: Trash2, danger: true, action: () => git.stashDrop(index, c.subject) },
+  ])
+}
+
 function commitMenu(e: MouseEvent, c: Commit) {
+  if (c.stash !== undefined) return stashMenu(e, c)
   const isHead = c.hash === headOid.value
   const label = c.shortHash
   const branch = snapshot.value?.currentBranch ?? 'HEAD'
@@ -348,7 +389,11 @@ function rowIndex(virtualIndex: number) {
         <span class="inline-flex h-[21px] items-center rounded-full border border-dashed border-faint px-2 text-[12px] text-muted">WIP</span>
       </span>
       <svg v-if="show.graph" :width="gWidth" height="32" class="block">
-        <circle :cx="laneX(headLane, gSpacing)" cy="16" r="9" fill="none" :stroke="laneColor(layout?.rows[headIndex]?.color ?? 0)" stroke-width="2" stroke-dasharray="3 2.5" />
+        <template v-if="wipRow">
+          <path v-for="(p, i) in wipPaths" :key="i" :d="p.d" :stroke="p.color" stroke-width="2" fill="none" stroke-dasharray="3 3" />
+          <circle :cx="laneX(wipRow.lane, gSpacing)" cy="16" r="9" fill="var(--gw-bg)" :stroke="laneColor(wipRow.color)" stroke-width="2" stroke-dasharray="3 2.5" />
+        </template>
+        <circle v-else :cx="laneX(headLane, gSpacing)" cy="16" r="9" fill="none" :stroke="laneColor(layout?.rows[headIndex]?.color ?? 0)" stroke-width="2" stroke-dasharray="3 2.5" />
       </svg>
       <span class="flex items-center gap-2 px-2 text-[13px] whitespace-nowrap" :class="{ 'pl-3': !show.refs && !show.graph }">
         <Pencil :size="14" class="shrink-0 text-accent" />
@@ -394,11 +439,12 @@ function rowIndex(virtualIndex: number) {
               :has-refs="displayRefs(c).length > 0 && show.refs"
               :band="visible.band && !isFiltered"
               :is-head="c.hash === headOid"
+              :stash="c.stash !== undefined"
               :edges-hidden="isFiltered"
             />
             <span
               :style="visible.band && !isFiltered ? { boxShadow: `inset 2px 0 0 ${laneColor(layout!.rows[rowIndex(v.index)].color)}` } : undefined"
-              class="flex h-full min-w-0 items-center gap-1.5 truncate px-2.5 text-[14px]" :class="[c.parents.length > 1 ? 'text-muted' : 'text-fg', { 'pl-3': !show.refs && !show.graph }]"
+              class="flex h-full min-w-0 items-center gap-1.5 truncate px-2.5 text-[14px]" :class="[c.parents.length > 1 || c.stash !== undefined ? 'text-muted' : 'text-fg', { 'pl-3': !show.refs && !show.graph }]"
             >
               <template v-if="!show.refs">
                 <RefPill

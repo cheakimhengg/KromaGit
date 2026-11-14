@@ -10,7 +10,7 @@ pub fn get_commits(git: &Git, limit: Option<usize>) -> AppResult<Vec<Commit>> {
     let format = format!("--format={LOG_FORMAT}");
     let mut args = vec![
         "log",
-        "--topo-order",
+        "--date-order",
         "--no-color",
         "--decorate=full",
         "-z",

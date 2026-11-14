@@ -52,6 +52,8 @@ pub enum Action {
     StashStore { oid: String, message: String },
     AbortOperation,
     ContinueOperation,
+    /// `git submodule update --init --recursive -- <path>`: checks out the commit the parent repo records
+    SubmoduleUpdate { path: String },
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
@@ -318,6 +320,10 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             git.run(&args)?;
             Out::none()
         }
+        SubmoduleUpdate { path } => {
+            git.run(&["submodule", "update", "--init", "--recursive", "--", path])?;
+            Out::none()
+        }
         DeleteTag { name } => {
             let oid = rev_parse(git, &format!("refs/tags/{name}"))?;
             git.run(&["tag", "-d", name])?;
@@ -491,10 +497,11 @@ mod tests {
             {"type":"stashDrop","index":0},
             {"type":"stashStore","oid":"abc","message":"m"},
             {"type":"abortOperation"},
-            {"type":"continueOperation"}
+            {"type":"continueOperation"},
+            {"type":"submoduleUpdate","path":"libs/x"}
         ]"#;
         let actions: Vec<Action> = serde_json::from_str(samples).expect("all frontend action shapes deserialize");
-        assert_eq!(actions.len(), 36);
+        assert_eq!(actions.len(), 37);
         assert!(matches!(&actions[11], Action::CheckoutRemote { remote_branch, .. } if remote_branch == "origin/x"));
         assert!(matches!(&actions[28], Action::StashPush { include_untracked: true, .. }));
     }

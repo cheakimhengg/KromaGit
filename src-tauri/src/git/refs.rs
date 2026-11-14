@@ -11,7 +11,7 @@ pub fn get_refs(git: &Git) -> AppResult<RefsPayload> {
     let results = std::thread::scope(|s| {
         let refs = s.spawn(|| git.run(&["for-each-ref", &format, "refs/heads", "refs/remotes", "refs/tags"]));
         let remotes = s.spawn(|| git.run(&["remote", "-v"]));
-        let stash = s.spawn(|| git.run(&["stash", "list", "--format=%gd%x00%ct%x00%gs"]));
+        let stash = s.spawn(|| git.run(&["stash", "list", STASH_FORMAT]));
         let worktrees = s.spawn(|| git.run(&["worktree", "list", "--porcelain", "-z"]));
         let submodules = s.spawn(|| {
             if has_submodules {
@@ -142,17 +142,23 @@ pub fn parse_remotes(raw: &[u8]) -> Vec<(String, String)> {
     out
 }
 
-/// Parses `git stash list --format=%gd%x00%ct%x00%gs`.
+pub const STASH_FORMAT: &str = "--format=%gd%x00%ct%x00%H%x00%P%x00%an%x00%ae%x00%gs";
+
+/// Parses `git stash list` in [`STASH_FORMAT`]: selector, date, oid, parents, author, email, message.
 pub fn parse_stashes(raw: &[u8]) -> Vec<Stash> {
     String::from_utf8_lossy(raw)
         .lines()
         .filter_map(|line| {
-            let mut f = line.splitn(3, '\0');
+            let mut f = line.splitn(7, '\0');
             let selector = f.next()?;
             let date = f.next()?.parse().unwrap_or(0);
+            let oid = f.next()?.to_string();
+            let parent = f.next()?.split(' ').next().filter(|p| !p.is_empty()).map(String::from);
+            let author_name = f.next()?.to_string();
+            let author_email = f.next()?.to_string();
             let message = f.next().unwrap_or_default().to_string();
             let index = selector.trim_start_matches("stash@{").trim_end_matches('}').parse().ok()?;
-            Some(Stash { index, message, date })
+            Some(Stash { index, message, date, oid, parent, author_name, author_email })
         })
         .collect()
 }
@@ -279,6 +285,9 @@ mod tests {
         assert_eq!(stashes[0].index, 0);
         assert_eq!(stashes[0].message, "On main: wip readme");
         assert!(stashes[0].date > 1_700_000_000);
+        assert_eq!(stashes[0].oid.len(), 40);
+        assert_eq!(stashes[0].parent.as_deref().map(str::len), Some(40));
+        assert!(!stashes[0].author_name.is_empty());
 
         let wts = parse_worktrees(WORKTREES);
         assert_eq!(wts.len(), 2);

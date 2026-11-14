@@ -152,8 +152,8 @@ export function createMockRepo(name: string, path: string, commitCount = 5000): 
     { name: 'upstream', url: `https://github.com/upstream-org/${name}.git`, branches: ['main', 'next'] },
   ]
   const stashes: Stash[] = [
-    { index: 0, message: 'WIP on feature/commit-graph: lane colors experiment', date: commits[0].date - 3600 },
-    { index: 1, message: 'On main: debug logging', date: commits[0].date - 86400 * 2 },
+    { index: 0, message: 'WIP on feature/commit-graph: lane colors experiment', date: commits[3].date + 60, oid: 'f00dbabe00000000000000000000000000000001', parent: commits[3].hash, authorName: commits[3].author.name, authorEmail: commits[3].author.email },
+    { index: 1, message: 'On main: debug logging', date: commits[9].date + 60, oid: 'f00dbabe00000000000000000000000000000002', parent: commits[9].hash, authorName: commits[9].author.name, authorEmail: commits[9].author.email },
   ]
   const worktrees: Worktree[] = [
     { path: path, branch: CURRENT_BRANCH, isMain: true },

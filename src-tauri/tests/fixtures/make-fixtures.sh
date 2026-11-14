@@ -69,7 +69,7 @@ G for-each-ref --format='%(refname)%00%(objectname)%00%(*objectname)%00%(upstrea
   refs/heads refs/remotes refs/tags > "$OUT/refs.bin"
 G remote -v > "$OUT/remotes.txt"
 G submodule status > "$OUT/submodules.txt"
-G stash list --format='%gd%x00%ct%x00%gs' > "$OUT/stash.bin"
+G stash list --format='%gd%x00%ct%x00%H%x00%P%x00%an%x00%ae%x00%gs' > "$OUT/stash.bin"
 G worktree list --porcelain -z > "$OUT/worktrees.bin"
 G diff --no-color --no-ext-diff -U3 -- README.md > "$OUT/diff_readme.txt"
 G show -s -z --format='%H%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%B' "$(G rev-parse feature/parser)" > "$OUT/show.bin"

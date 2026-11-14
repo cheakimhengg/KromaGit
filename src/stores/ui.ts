@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import type { Component } from 'vue'
 import type { DiffTarget } from '@/types/git'
+import { inTauri } from '@/api/git'
 
 export type CenterView = 'graph' | 'diff' | 'review' | 'split' | 'standup' | 'cleanup'
 export type DiffMode = 'unified' | 'split'
@@ -16,6 +17,11 @@ export interface MenuItem {
   /** small colour swatch instead of an icon */
   swatch?: string
   action?: () => void
+  disabled?: boolean
+  /** monospace heading, e.g. a path */
+  mono?: boolean
+  /** opens a submenu on hover */
+  children?: MenuItem[]
 }
 
 export interface Toast {
@@ -111,7 +117,8 @@ export const useUiStore = defineStore('ui', () => {
   const terminalHeight = ref(Number(localStorage.getItem('kromagit.terminal.height')) || 280)
   watch(terminalHeight, (h) => localStorage.setItem('kromagit.terminal.height', String(h)))
   /** the Home (welcome) page is showing instead of the active repository */
-  const home = ref(false)
+  /** the desktop app always starts on Home; opening a repo (or a startup path) leaves it */
+  const home = ref(inTauri)
   /** which Settings tab to show next time it opens */
   const settingsTab = ref<'appearance' | 'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts'>('appearance')
   /** bumped to ask components to act (commit box, AI generate, graph search) */

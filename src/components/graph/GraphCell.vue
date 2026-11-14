@@ -16,6 +16,7 @@ const props = defineProps<{
   band?: boolean
   isHead?: boolean
   edgesHidden?: boolean
+  stash?: boolean
 }>()
 
 const H = ROW_HEIGHT
@@ -69,7 +70,14 @@ const av = computed(() => avatarColors(avatarHue(props.authorEmail || props.auth
     <rect v-if="band" :x="cx" y="4" :width="Math.max(0, width - cx)" :height="H - 8" :fill="`url(#band-${commitHash})`" />
     <line v-if="hasRefs" x1="0" :y1="MID" :x2="cx - (row.isMerge ? 5 : R)" :y2="MID" :stroke="color" stroke-width="1.5" />
     <path v-for="(e, i) in edges" :key="i" :d="e.d" :stroke="e.color" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-    <template v-if="row.isMerge">
+    <template v-if="stash">
+      <circle :cx="cx" :cy="MID" :r="R" fill="var(--gw-bg)" :stroke="color" stroke-width="2" stroke-dasharray="3 2.4" />
+      <g :transform="`translate(${cx - 6} ${MID - 6})`" fill="none" :stroke="color" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="1.5" width="10" height="3" rx=".8" />
+        <path d="M2 4.5v5a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-5M5 7h2" />
+      </g>
+    </template>
+    <template v-else-if="row.isMerge">
       <circle :cx="cx" :cy="MID" r="4" fill="var(--gw-bg)" :stroke="color" stroke-width="2" />
     </template>
     <template v-else>

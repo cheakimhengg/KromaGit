@@ -61,10 +61,17 @@ pub struct Tag {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct Stash {
     pub index: u32,
     pub message: String,
     pub date: i64,
+    /// the stash commit itself
+    pub oid: String,
+    /// the commit it was made on (first parent)
+    pub parent: Option<String>,
+    pub author_name: String,
+    pub author_email: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
