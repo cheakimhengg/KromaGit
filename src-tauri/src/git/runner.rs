@@ -169,12 +169,12 @@ impl Git {
     }
 
     fn spawn_error(&self, e: std::io::Error) -> AppError {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            AppError::Io(e)
-        } else if !self.cwd.is_dir() {
+        if !self.cwd.is_dir() {
             AppError::PathNotFound(self.cwd.display().to_string())
-        } else {
+        } else if e.kind() == std::io::ErrorKind::NotFound {
             AppError::GitNotFound
+        } else {
+            AppError::Io(e)
         }
     }
 
