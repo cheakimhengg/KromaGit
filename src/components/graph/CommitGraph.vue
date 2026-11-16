@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
-  Archive, ArchiveRestore, Check, Cherry, Copy, GitMerge, SlidersHorizontal, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Trash2, Undo, User, X,
+  Archive, ArchiveRestore, ArrowDown, ArrowUp, Check, Cherry, Copy, GitMerge, SlidersHorizontal, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Trash2, Undo, User, X,
 } from '@/lib/icons'
 import GraphCell from './GraphCell.vue'
 import RefPill from './RefPill.vue'
@@ -24,10 +24,11 @@ const searchInput = ref<HTMLInputElement | null>(null)
 const snapshot = computed(() => repos.active?.snapshot ?? null)
 const layout = computed(() => repos.active?.layout ?? null)
 const commits = computed(() => repos.active?.graphCommits ?? [])
-const isFiltered = computed(() => messageQuery.value.trim() !== '' || authorQuery.value.trim() !== '')
+/** Search never hides commits: matches are highlighted and you jump between them, so the graph stays whole. */
+const isSearching = computed(() => messageQuery.value.trim() !== '' || authorQuery.value.trim() !== '')
 
-const visibleIndexes = computed<number[] | null>(() => {
-  if (!isFiltered.value) return null
+const matches = computed<number[]>(() => {
+  if (!isSearching.value) return []
   const q = messageQuery.value.trim().toLowerCase()
   const a = authorQuery.value.trim().toLowerCase()
   const out: number[] = []
@@ -40,8 +41,40 @@ const visibleIndexes = computed<number[] | null>(() => {
   }
   return out
 })
+const matchSet = computed(() => new Set(matches.value))
+const matchPos = ref(-1)
 
-const rowCount = computed(() => visibleIndexes.value?.length ?? commits.value.length)
+function goToMatch(pos: number) {
+  const list = matches.value
+  if (!list.length) return
+  matchPos.value = ((pos % list.length) + list.length) % list.length
+  const index = list[matchPos.value]
+  ui.selectCommit(commits.value[index].hash)
+  virtualizer.value.scrollToIndex(index, { align: 'center' })
+}
+function nextMatch(step: number) {
+  if (matchPos.value === -1) goToMatch(step > 0 ? 0 : -1)
+  else goToMatch(matchPos.value + step)
+}
+function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Enter') return
+  e.preventDefault()
+  nextMatch(e.shiftKey ? -1 : 1)
+}
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch([messageQuery, authorQuery], () => {
+  clearTimeout(searchTimer)
+  matchPos.value = -1
+  searchTimer = setTimeout(() => goToMatch(0), 200)
+})
+watch(
+  () => matches.value.length,
+  (n) => {
+    if (n && matchPos.value === -1 && isSearching.value) goToMatch(0)
+  },
+)
+
+const rowCount = computed(() => commits.value.length)
 
 const virtualizer = useVirtualizer(
   computed(() => ({
@@ -67,7 +100,7 @@ const visibleLanes = computed(() => {
     for (const e of r.lower) max = Math.max(max, e.from + 1, e.to + 1)
   }
   const w = layout.value?.wipRow
-  if (w && !isFiltered.value && changeCount.value) {
+  if (w && changeCount.value) {
     max = Math.max(max, w.lane + 1)
     for (const e of w.lower) max = Math.max(max, e.from + 1, e.to + 1)
   }
@@ -109,11 +142,11 @@ function openWip() {
 watch(
   () => { const items = virtualizer.value.getVirtualItems(); return items.length ? items[items.length - 1].index : -1 },
   (last) => {
-    if (isFiltered.value || complete.value || loadingCommits.value) return
+    if (complete.value || loadingCommits.value) return
     if (last >= rowCount.value - 40) void repos.loadMoreCommits()
   },
 )
-watch(isFiltered, (on) => {
+watch(isSearching, (on) => {
   if (on && !complete.value) void repos.loadAllCommits()
 })
 
@@ -321,13 +354,11 @@ function onListKey(e: KeyboardEvent) {
 }
 
 function displayIndexOf(hash: string): number {
-  const i = commits.value.findIndex((c) => c.hash === hash)
-  if (i === -1) return -1
-  return visibleIndexes.value ? visibleIndexes.value.indexOf(i) : i
+  return commits.value.findIndex((c) => c.hash === hash)
 }
 
 function rowIndex(virtualIndex: number) {
-  return visibleIndexes.value ? visibleIndexes.value[virtualIndex] : virtualIndex
+  return virtualIndex
 }
 </script>
 
@@ -336,24 +367,28 @@ function rowIndex(virtualIndex: number) {
     <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
       <div class="relative w-64 min-w-28 shrink">
         <Search :size="13" class="gw-search-icon" />
-        <input ref="searchInput" v-model="messageQuery" class="gw-input gw-search" placeholder="Search commits…" title="Search by message or commit hash" spellcheck="false" />
+        <input ref="searchInput" v-model="messageQuery" class="gw-input gw-search" placeholder="Search commits…" title="Search by message or commit hash — Enter for the next match, Shift+Enter for the previous" spellcheck="false" @keydown="onSearchKeydown" />
       </div>
       <div class="relative w-44 min-w-24 shrink">
         <User :size="13" class="gw-search-icon" />
-        <input v-model="authorQuery" class="gw-input gw-search" placeholder="Find author…" spellcheck="false" />
+        <input v-model="authorQuery" class="gw-input gw-search" placeholder="Find author…" title="Enter for the next commit by this author, Shift+Enter for the previous" spellcheck="false" @keydown="onSearchKeydown" />
       </div>
-      <button
-        v-if="isFiltered" type="button" class="flex items-center gap-1 rounded px-1.5 py-1 text-[12px] text-muted hover:bg-hover hover:text-fg"
-        @click="messageQuery = ''; authorQuery = ''"
-      >
-        <X :size="14" />Clear
-      </button>
+      <template v-if="isSearching">
+        <span class="shrink-0 font-mono text-[12px] whitespace-nowrap" :class="matches.length ? 'text-muted' : 'text-danger'">
+          {{ matches.length ? `${matchPos + 1 || '–'} of ${matches.length.toLocaleString()}` : 'No matches' }}
+        </span>
+        <button type="button" class="rounded p-1 text-muted hover:bg-hover hover:text-fg disabled:opacity-30" :disabled="!matches.length" title="Previous match (Shift+Enter)" @click="nextMatch(-1)"><ArrowUp :size="14" /></button>
+        <button type="button" class="rounded p-1 text-muted hover:bg-hover hover:text-fg disabled:opacity-30" :disabled="!matches.length" title="Next match (Enter)" @click="nextMatch(1)"><ArrowDown :size="14" /></button>
+        <button type="button" class="flex items-center gap-1 rounded px-1.5 py-1 text-[12px] text-muted hover:bg-hover hover:text-fg" @click="messageQuery = ''; authorQuery = ''">
+          <X :size="14" />Clear
+        </button>
+      </template>
       <div class="flex-1" />
       <span class="shrink-0 font-mono text-[12px] whitespace-nowrap text-muted">
-        <template v-if="isFiltered">{{ rowCount.toLocaleString() }} of </template>{{ commits.length.toLocaleString() }}{{ complete ? '' : '+' }} commits
+        {{ commits.length.toLocaleString() }}{{ complete ? '' : '+' }} commits
       </span>
       <span v-if="loadingCommits" class="flex items-center gap-1 text-[12px] text-faint">
-        <Loader2 :size="14" class="animate-spin" />{{ !commits.length ? 'loading' : isFiltered ? 'searching full history' : 'loading more' }}
+        <Loader2 :size="14" class="animate-spin" />{{ !commits.length ? 'loading' : isSearching ? 'searching full history' : 'loading more' }}
       </span>
       <button
         type="button" class="flex shrink-0 items-center rounded-md p-1 text-muted hover:bg-hover hover:text-fg"
@@ -376,7 +411,7 @@ function rowIndex(virtualIndex: number) {
     </div>
 
     <div
-      v-if="!isFiltered && changeCount"
+      v-if="changeCount"
       role="button" tabindex="0"
       class="grid h-8 shrink-0 cursor-pointer items-center overflow-y-hidden [scrollbar-gutter:stable] border-b border-dashed border-line transition-colors"
       :class="wipActive ? 'bg-select' : 'bg-surface/50 hover:bg-surface-2'"
@@ -410,7 +445,7 @@ function rowIndex(virtualIndex: number) {
             v-for="c in [commits[rowIndex(v.index)]]"
             :key="c.hash"
             class="absolute left-0 grid w-full cursor-pointer items-center text-[13px]"
-            :class="ui.selectedCommit === c.hash ? 'bg-select' : 'hover:bg-surface-2'"
+            :class="[ui.selectedCommit === c.hash ? 'bg-select' : 'hover:bg-surface-2', isSearching && !matchSet.has(rowIndex(v.index)) ? 'opacity-35' : '']"
             :style="{ height: `${ROW_HEIGHT}px`, transform: `translateY(${v.start}px)`, gridTemplateColumns: columns, '--lane': laneColor(layout!.rows[rowIndex(v.index)].color) }"
             @click="ui.selectCommit(c.hash)"
             @dblclick="onRowDblClick(c)"
@@ -437,13 +472,12 @@ function rowIndex(virtualIndex: number) {
               :author-email="c.author.email"
               :commit-hash="c.hash"
               :has-refs="displayRefs(c).length > 0 && show.refs"
-              :band="visible.band && !isFiltered"
+              :band="visible.band"
               :is-head="c.hash === headOid"
               :stash="c.stash !== undefined"
-              :edges-hidden="isFiltered"
             />
             <span
-              :style="visible.band && !isFiltered ? { boxShadow: `inset 2px 0 0 ${laneColor(layout!.rows[rowIndex(v.index)].color)}` } : undefined"
+              :style="visible.band ? { boxShadow: `inset 2px 0 0 ${laneColor(layout!.rows[rowIndex(v.index)].color)}` } : undefined"
               class="flex h-full min-w-0 items-center gap-1.5 truncate px-2.5 text-[14px]" :class="[c.parents.length > 1 || c.stash !== undefined ? 'text-muted' : 'text-fg', { 'pl-3': !show.refs && !show.graph }]"
             >
               <template v-if="!show.refs">
@@ -464,8 +498,7 @@ function rowIndex(virtualIndex: number) {
           </div>
         </template>
       </div>
-      <div v-if="isFiltered && rowCount === 0" class="p-8 text-center text-[13px] text-faint">No commits match these filters.</div>
-      <div v-else-if="!commits.length && loadingCommits" class="space-y-3 p-4">
+      <div v-if="!commits.length && loadingCommits" class="space-y-3 p-4">
         <div v-for="i in 8" :key="i" class="flex items-center gap-3">
           <div class="h-4 w-4 animate-pulse rounded-full bg-surface-3" />
           <div class="h-3 animate-pulse rounded bg-surface-3" :style="{ width: `${30 + ((i * 37) % 45)}%` }" />

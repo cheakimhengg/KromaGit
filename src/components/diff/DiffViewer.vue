@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Columns2, Copy, FileView, Files, Info, Loader2, SlidersHorizontal, Space, TextFont, TextWrap, Check, Minus, Plus, Rows3, Undo2, User, X } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
@@ -253,6 +253,44 @@ function toggleView(v: 'history' | 'blame') {
   else view.value = view.value === 'blame' ? 'history' : 'blame'
 }
 const splitRows = computed(() => hunks.value.map((h) => toSplitRows(h.lines)))
+
+/** Where each change block really sits in the scrolled content (wrapped lines make rows taller), as % of the full height. */
+const blockPos = ref<{ top: number; height: number }[]>([])
+function measureBlocks() {
+  const el = scroller.value
+  if (!el) return
+  const total = Math.max(el.scrollHeight, 1)
+  const base = el.getBoundingClientRect().top - el.scrollTop
+  blockPos.value = changeBlocks.value.map((b) => {
+    const first = el.querySelector<HTMLElement>(`[data-row="${b.row}"]`)
+    const last = el.querySelector<HTMLElement>(`[data-row="${b.row + b.len - 1}"]`) ?? first
+    if (!first || !last) return { top: (b.row / rowOffsets.value.total) * 100, height: Math.max((b.len / rowOffsets.value.total) * 100, 0.4) }
+    const top = first.getBoundingClientRect().top - base
+    const bottom = last.getBoundingClientRect().bottom - base
+    return { top: (top / total) * 100, height: Math.max(((bottom - top) / total) * 100, 0.4) }
+  })
+}
+let measureFrame = 0
+function scheduleMeasure() {
+  cancelAnimationFrame(measureFrame)
+  measureFrame = requestAnimationFrame(measureBlocks)
+}
+watch(
+  () => [changeBlocks.value, ui.diffMode, ui.diffOptions.wrap, ui.diffOptions.fullFile, hunks.value] as const,
+  () => void nextTick(scheduleMeasure),
+  { flush: 'post' },
+)
+let measureObs: ResizeObserver | null = null
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined' || !scroller.value) return
+  measureObs = new ResizeObserver(scheduleMeasure)
+  measureObs.observe(scroller.value)
+  if (scroller.value.firstElementChild) measureObs.observe(scroller.value.firstElementChild)
+})
+onBeforeUnmount(() => {
+  measureObs?.disconnect()
+  cancelAnimationFrame(measureFrame)
+})
 const stats = computed(() => {
   let add = 0
   let del = 0
@@ -465,7 +503,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         v-for="(b, i) in changeBlocks" :key="i" type="button"
         class="absolute right-0.5 left-0.5 min-h-[3px] rounded-sm hover:brightness-125"
         :class="{ 'ring-1 ring-fg': i === currentChange }"
-        :style="{ top: `${(b.row / rowOffsets.total) * 100}%`, height: `${Math.max((b.len / rowOffsets.total) * 100, 0.4)}%`, background: RULER_COLOR[b.kind] }"
+        :style="{ top: `${blockPos[i]?.top ?? (b.row / rowOffsets.total) * 100}%`, height: `${blockPos[i]?.height ?? Math.max((b.len / rowOffsets.total) * 100, 0.4)}%`, background: RULER_COLOR[b.kind] }"
         :title="`${b.kind === 'add' ? 'Added' : b.kind === 'del' ? 'Removed' : 'Changed'} · ${b.len} ${b.len === 1 ? 'line' : 'lines'}`"
         @click="jumpToBlock(i)"
       />
