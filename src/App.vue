@@ -12,6 +12,7 @@ import ContextMenu from '@/components/common/ContextMenu.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Toaster from '@/components/common/Toaster.vue'
 import Dialog from '@/components/common/Dialog.vue'
+import WhatsNew from '@/components/common/WhatsNew.vue'
 import OperationBanner from '@/components/layout/OperationBanner.vue'
 import WelcomeScreen from '@/components/layout/WelcomeScreen.vue'
 import ResizeHandle from '@/components/layout/ResizeHandle.vue'
@@ -178,5 +179,6 @@ onBeforeUnmount(() => {
     <CommandPalette />
     <RepoSwitcher />
     <Dialog />
+    <WhatsNew />
   </div>
 </template>

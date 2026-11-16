@@ -10,6 +10,7 @@ import {
 } from '@/lib/icons'
 import * as git from '@/actions/git'
 import { useAiStore } from '@/stores/ai'
+import { useUpdatesStore } from '@/stores/updates'
 import { useOpsStore } from '@/stores/ops'
 import { useReposStore } from '@/stores/repos'
 import { useSettingsStore } from '@/stores/settings'
@@ -95,6 +96,8 @@ export function useCommands() {
     { id: 'ai-message', title: 'AI: generate commit message', group: 'AI', icon: Sparkles, shortcut: 'Mod+Shift+M', global: true, enabled: () => idle() && !!snap()?.workingCopy.staged.length, run: () => ui.requestGenerate() },
     { id: 'ai-review', title: 'AI: review staged changes', group: 'AI', icon: ScanSearch, enabled: () => idle() && !!snap()?.workingCopy.staged.length, run: () => ai.runReview() },
     { id: 'ai-split', title: 'AI: split changes into commits', group: 'AI', icon: Split, enabled: idle, run: () => ai.suggestSplit() },
+    { id: 'whats-new', title: "What's new in KromaGit", group: 'Help', icon: Sparkles, keywords: 'release notes changelog version update new', run: () => void useUpdatesStore().showWhatsNew() },
+    { id: 'check-updates', title: 'Check for updates', group: 'Help', icon: CloudDownload, keywords: 'update upgrade version release', run: () => void useUpdatesStore().checkOrInstall() },
     { id: 'standup', title: 'Standup: what did I do?', group: 'AI', icon: CalendarClock, keywords: 'summary report today week', run: () => ui.showPanel('standup') },
   ]
 

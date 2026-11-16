@@ -7,8 +7,27 @@ import { useUiStore } from '@/stores/ui'
 export type UpdateStatus = 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'ready' | 'error'
 
 const AUTO_KEY = 'kromagit.updates.autoCheck'
+const SEEN_KEY = 'kromagit.updates.lastSeenVersion'
+const RELEASES = 'https://api.github.com/repos/cheakimhengg/KromaGit/releases'
 const LAST_KEY = 'kromagit.updates.lastCheck'
 const DAY = 24 * 60 * 60 * 1000
+
+/** Only the "What's new" part of the release notes, as plain bullet lines (install help is for the website, not the app). */
+export function whatsNew(body: string | null | undefined): string[] {
+  if (!body) return []
+  const lines = body.replace(/\r/g, '').split('\n')
+  const start = lines.findIndex((l) => /^#{1,6}\s*what'?s new/i.test(l.trim()))
+  if (start === -1) return []
+  const out: string[] = []
+  for (const raw of lines.slice(start + 1)) {
+    const l = raw.trim()
+    if (/^#{1,6}\s/.test(l)) break
+    const m = l.match(/^[-*+]\s+(.*)$/)
+    if (!m) continue
+    out.push(m[1].replace(/\*\*|__|`/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').trim())
+  }
+  return out.filter(Boolean).slice(0, 10)
+}
 
 function errorText(e: unknown): string {
   const s = e instanceof Error ? e.message : String(e)
@@ -22,7 +41,10 @@ export const useUpdatesStore = defineStore('updates', () => {
   const current = __APP_VERSION__
   const status = ref<UpdateStatus>('idle')
   const latest = ref<string | null>(null)
-  const notes = ref<string | null>(null)
+  const whatsNewOpen = ref(false)
+  const whatsNewVersion = ref(current)
+  const whatsNewItems = ref<string[]>([])
+  const whatsNewStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const progress = ref(0)
   const error = ref<string | null>(null)
   const lastChecked = ref<number | null>(Number(localStorage.getItem(LAST_KEY)) || null)
@@ -47,7 +69,6 @@ export const useUpdatesStore = defineStore('updates', () => {
       localStorage.setItem(LAST_KEY, String(lastChecked.value))
       if (pending) {
         latest.value = pending.version
-        notes.value = pending.body?.trim() || null
         status.value = 'available'
         if (!opts.silent) void promptInstall()
       } else {
@@ -70,9 +91,8 @@ export const useUpdatesStore = defineStore('updates', () => {
     if (!pending) return
     const ui = useUiStore()
     const ok = await ui.confirm({
-      title: `KromaGit ${pending.version} is available`,
-      message: `You have ${current}. The update downloads in the background, then KromaGit restarts. Your open tabs come back where you left them.`,
-      detail: notes.value ? notes.value.split('\n').filter(Boolean).slice(0, 12) : undefined,
+      title: `Update to KromaGit ${pending.version}?`,
+      message: `You have ${current}. KromaGit downloads the update and restarts, with your tabs right where you left them.`,
       confirmLabel: 'Update and restart',
     })
     if (ok) await install()
@@ -109,11 +129,40 @@ export const useUpdatesStore = defineStore('updates', () => {
     return check()
   }
 
+  /** Opens the "What's new" window for a version (the one running, by default) and loads its release notes. */
+  async function showWhatsNew(version = current) {
+    whatsNewVersion.value = version
+    whatsNewOpen.value = true
+    whatsNewStatus.value = 'loading'
+    try {
+      const res = await fetch(`${RELEASES}/tags/v${version}`, { headers: { Accept: 'application/vnd.github+json' } })
+      if (!res.ok) throw new Error(String(res.status))
+      const rel = (await res.json()) as { body?: string }
+      whatsNewItems.value = whatsNew(rel.body)
+      whatsNewStatus.value = 'ready'
+    } catch {
+      whatsNewItems.value = []
+      whatsNewStatus.value = 'error'
+    }
+  }
+
+  /** After an update, offer "What's new" once. */
+  function announceUpdate() {
+    const seen = localStorage.getItem(SEEN_KEY)
+    localStorage.setItem(SEEN_KEY, current)
+    if (!seen || seen === current) return
+    useUiStore().toast(
+      { kind: 'success', title: `Updated to KromaGit ${current}`, action: { label: "See what's new", run: () => void showWhatsNew() } },
+      12000,
+    )
+  }
+
   function checkOnLaunch() {
+    if (inTauri) announceUpdate()
     if (!inTauri || !autoCheck.value) return
     if (lastChecked.value && Date.now() - lastChecked.value < DAY) return
     setTimeout(() => void check({ silent: true }), 8000)
   }
 
-  return { current, status, latest, notes, progress, error, lastChecked, autoCheck, check, checkOrInstall, install, checkOnLaunch }
+  return { current, status, latest, progress, error, lastChecked, autoCheck, check, checkOrInstall, install, checkOnLaunch, showWhatsNew, whatsNewOpen, whatsNewVersion, whatsNewItems, whatsNewStatus }
 })

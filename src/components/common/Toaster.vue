@@ -24,6 +24,7 @@ const colors = { info: 'text-accent', success: 'text-success', error: 'text-dang
         <div class="min-w-0 flex-1">
           <div class="text-[13px] font-medium text-fg">{{ t.title }}</div>
           <div v-if="t.detail" class="mt-0.5 text-[12px] text-muted">{{ t.detail }}</div>
+          <button v-if="t.action" type="button" class="mt-1.5 text-[12px] font-medium text-accent hover:underline" @click="t.action.run(); ui.dismissToast(t.id)">{{ t.action.label }}</button>
         </div>
         <button type="button" class="text-faint hover:text-fg" @click="ui.dismissToast(t.id)"><X :size="16" /></button>
       </div>

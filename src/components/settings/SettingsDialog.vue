@@ -324,7 +324,6 @@ function onKey(e: KeyboardEvent) {
               <div v-if="updates.status === 'downloading'" class="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-3">
                 <div class="h-full rounded-full bg-accent transition-[width]" :style="{ width: `${Math.round(updates.progress * 100)}%` }" />
               </div>
-              <pre v-if="updates.status === 'available' && updates.notes" class="mt-4 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-surface p-3 font-sans text-[12.5px] text-muted">{{ updates.notes }}</pre>
             </div>
             <div class="card">
               <label class="flex cursor-pointer items-center justify-between gap-4">
@@ -334,6 +333,17 @@ function onKey(e: KeyboardEvent) {
                 </span>
                 <input v-model="updates.autoCheck" type="checkbox" class="toggle" />
               </label>
+            </div>
+            <div class="card">
+              <div class="flex items-center justify-between gap-4">
+                <span>
+                  <span class="card-title block">What's new in {{ updates.current }}</span>
+                  <span class="card-desc block">See what changed in the version you're running.</span>
+                </span>
+                <button type="button" class="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line-strong px-3.5 text-[13px] font-medium text-fg hover:bg-hover" @click="updates.showWhatsNew()">
+                  <Sparkles :size="15" />What's new
+                </button>
+              </div>
             </div>
             <p class="text-[12px] text-faint">You can also click the version number in the status bar to check.</p>
           </template>
