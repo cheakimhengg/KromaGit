@@ -81,7 +81,7 @@ onBeforeUnmount(() => {
     v-if="visible"
     ref="el"
     role="tooltip"
-    class="pointer-events-none fixed z-[60] max-w-[320px] rounded-md border border-line-strong bg-surface-2 px-2 py-1 text-[12px] whitespace-pre-line text-fg shadow-lg shadow-black/40"
+    class="pointer-events-none fixed z-[60] w-max max-w-[320px] rounded-md border border-line-strong bg-surface-2 px-2 py-1 text-[12px] whitespace-pre-line text-fg shadow-lg shadow-black/40"
     :style="{ left: `${pos.x}px`, top: `${pos.y}px` }"
   >{{ text }}</div>
 </template>

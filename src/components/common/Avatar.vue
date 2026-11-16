@@ -21,7 +21,7 @@ const src = computed(() => avatarUrl(props.email))
 
 <template>
   <span class="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold leading-none" :style="style" :title="email ? `${name} <${email}>` : name">
-    {{ initials(name) }}
+    {{ initials(name).charAt(0) }}
     <img
       v-if="src" :src="src" alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false"
       class="absolute inset-0 h-full w-full object-cover"

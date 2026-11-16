@@ -135,10 +135,24 @@ jobs:
             echo "APPIMAGETOOL_SIGN_PASSPHRASE=$LINUX_GPG_PASSPHRASE"
           } >> "$GITHUB_ENV"
 
+      # ---------- In-app updates: sign the update bundles + latest.json ----------
+      - name: Enable updater artifacts
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY not set — no in-app update files for this release."
+            exit 0
+          fi
+          echo "TAURI_UPDATER_ARGS=--config src-tauri/tauri.release.conf.json" >> "$GITHUB_ENV"
+
       - name: Build and upload
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v__VERSION__-{0}', github.run_number) }}
           releaseName: KromaGit ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
@@ -152,4 +166,5 @@ jobs:
             KromaGit needs Git installed. AI features are optional.
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }} ${{ env.TAURI_SIGN_ARGS }}
+          includeUpdaterJson: true
+          args: ${{ matrix.args }} ${{ env.TAURI_SIGN_ARGS }} ${{ env.TAURI_UPDATER_ARGS }}

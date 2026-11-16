@@ -66,6 +66,17 @@ The workflow imports the certificate into the runner's certificate store and pas
 
 The AppImage gets an embedded signature users can check with `./KromaGit.AppImage --appimage-signature`. `.deb` / `.rpm` packages are not signed by the bundler; distribute them through a signed repository if you need that.
 
+### In-app updates (Tauri updater)
+
+KromaGit checks `https://github.com/cheakimhengg/KromaGit/releases/latest/download/latest.json` (Settings → Updates, or click the version in the status bar). The public key is in `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`; the matching private key stays with the maintainer.
+
+| Secret | What it is |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of the private key made by `pnpm tauri signer generate -w ~/.tauri/kromagit.key` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Its password (leave unset if it has none) |
+
+With the key set, the workflow builds the update bundles, signs them and attaches `latest.json` to the release. Users only see the update once the draft release is **published** — drafts don't count as "latest". Keep a backup of the private key: without it, existing installs can't verify new updates.
+
 ## Unsigned builds
 
 - **macOS**: right-click the app → **Open** the first time, or `xattr -dr com.apple.quarantine /Applications/KromaGit.app`.

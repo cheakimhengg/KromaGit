@@ -24,6 +24,7 @@ import CleanupPanel from '@/components/ai/CleanupPanel.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
+import { useUpdatesStore } from '@/stores/updates'
 import CommandPalette from '@/components/common/CommandPalette.vue'
 import RepoSwitcher from '@/components/common/RepoSwitcher.vue'
 import { useCommands } from '@/commands/registry'
@@ -109,6 +110,7 @@ onMounted(() => {
   void settings.load()
   void watchWindowChrome()
   void repos.openStartupPaths()
+  useUpdatesStore().checkOnLaunch()
   window.addEventListener('keydown', onEscapeCapture, true)
   window.addEventListener('keydown', onKey)
   window.addEventListener('focus', onFocus)

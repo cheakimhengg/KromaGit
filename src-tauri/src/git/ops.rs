@@ -350,7 +350,7 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
                 "ffOnly" => "--ff-only",
                 _ => "--no-rebase",
             };
-            network(git, &["pull", "--no-edit", flag])?
+            network(git, &["pull", "--prune", "--no-edit", flag])?
         }
         Push { remote, branch, set_upstream, force } => {
             let mut args = vec!["push"];

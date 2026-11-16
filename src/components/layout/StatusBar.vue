@@ -7,6 +7,7 @@ import { useUiStore } from '@/stores/ui'
 import { useOpsStore } from '@/stores/ops'
 import { useSettingsStore } from '@/stores/settings'
 import { useAiStore } from '@/stores/ai'
+import { useUpdatesStore } from '@/stores/updates'
 import { fullDate, relativeTime } from '@/lib/format'
 
 const repos = useReposStore()
@@ -14,11 +15,19 @@ const ui = useUiStore()
 const ops = useOpsStore()
 const settings = useSettingsStore()
 const ai = useAiStore()
+const updates = useUpdatesStore()
 const snapshot = computed(() => repos.active?.snapshot ?? null)
 const head = computed(() => snapshot.value?.head ?? null)
 const changes = computed(() => (snapshot.value ? snapshot.value.workingCopy.unstaged.length + snapshot.value.workingCopy.staged.length : 0))
 const lastFetch = computed(() => snapshot.value?.lastFetch ?? null)
-const version = __APP_VERSION__
+const versionTitle = computed(() => {
+  switch (updates.status) {
+    case 'available': return `KromaGit ${updates.latest} is available — click to update`
+    case 'checking': return 'Checking for updates…'
+    case 'downloading': return `Downloading update… ${Math.round(updates.progress * 100)}%`
+    default: return 'Click to check for updates'
+  }
+})
 </script>
 
 <template>
@@ -49,6 +58,16 @@ const version = __APP_VERSION__
     <button type="button" class="flex items-center rounded px-1 hover:bg-hover hover:text-fg" :title="`Theme: ${settings.settings.appearance.theme} — click to switch`" @click="settings.toggleTheme()">
       <component :is="resolvedTheme === 'light' ? Sun : Moon" :size="14" />
     </button>
-    <span class="font-mono text-faint">v{{ version }}</span>
+    <button
+      type="button"
+      class="flex items-center gap-1.5 rounded px-1 font-mono hover:bg-hover hover:text-fg"
+      :class="updates.status === 'available' ? 'text-accent' : 'text-faint'"
+      :title="versionTitle"
+      @click="updates.checkOrInstall()"
+    >
+      <Loader2 v-if="updates.status === 'checking' || updates.status === 'downloading'" :size="12" class="animate-spin" />
+      <span v-else-if="updates.status === 'available'" class="h-1.5 w-1.5 rounded-full bg-accent" />
+      v{{ updates.current }}<template v-if="updates.status === 'available'"> → {{ updates.latest }}</template>
+    </button>
   </div>
 </template>

@@ -3,217 +3,412 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KromaGit — a colourful, local-first Git client</title>
+  <title>KromaGit — the calm, local-first Git client</title>
   <meta name="description" content="KromaGit is a fast, local-first Git desktop client for macOS, Windows and Linux. A commit graph you can read at a glance, line-by-line staging, undo for almost everything, and optional AI with your own key." />
-  <meta property="og:title" content="KromaGit — Git, in full colour" />
-  <meta property="og:description" content="A fast, local-first Git desktop client with undo for almost everything and optional AI." />
+  <meta property="og:title" content="KromaGit — Git you can see" />
+  <meta property="og:description" content="A fast, local-first Git desktop client with a readable graph, undo for almost everything and optional AI." />
   <meta property="og:image" content="assets/graph.jpg" />
+  <meta name="theme-color" content="#121419" />
+  <script>
+    (() => {
+      let t = null
+      try { t = localStorage.getItem('kromagit-site-theme') } catch {}
+      if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+      document.documentElement.dataset.theme = t
+    })()
+  </script>
   <link rel="icon" type="image/png" href="assets/favicon.png" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
+
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="30" height="30" />KromaGit</a>
-      <nav class="nav-links">
+      <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="28" height="28" />KromaGit</a>
+      <nav class="nav-links" aria-label="Sections">
         <a href="#features">Features</a>
+        <a href="#graph">Graph</a>
         <a href="#ai">AI</a>
         <a href="#themes">Themes</a>
         <a href="#faq">FAQ</a>
       </nav>
       <div class="nav-cta">
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch between light and dark">
+          <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>
+        </button>
         <a class="icon-link" href="https://github.com/cheakimhengg/KromaGit" aria-label="KromaGit on GitHub">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.56-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
         </a>
-        <a class="btn btn-small" href="#download">Download</a>
+        <a class="btn btn-sm" href="#download">Download</a>
       </div>
     </div>
   </header>
 
-  <main id="top">
-    <section class="hero">
-      <div class="glow glow-a"></div>
-      <div class="glow glow-b"></div>
-      <div class="wrap hero-inner">
-        <span class="pill">v0.2 · free and open source</span>
-        <h1>Git, in <span class="grad">full colour</span>.</h1>
-        <p class="lead">
-          KromaGit is a fast, local-first Git client. See your whole history as a graph you can read at a glance,
-          stage exactly the lines you mean, and undo almost anything — no account, no server, no telemetry.
-        </p>
-        <div class="cta">
-          <a class="btn" href="https://github.com/cheakimhengg/KromaGit/releases/latest">
+  <main id="main">
+    <!-- hero -->
+    <section class="hero" id="top">
+      <div class="hero-bg" aria-hidden="true"><div class="grid-lines"></div><div class="aurora a1"></div><div class="aurora a2"></div><div class="aurora a3"></div></div>
+      <div class="wrap hero-copy">
+        <a class="announce reveal" href="#workspace"><span class="tag">New in 0.2</span>Tab groups, stashes in the graph and more<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg></a>
+        <h1 class="reveal">Git you can <span class="grad">see</span></h1>
+        <p class="lead reveal">A fast, calm, local-first Git client. Read your history at a glance, stage exactly the lines you mean, and undo almost anything — with no account, no server and no telemetry.</p>
+        <div class="cta reveal">
+          <a class="btn btn-lg" href="#download">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-            Download KromaGit
+            Download for free
           </a>
-          <a class="btn btn-ghost" href="https://github.com/cheakimhengg/KromaGit">View the source</a>
+          <a class="btn btn-lg btn-ghost" href="https://github.com/cheakimhengg/KromaGit">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.56-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+            Star on GitHub
+          </a>
         </div>
-        <p class="meta">macOS · Windows · Linux &nbsp;—&nbsp; MIT licensed &nbsp;—&nbsp; built with Tauri 2, Rust and Vue</p>
-        <figure class="shot hero-shot">
-          <img src="assets/graph.jpg" alt="KromaGit showing a colourful commit graph, branch pills, tab groups and the working copy panel" width="2200" height="1344" />
+        <p class="meta reveal">Free &amp; open source · macOS, Windows and Linux · MIT licensed</p>
+      </div>
+      <div class="wrap stage">
+        <figure class="window hero-window" id="hero-window">
+          <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>KromaGit — feature/commit-graph</span></div>
+          <img src="assets/graph.jpg" data-light="assets/light.jpg" alt="KromaGit showing a commit graph with branch labels, stashes, tab groups and commit details" width="2200" height="1344" fetchpriority="high" />
         </figure>
+        <div class="stage-glow" aria-hidden="true"></div>
       </div>
     </section>
 
-    <section id="features" class="section">
+    <!-- works with -->
+    <section class="works">
       <div class="wrap">
-        <p class="eyebrow">Everyday Git, made visible</p>
-        <h2>Everything you do in the terminal — with a graph you can see.</h2>
-        <p class="sub">KromaGit drives the <code>git</code> you already have installed, so it behaves exactly like the command line.</p>
-        <div class="grid">
-          <article class="card">
-            <div class="ic ic-blue"><svg viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="7" r="2.2"/><path d="M6 7.2v9.6M18 9.2c0 4-6 3.5-11 7.8"/></svg></div>
-            <h3>A graph that reads at a glance</h3>
-            <p>Coloured lanes, clear merges, author pictures and branch pills. Opens 50,000-commit repositories in well under a second.</p>
+        <p>Works with any Git remote</p>
+        <ul>
+          <li>GitHub</li><li>GitLab</li><li>Bitbucket</li><li>Azure DevOps</li><li>Gitea</li><li>Self-hosted</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- bento -->
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-head center reveal">
+          <p class="eyebrow">Features</p>
+          <h2>Everything you need<br /><span class="dim">Nothing in your way</span></h2>
+          <p class="sub">All the Git you use every day, laid out so you can see what's happening before you click.</p>
+        </div>
+        <div class="bento">
+          <article class="tile t-wide reveal" id="graph-tile">
+            <div class="tile-copy"><h3>A graph that reads at a glance</h3><p>Every branch keeps its lane and colour. Stashes and uncommitted work sit right in the timeline.</p></div>
+            <div class="shot" style="--img: url(assets/graph.jpg); --img-light: url(assets/light.jpg); --x: 280; --y: 140; --w: 780; --h: 420"></div>
           </article>
-          <article class="card">
-            <div class="ic ic-green"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m15 17 2 2 4-4"/></svg></div>
-            <h3>Stage exactly what you mean</h3>
-            <p>Whole files, single hunks or selected lines. Inline or side-by-side diffs with word highlights, and before/after previews for images.</p>
+          <article class="tile reveal">
+            <div class="tile-copy"><h3>Undo almost anything</h3><p>Checkout, commit, discard, reset, delete a branch — undo and redo, safely.</p></div>
+            <div class="mock undo-mock" aria-hidden="true">
+              <div class="toast"><span class="ok"></span><div><b>Discarded 3 files</b><small>src/lib/graph-layout.ts and 2 more</small></div><button tabindex="-1">Undo</button></div>
+              <div class="toast t2"><span class="ok"></span><div><b>Deleted branch fix/crlf-diff</b><small>was at 61fd341</small></div><button tabindex="-1">Undo</button></div>
+              <div class="keys"><kbd>⌘</kbd><kbd>Z</kbd></div>
+            </div>
           </article>
-          <article class="card">
-            <div class="ic ic-violet"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></div>
-            <h3>Undo almost anything</h3>
-            <p>Checkout, commit, discard, reset, delete a branch — undo and redo, guarded so it refuses if the repository changed behind your back.</p>
+          <article class="tile reveal">
+            <div class="tile-copy"><h3>Find anything with ⌘K</h3><p>Every action, branch and repository, a few keystrokes away.</p></div>
+            <div class="shot" style="--img: url(assets/palette.jpg); --img-light: url(assets/palette-light.jpg); --x: 390; --y: 95; --w: 660; --h: 300"></div>
           </article>
-          <article class="card">
-            <div class="ic ic-pink"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 4v5"/></svg></div>
-            <h3>Many repos, neatly grouped</h3>
-            <p>Every repository is a tab. Put them in coloured groups, collapse them, drag to reorder, and open submodules or worktrees in one click.</p>
+          <article class="tile t-wide reveal">
+            <div class="tile-copy"><h3>Stage exactly what you mean</h3><p>Whole files, single hunks or just the lines you click. Inline or side by side, with changed words highlighted.</p></div>
+            <div class="shot" style="--img: url(assets/diff.jpg); --img-light: url(assets/diff-light.jpg); --x: 0; --y: 135; --w: 1050; --h: 470"></div>
           </article>
-          <article class="card">
-            <div class="ic ic-amber"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
-            <h3>History and blame</h3>
-            <p>Follow a file through renames, see who changed each line and when, and jump straight to the commit behind it.</p>
+          <article class="tile t-wide reveal" id="workspace">
+            <div class="tile-copy"><h3>All your repositories, neatly grouped</h3><p>Coloured tab groups, drag to reorder, open submodules and worktrees in a click. KromaGit reopens where you left off.</p></div>
+            <div class="shot" style="--img: url(assets/groups.jpg); --img-light: url(assets/groups-light.jpg); --x: 0; --y: 0; --w: 720; --h: 320"></div>
           </article>
-          <article class="card">
-            <div class="ic ic-teal"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 10 3 2-3 2M12 15h5"/></svg></div>
-            <h3>A terminal right inside</h3>
-            <p>Open a real shell in the current repository without leaving the app, for the odd command a button doesn't cover.</p>
+          <article class="tile reveal">
+            <div class="tile-copy"><h3>Native and light</h3><p>Built with Tauri and Rust. It runs your real <code>git</code>, so it behaves exactly like the terminal.</p></div>
+            <div class="mock stats-mock" aria-hidden="true">
+              <div><strong>&lt; 1s</strong><span>to open 50,000 commits</span></div>
+              <div><strong>~8 MB</strong><span>app size</span></div>
+              <div><strong>0</strong><span>telemetry</span></div>
+            </div>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="section split">
-      <div class="wrap split-inner">
-        <div class="split-text">
+    <!-- deep dive: graph -->
+    <section class="section showcase" id="graph">
+      <div class="wrap showcase-inner">
+        <div class="showcase-copy reveal">
+          <p class="eyebrow">Graph</p>
+          <h2>History you can actually follow</h2>
+          <p>Merges join where they really happen and every branch stays in its own lane, so even busy repositories with dozens of branches stay readable.</p>
+          <ul class="ticks">
+            <li>Branch, remote and tag labels in their lane colour</li>
+            <li>Stashes drawn next to the commit they came from</li>
+            <li>Search by message or author, and hover a label to see its full name</li>
+          </ul>
+        </div>
+        <figure class="window tilt reveal"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/light.jpg" data-dark="assets/graph.jpg" alt="The commit graph in KromaGit" loading="lazy" width="2200" height="1344" /></figure>
+      </div>
+    </section>
+
+    <!-- deep dive: changes -->
+    <section class="section showcase reverse" id="changes">
+      <div class="wrap showcase-inner">
+        <div class="showcase-copy reveal">
           <p class="eyebrow">Changes</p>
-          <h2>Review every line before it lands.</h2>
+          <h2>Review every line before it lands</h2>
+          <p>A diff viewer built for reading: word-level highlights, a change map down the side, and a view that remembers how you like it.</p>
           <ul class="ticks">
-            <li>Side-by-side or inline, with changed words highlighted</li>
             <li>Click line numbers to stage or discard just those lines</li>
-            <li>Ignore whitespace, wrap long lines, or show the whole file</li>
-            <li>A change map down the side jumps you to each edit</li>
+            <li>Ignore whitespace, wrap long lines or show the whole file</li>
+            <li>File history across renames, and blame for every line</li>
           </ul>
         </div>
-        <figure class="shot"><img src="assets/diff.jpg" alt="Side-by-side diff with highlighted word changes" loading="lazy" width="2200" height="1344" /></figure>
+        <figure class="window tilt reveal"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/diff.jpg" data-light="assets/diff-light.jpg" alt="A side-by-side diff with changed words highlighted" loading="lazy" width="2200" height="1344" /></figure>
       </div>
     </section>
 
-    <section class="section split reverse">
-      <div class="wrap split-inner">
-        <div class="split-text">
-          <p class="eyebrow">Keyboard</p>
-          <h2>Everything is one shortcut away.</h2>
-          <ul class="ticks">
-            <li><kbd>⌘</kbd> <kbd>K</kbd> finds any action, branch or tab</li>
-            <li><kbd>⌘</kbd> <kbd>P</kbd> jumps to any recent repository</li>
-            <li>Walk commits with <kbd>↑</kbd> <kbd>↓</kbd>, close anything with <kbd>Esc</kbd></li>
+    <!-- AI -->
+    <section class="section" id="ai">
+      <div class="wrap ai-inner">
+        <div class="ai-copy reveal">
+          <p class="eyebrow">AI, on your terms</p>
+          <h2>Help when you want it<br /><span class="dim">Off when you don't</span></h2>
+          <p class="sub">Run a local model with Ollama for free, or bring your own key for Claude, OpenAI or Gemini. Keys live in your system keychain, and nothing is sent without your say-so.</p>
+          <ul class="ai-list">
+            <li><b>Commit messages</b> from the staged diff, in your team's style</li>
+            <li><b>Review</b> that flags bugs, debug code and secrets by file and line</li>
+            <li><b>Explain</b> any commit in plain language</li>
+            <li><b>Split</b> a big change into logical commits</li>
+            <li><b>Standup</b> notes across all your repositories</li>
+            <li><b>Cleanup</b> of merged and stale branches</li>
           </ul>
         </div>
-        <figure class="shot"><img src="assets/palette.jpg" alt="Command palette searching for checkout" loading="lazy" width="2200" height="1344" /></figure>
+        <div class="ai-mock reveal" aria-hidden="true">
+          <div class="panel">
+            <div class="panel-head"><span>Commit</span><em>3 staged</em></div>
+            <div class="files">
+              <div><i class="m">M</i>graph-layout.ts <small>src/lib</small><b>+18 −6</b></div>
+              <div><i class="m">M</i>GraphCell.vue <small>src/components/graph</small><b>+9 −3</b></div>
+              <div><i class="a">A</i>stash-rows.ts <small>src/lib</small><b>+42</b></div>
+            </div>
+            <div class="summary"><span class="typed">feat(graph): show stashes as rows in the history</span><span class="caret"></span><span class="spark">✦</span></div>
+            <div class="desc">
+              <span class="line w90"></span><span class="line w70"></span><span class="line w80"></span>
+            </div>
+            <div class="panel-foot"><span class="chip">Ollama · llama3.1</span><span class="commit">Commit</span></div>
+          </div>
+          <div class="privacy">
+            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span><b>Your code stays yours.</b> Likely secrets are redacted and <code>.env</code> files are never sent.</span>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section id="ai" class="section ai">
+    <!-- themes -->
+    <section class="section" id="themes">
       <div class="wrap">
-        <p class="eyebrow">Optional AI</p>
-        <h2>Help when you want it. Off when you don't.</h2>
-        <p class="sub">Run a local model with Ollama for free, or bring your own key for Claude, OpenAI or Gemini. Keys live in your OS keychain.</p>
-        <div class="grid grid-3">
-          <article class="card small"><h3>Commit messages</h3><p>Written from the staged diff, in your team's convention or learned from your recent commits.</p></article>
-          <article class="card small"><h3>Review</h3><p>Flags likely bugs, leftover debug code and committed secrets, linked to the file and line.</p></article>
-          <article class="card small"><h3>Explain a commit</h3><p>A plain-language summary of what changed, why, and what to double-check.</p></article>
-          <article class="card small"><h3>Split a big change</h3><p>Proposes logical commits by file or hunk. Edit the plan, apply in one click, undo in one click.</p></article>
-          <article class="card small"><h3>Standup</h3><p>“What did I do?” across every open repository for today, this week or any range.</p></article>
-          <article class="card small"><h3>Branch cleanup</h3><p>Merged, gone and stale branches in a checklist, deleted only after you confirm.</p></article>
+        <div class="section-head center reveal">
+          <p class="eyebrow">Themes</p>
+          <h2>Easy on the eyes, all day</h2>
+          <p class="sub">Five Kroma themes tuned for low glare, plus VS Code, GitHub, One Dark Pro, Tokyo Night, Catppuccin, Dracula, Nord and Ayu.</p>
         </div>
-        <div class="privacy">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
-          <p><strong>Your code stays yours.</strong> The first request to a cloud provider shows exactly what will be sent and asks first. Likely secrets are redacted, <code>.env</code> and key files are never sent, and nothing changes in your repository until you click.</p>
+        <div class="theme-tabs reveal">
+          <input type="radio" name="theme" id="t-dark" checked />
+          <input type="radio" name="theme" id="t-light" />
+          <input type="radio" name="theme" id="t-dracula" />
+          <input type="radio" name="theme" id="t-all" />
+          <div class="tab-labels">
+            <label for="t-dark"><span class="sw" style="--a:#1b1d24;--b:#8aa2f2"></span>Kroma Dark</label>
+            <label for="t-light"><span class="sw" style="--a:#f4f5f7;--b:#3d63c9"></span>Kroma Light</label>
+            <label for="t-dracula"><span class="sw" style="--a:#282a36;--b:#bd93f9"></span>Dracula</label>
+            <label for="t-all"><span class="sw sw-all"></span>All themes</label>
+          </div>
+          <figure class="window tab-panels">
+            <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+            <img class="p-dark" src="assets/graph.jpg" alt="KromaGit in the Kroma Dark theme" loading="lazy" width="2200" height="1344" />
+            <img class="p-light" src="assets/light.jpg" alt="KromaGit in the Kroma Light theme" loading="lazy" width="2200" height="1344" />
+            <img class="p-dracula" src="assets/dracula.jpg" alt="KromaGit in the Dracula theme" loading="lazy" width="2200" height="1344" />
+            <img class="p-all" src="assets/themes.jpg" alt="The theme picker in Settings" loading="lazy" width="2200" height="1344" />
+          </figure>
         </div>
       </div>
     </section>
 
-    <section id="themes" class="section">
+    <!-- spec -->
+    <section class="section" id="everything">
       <div class="wrap">
-        <p class="eyebrow">Themes</p>
-        <h2>Seventeen themes, easy on the eyes.</h2>
-        <p class="sub">Kroma Dark, Midnight, Dim, Kroma Light and Paper — plus VS Code, GitHub, One Dark Pro, Tokyo Night, Catppuccin, Dracula, Nord and Ayu.</p>
-        <div class="duo">
-          <figure class="shot"><img src="assets/themes.jpg" alt="Theme picker in settings" loading="lazy" width="2200" height="1344" /></figure>
-          <figure class="shot"><img src="assets/light.jpg" alt="KromaGit in the Catppuccin Latte light theme" loading="lazy" width="2200" height="1344" /></figure>
+        <div class="section-head reveal">
+          <p class="eyebrow">In the box</p>
+          <h2>Everything you do in the terminal,<br /><span class="dim">made visible</span></h2>
+        </div>
+        <div class="spec reveal">
+          <div><h3>Every day</h3><ul><li>Fetch, pull and push with ahead/behind counts</li><li>Commit, amend and edit the last message</li><li>Stash, apply, pop and drop</li><li>Discard with undo</li></ul></div>
+          <div><h3>Branches</h3><ul><li>Create, rename, check out and delete</li><li>Merge, rebase and cherry-pick</li><li>Branch folders by prefix</li><li>Tags, remotes and upstream tracking</li></ul></div>
+          <div><h3>Reading changes</h3><ul><li>Inline and side-by-side diffs</li><li>Word highlights and a change map</li><li>Image before/after previews</li><li>File history and blame</li></ul></div>
+          <div><h3>Workspace</h3><ul><li>Tabs, groups and drag to reorder</li><li>Submodules and worktrees</li><li>Built-in terminal</li><li>Reopens where you left off</li></ul></div>
         </div>
       </div>
     </section>
 
-    <section id="download" class="section download">
+    <!-- download -->
+    <section class="section" id="download">
       <div class="wrap">
-        <p class="eyebrow">Download</p>
-        <h2>Free for everyone, on every desktop.</h2>
-        <div class="platforms">
-          <a class="platform" href="https://github.com/cheakimhengg/KromaGit/releases/latest">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.2.8 1.1 1.7 2.3 2.9 2.3 1.1 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-.9-2.5-3.7ZM14.2 5.7c.6-.8 1.1-1.8 1-2.9-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2.1-.5 2.7-1.3Z"/></svg>
-            <strong>macOS</strong><span>.dmg · Apple silicon &amp; Intel</span>
-          </a>
-          <a class="platform" href="https://github.com/cheakimhengg/KromaGit/releases/latest">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10.5 4.5v7H3v-6Zm0 13 7.5 1v-7H3v6Zm8.5 1.1L21 21v-8.5h-9.5v7.1Zm0-15.2v7.1H21V3l-9.5 1.4Z"/></svg>
-            <strong>Windows</strong><span>.msi · setup.exe</span>
-          </a>
-          <a class="platform" href="https://github.com/cheakimhengg/KromaGit/releases/latest">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M12 3c-2 0-3 1.8-3 4 0 1.6.4 2.6-.6 4.4C7 14 5 15.8 6 18.5c.8 2 3 2.5 6 2.5s5.2-.5 6-2.5c1-2.7-1-4.5-2.4-7.1-1-1.8-.6-2.8-.6-4.4 0-2.2-1-4-3-4Z"/><circle cx="10.5" cy="7.5" r=".9" fill="currentColor"/><circle cx="13.5" cy="7.5" r=".9" fill="currentColor"/></svg>
-            <strong>Linux</strong><span>.AppImage · .deb · .rpm</span>
-          </a>
+        <div class="final reveal">
+          <div class="final-glow" aria-hidden="true"></div>
+          <svg class="final-lanes" viewBox="0 0 1200 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+            <defs>
+              <linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0" /><stop offset=".18" stop-color="#fff" /><stop offset=".82" stop-color="#fff" /><stop offset="1" stop-color="#fff" stop-opacity="0" /></linearGradient>
+              <mask id="lane-mask"><rect width="1200" height="300" fill="url(#fade)" /></mask>
+            </defs>
+            <g mask="url(#lane-mask)" fill="none" stroke-width="2.5" stroke-linecap="round">
+              <path class="ln" stroke="#8aa2f2" d="M-20 200 H1220" />
+              <path class="ln" stroke="#5eead4" d="M-20 250 H230 C290 250 300 200 360 200" />
+              <path class="ln" stroke="#e08bb8" d="M470 200 C530 200 540 150 600 150 H840 C900 150 910 200 970 200" />
+              <path class="ln" stroke="#e2b25c" d="M640 200 C700 200 710 250 770 250 H1220" />
+              <path class="ln" stroke="#b49ae8" d="M-20 150 H120 C180 150 190 200 250 200" />
+              <path class="ln" stroke="#5cc392" d="M1060 250 C1110 250 1120 200 1170 200" opacity=".7" />
+              <path class="pulse p1" stroke="#8aa2f2" d="M-20 200 H1220" />
+              <path class="pulse p2" stroke="#e08bb8" d="M470 200 C530 200 540 150 600 150 H840 C900 150 910 200 970 200" />
+              <path class="pulse p3" stroke="#e2b25c" d="M640 200 C700 200 710 250 770 250 H1220" />
+              <path class="pulse p4" stroke="#5eead4" d="M-20 250 H230 C290 250 300 200 360 200" />
+            </g>
+            <g mask="url(#lane-mask)" stroke-width="2.5">
+              <circle class="nd" cx="140" cy="200" r="6" fill="#121419" stroke="#8aa2f2" />
+              <circle class="nd" cx="360" cy="200" r="5" fill="#121419" stroke="#5eead4" />
+              <circle class="nd" cx="560" cy="200" r="6" fill="#121419" stroke="#8aa2f2" />
+              <circle class="nd" cx="720" cy="150" r="6" fill="#121419" stroke="#e08bb8" />
+              <circle class="nd" cx="970" cy="200" r="5" fill="#121419" stroke="#e08bb8" />
+              <circle class="nd" cx="880" cy="250" r="6" fill="#121419" stroke="#e2b25c" />
+              <circle class="nd" cx="1100" cy="200" r="6" fill="#121419" stroke="#8aa2f2" />
+              <circle class="nd" cx="60" cy="150" r="6" fill="#121419" stroke="#b49ae8" />
+            </g>
+          </svg>
+          <div class="final-body">
+            <div class="logo-ring"><img class="final-logo" src="assets/logo.svg" alt="" width="76" height="76" /></div>
+            <h2>Try KromaGit <span class="grad">today</span></h2>
+            <p class="sub">Free for everyone, on every desktop. It uses the <code>git</code> already on your computer.</p>
+            <div class="final-cta">
+              <a class="btn btn-xl" id="dl-main" href="https://github.com/cheakimhengg/KromaGit/releases/latest">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                <span id="dl-label">Download KromaGit</span>
+              </a>
+              <a class="btn btn-xl btn-ghost" href="https://github.com/cheakimhengg/KromaGit/releases">All releases</a>
+            </div>
+            <div class="platform-chips">
+              <a href="https://github.com/cheakimhengg/KromaGit/releases/latest" data-os="mac"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.2.8 1.1 1.7 2.3 2.9 2.3 1.1 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-.9-2.5-3.7ZM14.2 5.7c.6-.8 1.1-1.8 1-2.9-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2.1-.5 2.7-1.3Z"/></svg>macOS <small>.dmg</small></a>
+              <a href="https://github.com/cheakimhengg/KromaGit/releases/latest" data-os="win"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10.5 4.5v7H3v-6Zm0 13 7.5 1v-7H3v6Zm8.5 1.1L21 21v-8.5h-9.5v7.1Zm0-15.2v7.1H21V3l-9.5 1.4Z"/></svg>Windows <small>.msi</small></a>
+              <a href="https://github.com/cheakimhengg/KromaGit/releases/latest" data-os="linux"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M12 3c-2 0-3 1.8-3 4 0 1.6.4 2.6-.6 4.4C7 14 5 15.8 6 18.5c.8 2 3 2.5 6 2.5s5.2-.5 6-2.5c1-2.7-1-4.5-2.4-7.1-1-1.8-.6-2.8-.6-4.4 0-2.2-1-4-3-4Z"/><circle cx="10.5" cy="7.5" r=".9" fill="currentColor"/><circle cx="13.5" cy="7.5" r=".9" fill="currentColor"/></svg>Linux <small>.AppImage · .deb</small></a>
+            </div>
+            <ul class="final-traits">
+              <li>Free forever</li><li>No account</li><li>MIT licensed</li><li>~8 MB</li>
+            </ul>
+            <div class="build">
+              <span>Or build it yourself</span>
+              <code id="build-cmd">pnpm install &amp;&amp; pnpm tauri build</code>
+              <button type="button" class="copy" data-copy="build-cmd">Copy</button>
+            </div>
+          </div>
         </div>
-        <p class="note">Needs <code>git</code> installed. Prefer to build it yourself? <code>pnpm install &amp;&amp; pnpm tauri build</code></p>
       </div>
     </section>
 
-    <section id="faq" class="section faq">
-      <div class="wrap narrow">
-        <p class="eyebrow">FAQ</p>
-        <h2>Questions</h2>
-        <details>
-          <summary>Is it really free?</summary>
-          <p>Yes. KromaGit is MIT licensed with no paid tier, no account and no sign-in. AI features are optional; with Ollama they cost nothing, with a cloud provider you pay that provider directly with your own key.</p>
-        </details>
-        <details>
-          <summary>Does my code leave my computer?</summary>
-          <p>Not unless you turn on a cloud AI provider and confirm a request. KromaGit has no server and sends no telemetry. Profile pictures are looked up from GitHub and Gravatar by email — you can switch that off in Settings.</p>
-        </details>
-        <details>
-          <summary>macOS says the app can't be opened.</summary>
-          <p>Builds without an Apple developer signature trigger a warning on first launch. Right-click KromaGit in Applications and choose <em>Open</em>, or allow it under <em>System Settings → Privacy &amp; Security</em>. You only need to do this once.</p>
-        </details>
-        <details>
-          <summary>How is it different from other Git clients?</summary>
-          <p>It's small and native (Tauri, not a bundled browser), runs your real <code>git</code>, makes almost every action undoable, and keeps AI strictly optional and on your terms.</p>
-        </details>
-        <details>
-          <summary>Where do I report a bug or ask for a feature?</summary>
-          <p>Open an issue on <a href="https://github.com/cheakimhengg/KromaGit/issues">GitHub</a>. Pull requests are welcome too.</p>
-        </details>
+    <!-- faq -->
+    <section class="section faq" id="faq">
+      <div class="wrap faq-inner">
+        <div class="reveal">
+          <p class="eyebrow">FAQ</p>
+          <h2>Questions,<br /><span class="dim">answered</span></h2>
+          <p class="sub">Something else? <a href="https://github.com/cheakimhengg/KromaGit/issues">Open an issue on GitHub</a>.</p>
+        </div>
+        <div class="faq-list reveal">
+          <details>
+            <summary>Is it really free?</summary>
+            <p>Yes. KromaGit is MIT licensed with no paid tier, no account and no sign-in. AI features are optional; with Ollama they cost nothing, and with a cloud provider you pay that provider directly with your own key.</p>
+          </details>
+          <details>
+            <summary>Does my code leave my computer?</summary>
+            <p>Not unless you turn on a cloud AI provider and confirm a request. KromaGit has no server and sends no telemetry. Profile pictures are looked up from GitHub and Gravatar by email, and you can switch that off in Settings.</p>
+          </details>
+          <details>
+            <summary>macOS says the app can't be opened.</summary>
+            <p>Builds without an Apple developer signature trigger a warning on first launch. Right-click KromaGit in Applications and choose <em>Open</em>, or allow it under <em>System Settings → Privacy &amp; Security</em>. You only need to do this once.</p>
+          </details>
+          <details>
+            <summary>How is it different from other Git clients?</summary>
+            <p>It's small and native (Tauri, not a bundled browser), runs your real <code>git</code>, makes almost every action undoable, and keeps AI strictly optional and on your terms.</p>
+          </details>
+          <details>
+            <summary>Does it work with my company's Git server?</summary>
+            <p>Yes. KromaGit talks to remotes through your own <code>git</code>, so anything you can push to from the terminal — GitHub, GitLab, Bitbucket, Azure DevOps or a self-hosted server — works the same way, with your existing credentials.</p>
+          </details>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="footer">
-    <div class="wrap footer-inner">
-      <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="24" height="24" />KromaGit</a>
-      <p>© 2026 Chea KimHeng · MIT License · Built with Tauri 2, Rust and Vue 3</p>
-      <a href="https://github.com/cheakimhengg/KromaGit">GitHub</a>
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="26" height="26" />KromaGit</a>
+        <p>The calm, local-first Git client for macOS, Windows and Linux.</p>
+      </div>
+      <div><h4>Product</h4><a href="#features">Features</a><a href="#graph">Graph</a><a href="#ai">AI</a><a href="#themes">Themes</a></div>
+      <div><h4>Download</h4><a href="https://github.com/cheakimhengg/KromaGit/releases/latest">Latest release</a><a href="https://github.com/cheakimhengg/KromaGit/releases">All releases</a></div>
+      <div><h4>Project</h4><a href="https://github.com/cheakimhengg/KromaGit">Source code</a><a href="https://github.com/cheakimhengg/KromaGit/issues">Report an issue</a></div>
+    </div>
+    <div class="wrap footer-base">
+      <p>© 2026 Chea KimHeng · MIT License</p>
+      <p>Built with Tauri 2, Rust and Vue 3</p>
     </div>
   </footer>
+
+  <script>
+    (() => {
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+      const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) }
+      }), { rootMargin: '0px 0px -8% 0px' })
+      document.querySelectorAll('.reveal').forEach((el) => (reduce ? el.classList.add('in') : io.observe(el)))
+
+      const hero = document.getElementById('hero-window')
+      if (hero && !reduce) {
+        const tilt = () => {
+          const t = Math.min(1, Math.max(0, window.scrollY / 420))
+          hero.style.transform = `perspective(1800px) rotateX(${(1 - t) * 14}deg) scale(${0.94 + t * 0.06})`
+        }
+        tilt(); addEventListener('scroll', tilt, { passive: true })
+      }
+
+      document.querySelectorAll('.tile').forEach((tile) => tile.addEventListener('pointermove', (e) => {
+        const r = tile.getBoundingClientRect()
+        tile.style.setProperty('--mx', `${e.clientX - r.left}px`)
+        tile.style.setProperty('--my', `${e.clientY - r.top}px`)
+      }))
+
+      const ua = navigator.userAgent
+      const os = /Mac/.test(ua) ? ['mac', 'macOS'] : /Win/.test(ua) ? ['win', 'Windows'] : /Linux|X11/.test(ua) ? ['linux', 'Linux'] : null
+      if (os) {
+        document.getElementById('dl-label').textContent = `Download for ${os[1]}`
+        document.querySelector(`.platform-chips [data-os="${os[0]}"]`)?.classList.add('current')
+      }
+
+      const root = document.documentElement
+      document.querySelectorAll('img[data-light], img[data-dark]').forEach((img) => { img.dataset.base = img.getAttribute('src') })
+      const applyShots = () => {
+        const light = root.dataset.theme === 'light'
+        document.querySelectorAll('img[data-light]').forEach((img) => { img.src = light ? img.dataset.light : img.dataset.base })
+        document.querySelectorAll('img[data-dark]').forEach((img) => { img.src = light ? img.dataset.dark : img.dataset.base })
+        document.querySelector('meta[name=theme-color]').content = light ? '#f6f7f9' : '#121419'
+      }
+      applyShots()
+      document.getElementById('theme-toggle').addEventListener('click', () => {
+        root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light'
+        try { localStorage.setItem('kromagit-site-theme', root.dataset.theme) } catch {}
+        applyShots()
+      })
+
+      document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1500) } catch {}
+      }))
+    })()
+  </script>
 </body>
 </html>

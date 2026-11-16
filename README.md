@@ -9,6 +9,13 @@
 </p>
 
 <p align="center">
+  <a href="https://kromagit.vercel.app"><b>Website</b></a> ·
+  <a href="https://github.com/cheakimhengg/KromaGit/releases/latest"><b>Download</b></a> ·
+  <a href="#features"><b>Features</b></a> ·
+  <a href="docs/RELEASING.md"><b>Releasing</b></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/cheakimhengg/KromaGit/actions/workflows/ci.yml"><img src="https://github.com/cheakimhengg/KromaGit/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB" alt="Tauri 2" />
@@ -28,7 +35,7 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 ## Features
 
 **History**
-- Commit graph with colored lanes, curved merges, author profile pictures and branch/tag pills
+- Commit graph with colored lanes, curved merges, author profile pictures and branch/tag pills; every branch keeps its lane, and stashes sit in the history next to the commit they came from
 - Opens 50,000-commit repositories in well under a second; every list is virtualized
 - Search by message or hash, filter by author, walk commits with ↑ / ↓; show or hide any column
 - Commit details with full message, parents and changed files
@@ -50,11 +57,12 @@ KromaGit runs entirely on your computer: no server, no account, no telemetry. It
 - Network commands time out instead of hanging on a password prompt
 
 **Workflow**
-- Multiple repositories as tabs, with named, colored, collapsible **tab groups** and drag-to-reorder
+- Multiple repositories as tabs, with named, colored, collapsible **tab groups** and drag-to-reorder; KromaGit reopens where you left off, view settings included
 - **⌘K command palette** for every action, branch and tab; **⌘P** to jump to any recent repository; a Home page; keyboard shortcuts throughout (⌘W closes the tab, Esc closes whatever is open)
-- Five eye-friendly themes — Kroma Dark, Midnight, Dim, Kroma Light, Paper — or follow the system, with six accent colours; zoom, resizable panels, a welcome screen with recent repositories, open in your terminal or editor
+- Five eye-friendly Kroma themes — Dark, Midnight, Dim, Light and Paper — plus VS Code, GitHub, One Dark Pro, Tokyo Night, Catppuccin, Dracula, Nord and Ayu, or follow the system; six accent colours, zoom, resizable panels, open in your terminal or editor
+- **In-app updates**: click the version in the status bar or use **Settings → Updates**; signed updates install and restart in one click
 
-**Profile pictures** are looked up by author email: GitHub no-reply addresses directly, other authors through the GitHub API (repositories hosted on GitHub) and Gravatar. Results are cached; authors without a picture keep their initials. Turn it off in **Settings → General** and no lookups are made.
+**Profile pictures** are looked up by author email: GitHub no-reply addresses directly, other authors through the GitHub API (repositories hosted on GitHub) and Gravatar. Results are cached; authors without a picture keep their initials. Turn it off in **Settings → Appearance** and no lookups are made.
 
 ### AI (optional)
 

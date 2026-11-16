@@ -18,7 +18,7 @@
         "height": 900,
         "minWidth": 1024,
         "minHeight": 640,
-        "backgroundColor": "#1b1d22",
+        "backgroundColor": "#1b1d24",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "dragDropEnabled": false
@@ -40,5 +40,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgwQUIzMEE0NDE2QUQ1MEIKUldRTDFXcEJwRENyZ0txUThmaEIrcE5tSXh4dlRETUwveTZXMVNOcm5NamZBdGdYU3BKQUg4Y24K",
+      "endpoints": [
+        "https://github.com/cheakimhengg/KromaGit/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

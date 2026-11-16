@@ -2,13 +2,15 @@
 import { computed, ref, watch } from 'vue'
 import { clone } from '@/lib/clone'
 import {
-  AppWindow, CalendarClock, Check, FolderGit2, Keyboard, KeyRound, Loader2, Monitor, Moon, Palette, RefreshCw, Search, ShieldCheck, Sparkles, Sun, X,
+  AppWindow, CalendarClock, Check, CloudDownload, FolderGit2, Keyboard, KeyRound, Loader2, Monitor, Moon, Palette, RefreshCw, Search, ShieldCheck, Sparkles, Sun, X,
 } from '@/lib/icons'
 import { aiApi } from '@/api/ai'
 import { errorMessage } from '@/api/git'
 import { PROVIDERS, isCloud, useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
+import { useUpdatesStore } from '@/stores/updates'
+import { relativeTime } from '@/lib/format'
 import { TEMPLATE_PRESETS } from '@/ai/prompts'
 import { useCommands } from '@/commands/registry'
 import { formatCombo, isMac } from '@/lib/shortcuts'
@@ -20,7 +22,7 @@ const ui = useUiStore()
 const store = useSettingsStore()
 const repos = useReposStore()
 
-type Tab = 'appearance' | 'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts'
+type Tab = 'appearance' | 'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts' | 'updates'
 const tab = ref<Tab>('appearance')
 const SECTIONS: { id: Tab; label: string; icon: unknown; desc: string; keywords: string }[] = [
   { id: 'appearance', label: 'Appearance', icon: Palette, desc: 'Theme, accent colour and zoom', keywords: 'dark light system color colour zoom size avatar picture photo gravatar' },
@@ -29,7 +31,9 @@ const SECTIONS: { id: Tab; label: string; icon: unknown; desc: string; keywords:
   { id: 'repo', label: 'This repository', icon: FolderGit2, desc: 'Commit message convention for the open repository', keywords: 'commit message template convention conventional' },
   { id: 'workflow', label: 'Standup & cleanup', icon: CalendarClock, desc: 'Who you are for standups, which branches count as merged', keywords: 'standup email cleanup base branch stale days' },
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard, desc: 'Every keyboard shortcut', keywords: 'keyboard keys hotkey shortcut' },
+  { id: 'updates', label: 'Updates', icon: CloudDownload, desc: 'Your version and new releases', keywords: 'update upgrade version release new download about' },
 ]
+const updates = useUpdatesStore()
 const filter = ref('')
 const visibleSections = computed(() => {
   const q = filter.value.trim().toLowerCase()
@@ -286,6 +290,52 @@ function onKey(e: KeyboardEvent) {
               <input v-model="draft.general.editorApp" class="gw-input mt-3 h-9 font-mono" :placeholder="isMacOS ? 'VS Code / Cursor if installed — e.g. Zed, Sublime Text' : 'code (default) — e.g. zed {path}'" spellcheck="false" />
             </div>
             <p class="text-[12px] text-faint">{{ isMacOS ? 'An application name, or a full command line.' : 'A command line;' }} <code>{path}</code> is replaced by the repository folder (appended if omitted).</p>
+          </template>
+
+          <template v-else-if="tab === 'updates'">
+            <div class="card">
+              <div class="flex items-center gap-4">
+                <img src="/favicon.png" alt="" class="h-12 w-12 rounded-xl" />
+                <div class="min-w-0 flex-1">
+                  <div class="text-[15px] font-semibold text-fg">KromaGit {{ updates.current }}</div>
+                  <p class="card-desc !mt-0.5">
+                    <template v-if="updates.status === 'checking'">Checking for updates…</template>
+                    <template v-else-if="updates.status === 'available'"><span class="text-accent">Version {{ updates.latest }} is available.</span></template>
+                    <template v-else-if="updates.status === 'downloading'">Downloading {{ updates.latest }}… {{ Math.round(updates.progress * 100) }}%</template>
+                    <template v-else-if="updates.status === 'ready'">Installed. Restarting…</template>
+                    <template v-else-if="updates.status === 'error'"><span class="text-danger">{{ updates.error }}</span></template>
+                    <template v-else-if="updates.status === 'upToDate'">You have the latest version.</template>
+                    <template v-else-if="updates.lastChecked">Last checked {{ relativeTime(updates.lastChecked / 1000) }}.</template>
+                    <template v-else>Updates come from the project's GitHub releases.</template>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3.5 text-[13px] font-medium disabled:opacity-60"
+                  :class="updates.status === 'available' ? 'bg-accent text-on-accent hover:opacity-90' : 'border border-line-strong text-fg hover:bg-hover'"
+                  :disabled="updates.status === 'checking' || updates.status === 'downloading' || updates.status === 'ready'"
+                  @click="updates.checkOrInstall()"
+                >
+                  <Loader2 v-if="updates.status === 'checking' || updates.status === 'downloading'" :size="15" class="animate-spin" />
+                  <CloudDownload v-else :size="15" />
+                  {{ updates.status === 'available' ? 'Update and restart' : 'Check for updates' }}
+                </button>
+              </div>
+              <div v-if="updates.status === 'downloading'" class="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-3">
+                <div class="h-full rounded-full bg-accent transition-[width]" :style="{ width: `${Math.round(updates.progress * 100)}%` }" />
+              </div>
+              <pre v-if="updates.status === 'available' && updates.notes" class="mt-4 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-surface p-3 font-sans text-[12.5px] text-muted">{{ updates.notes }}</pre>
+            </div>
+            <div class="card">
+              <label class="flex cursor-pointer items-center justify-between gap-4">
+                <span>
+                  <span class="card-title block">Check automatically</span>
+                  <span class="card-desc block">Look for a new version once a day when KromaGit opens. You're always asked before anything is installed.</span>
+                </span>
+                <input v-model="updates.autoCheck" type="checkbox" class="toggle" />
+              </label>
+            </div>
+            <p class="text-[12px] text-faint">You can also click the version number in the status bar to check.</p>
           </template>
 
           <template v-else-if="tab === 'shortcuts'">

@@ -418,7 +418,7 @@ function rowIndex(virtualIndex: number) {
           >
             <span v-if="show.refs" class="flex min-w-0 items-center gap-1 overflow-hidden pl-3">
               <template v-for="(r, i) in displayRefs(c)" :key="r.ref.name">
-                <RefPill v-if="i < 1" class="min-w-0 shrink cursor-pointer" :label="r.label" :title="r.ref.current ? `${r.ref.name} (checked out)` : `Double-click to check out ${r.ref.name}`" @dblclick.stop="checkoutRef(r.ref)" @contextmenu.stop.prevent="refMenu($event, r.ref, r.label)" :ref-label="r.ref" :has-remote="r.hasRemote" :color="laneColor(layout!.rows[rowIndex(v.index)].color)" />
+                <RefPill v-if="i < 1" class="min-w-0 shrink cursor-pointer" :label="r.label" :title="r.ref.kind === 'stash' ? r.label : r.ref.name" @dblclick.stop="checkoutRef(r.ref)" @contextmenu.stop.prevent="refMenu($event, r.ref, r.label)" :ref-label="r.ref" :has-remote="r.hasRemote" :color="laneColor(layout!.rows[rowIndex(v.index)].color)" />
               </template>
               <span v-if="displayRefs(c).length > 1" class="shrink-0 rounded-full bg-surface-3 px-1.5 text-[11px] leading-[18px] text-muted" :title="displayRefs(c).slice(1).map((r) => r.label).join(', ')">
                 +{{ displayRefs(c).length - 1 }}

@@ -61,7 +61,6 @@ const scroller = ref<HTMLElement | null>(null)
 const focused = ref<number | null>(null)
 
 async function focusLine(line: number) {
-  ui.diffMode = 'unified'
   focused.value = line
   await nextTick()
   const el = scroller.value?.querySelector(`[data-new="${line}"]`) ?? scroller.value?.querySelector(`[data-near="${line}"]`)
@@ -439,6 +438,8 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
               v-for="side in (['left', 'right'] as const)" :key="side"
               class="flex min-w-0 overflow-hidden"
               :data-kind="row[side]?.kind"
+              :data-new="side === 'right' ? row.right?.newNo : undefined"
+              :data-near="side === 'left' ? row.left?.oldNo : undefined"
               :class="[row[side] ? lineClass(row[side]!, selected.has(key(hi, row[side]!.index))) : 'bg-surface/40', side === 'left' ? 'border-r border-line' : '']"
             >
               <template v-if="row[side]">

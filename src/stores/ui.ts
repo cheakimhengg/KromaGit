@@ -73,8 +73,14 @@ interface OpenDialog extends DialogOptions {
 
 let toastSeq = 0
 
+function stored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  const v = localStorage.getItem(key)
+  return allowed.includes(v as T) ? (v as T) : fallback
+}
+
 export const useUiStore = defineStore('ui', () => {
-  const sidebarCollapsed = ref(false)
+  const sidebarCollapsed = ref(localStorage.getItem('kromagit.sidebarCollapsed') === '1')
+  watch(sidebarCollapsed, (v) => localStorage.setItem('kromagit.sidebarCollapsed', v ? '1' : '0'))
   const SECTIONS_KEY = 'kromagit.sections.v1'
   /** sidebar section title → expanded; missing = the section's default */
   const sidebarSections = ref<Record<string, boolean>>(
@@ -90,7 +96,8 @@ export const useUiStore = defineStore('ui', () => {
   const selectedCommit = ref<string | null>(null)
   const centerView = ref<CenterView>('graph')
   const diffTarget = ref<DiffTarget | null>(null)
-  const diffMode = ref<DiffMode>('unified')
+  const diffMode = ref<DiffMode>(stored('kromagit.diffMode', ['unified', 'split'] as const, 'unified'))
+  watch(diffMode, (v) => localStorage.setItem('kromagit.diffMode', v))
   /** what the file viewer shows: the change, the file's history, or blame */
   const diffView = ref<'diff' | 'history' | 'blame'>('diff')
   const DIFF_OPTS_KEY = 'kromagit.diffOptions.v1'
@@ -108,7 +115,8 @@ export const useUiStore = defineStore('ui', () => {
     })(),
   })
   watch(diffOptions, (v) => localStorage.setItem(DIFF_OPTS_KEY, JSON.stringify(v)), { deep: true })
-  const fileViewMode = ref<'list' | 'tree'>('list')
+  const fileViewMode = ref<'list' | 'tree'>(stored('kromagit.fileViewMode', ['list', 'tree'] as const, 'list'))
+  watch(fileViewMode, (v) => localStorage.setItem('kromagit.fileViewMode', v))
   const settingsOpen = ref(false)
   const paletteOpen = ref(false)
   const switcherOpen = ref(false)
@@ -117,10 +125,11 @@ export const useUiStore = defineStore('ui', () => {
   const terminalHeight = ref(Number(localStorage.getItem('kromagit.terminal.height')) || 280)
   watch(terminalHeight, (h) => localStorage.setItem('kromagit.terminal.height', String(h)))
   /** the Home (welcome) page is showing instead of the active repository */
-  /** the desktop app always starts on Home; opening a repo (or a startup path) leaves it */
-  const home = ref(inTauri)
+  /** the desktop app reopens where it was left: on Home, or on the last active repository */
+  const home = ref(inTauri && localStorage.getItem('kromagit.home') !== '0')
+  watch(home, (v) => localStorage.setItem('kromagit.home', v ? '1' : '0'))
   /** which Settings tab to show next time it opens */
-  const settingsTab = ref<'appearance' | 'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts'>('appearance')
+  const settingsTab = ref<'appearance' | 'general' | 'ai' | 'repo' | 'workflow' | 'shortcuts' | 'updates'>('appearance')
   /** bumped to ask components to act (commit box, AI generate, graph search) */
   const commitRequest = ref(0)
   /** set to switch the commit box into amend mode; the commit box clears it */
