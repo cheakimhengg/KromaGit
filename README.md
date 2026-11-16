@@ -178,6 +178,10 @@ Parser tests use output captured from a real repository; regenerate it with `bas
 
 `pnpm tauri build` produces installers for the current platform. Releases for all platforms are built by GitHub Actions — see [docs/RELEASING.md](docs/RELEASING.md).
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security problems privately as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 [MIT](LICENSE) © 2026 Chea KimHeng
