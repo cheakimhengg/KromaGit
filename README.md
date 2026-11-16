@@ -98,6 +98,19 @@ Before code ever leaves your machine:
 
 Download the installer for your platform from [**Releases**](https://github.com/cheakimhengg/KromaGit/releases). KromaGit needs [Git](https://git-scm.com/downloads) 2.36 or newer.
 
+**First launch on macOS:** KromaGit isn't signed with a paid Apple developer certificate yet, so macOS asks you to confirm it once:
+
+1. Open KromaGit from **Applications**. When macOS says it can't verify the developer, click **Done**.
+2. Go to **System Settings → Privacy & Security**, scroll to **Security** and click **Open Anyway**.
+
+If macOS says the app **is damaged** (or there's no Open Anyway button), run this once in Terminal, then open it again:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/KromaGit.app
+```
+
+**Windows:** if SmartScreen says "Windows protected your PC", click **More info → Run anyway**.
+
 For local AI, install [Ollama](https://ollama.com) and pull a coding model, e.g. `ollama pull qwen2.5-coder`, then pick it in **Settings → AI**.
 
 You can also open a repository from the command line: `KromaGit ~/code/my-project`.

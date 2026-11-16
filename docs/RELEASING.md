@@ -79,5 +79,5 @@ With the key set, the workflow builds the update bundles, signs them and attache
 
 ## Unsigned builds
 
-- **macOS**: right-click the app → **Open** the first time, or `xattr -dr com.apple.quarantine /Applications/KromaGit.app`.
+- **macOS**: builds are ad-hoc signed (`bundle.macOS.signingIdentity: "-"`), so the first launch shows *can't verify the developer*; users click **Open Anyway** in **System Settings → Privacy & Security**. If a download still reports *damaged*, `xattr -dr com.apple.quarantine /Applications/KromaGit.app` fixes it. A Developer ID certificate (see above) removes the prompt entirely.
 - **Windows**: SmartScreen shows "Windows protected your PC" → **More info** → **Run anyway**.

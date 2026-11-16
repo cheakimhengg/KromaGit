@@ -298,6 +298,7 @@
               <a href="https://github.com/cheakimhengg/KromaGit/releases/latest" data-os="win" data-asset="win"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10.5 4.5v7H3v-6Zm0 13 7.5 1v-7H3v6Zm8.5 1.1L21 21v-8.5h-9.5v7.1Zm0-15.2v7.1H21V3l-9.5 1.4Z"/></svg>Windows <small>.exe</small></a>
               <a href="https://github.com/cheakimhengg/KromaGit/releases/latest" data-os="linux" data-asset="linux"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M12 3c-2 0-3 1.8-3 4 0 1.6.4 2.6-.6 4.4C7 14 5 15.8 6 18.5c.8 2 3 2.5 6 2.5s5.2-.5 6-2.5c1-2.7-1-4.5-2.4-7.1-1-1.8-.6-2.8-.6-4.4 0-2.2-1-4-3-4Z"/><circle cx="10.5" cy="7.5" r=".9" fill="currentColor"/><circle cx="13.5" cy="7.5" r=".9" fill="currentColor"/></svg>Linux <small>.AppImage</small></a>
             </div>
+            <p class="first-launch">On a Mac? macOS asks you to confirm KromaGit the first time. <a href="#macos-first-launch" data-open-faq>Here's how</a>.</p>
             <ul class="final-traits">
               <li>Free forever</li><li>No account</li><li>MIT licensed</li><li>~8 MB</li>
             </ul>
@@ -328,9 +329,15 @@
             <summary>Does my code leave my computer?</summary>
             <p>Not unless you turn on a cloud AI provider and confirm a request. KromaGit has no server and sends no telemetry. Profile pictures are looked up from GitHub and Gravatar by email, and you can switch that off in Settings.</p>
           </details>
-          <details>
-            <summary>macOS says the app can't be opened.</summary>
-            <p>Builds without an Apple developer signature trigger a warning on first launch. Right-click KromaGit in Applications and choose <em>Open</em>, or allow it under <em>System Settings → Privacy &amp; Security</em>. You only need to do this once.</p>
+          <details id="macos-first-launch">
+            <summary>macOS won't open KromaGit the first time</summary>
+            <p>KromaGit isn't signed with a paid Apple developer certificate yet, so macOS asks you to confirm it once. After that it opens normally, including after updates.</p>
+            <ol class="steps">
+              <li>Drag KromaGit from the <code>.dmg</code> into <strong>Applications</strong> and open it. macOS says it <em>can't verify the developer</em> — click <strong>Done</strong>.</li>
+              <li>Open <strong>System Settings → Privacy &amp; Security</strong>, scroll down to <strong>Security</strong> and click <strong>Open Anyway</strong> next to KromaGit, then confirm.</li>
+            </ol>
+            <p>If macOS says the app <em>is damaged</em> instead, or there's no <strong>Open Anyway</strong> button, run this once in Terminal and open KromaGit again:</p>
+            <div class="cmd"><code id="xattr-cmd">xattr -dr com.apple.quarantine /Applications/KromaGit.app</code><button type="button" class="copy" data-copy="xattr-cmd">Copy</button></div>
           </details>
           <details>
             <summary>How is it different from other Git clients?</summary>
@@ -428,6 +435,12 @@
         try { localStorage.setItem('kromagit-site-theme', root.dataset.theme) } catch {}
         applyShots()
       })
+
+      document.querySelectorAll('[data-open-faq]').forEach((link) => link.addEventListener('click', () => {
+        const d = document.querySelector(link.getAttribute('href'))
+        if (d) d.open = true
+      }))
+      if (location.hash === '#macos-first-launch') document.getElementById('macos-first-launch').open = true
 
       document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1500) } catch {}
