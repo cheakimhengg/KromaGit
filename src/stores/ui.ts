@@ -30,6 +30,8 @@ export interface Toast {
   title: string
   detail?: string
   action?: { label: string; run: () => void }
+  /** stays until closed or acted on */
+  sticky?: boolean
 }
 
 export interface DialogField {
@@ -216,7 +218,8 @@ export const useUiStore = defineStore('ui', () => {
   function toast(t: Omit<Toast, 'id'>, ttlMs = 3500) {
     const id = ++toastSeq
     toasts.value.push({ ...t, id })
-    setTimeout(() => dismissToast(id), ttlMs)
+    if (!t.sticky) setTimeout(() => dismissToast(id), ttlMs)
+    return id
   }
 
   function dismissToast(id: number) {

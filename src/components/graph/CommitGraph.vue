@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
-  Archive, ArchiveRestore, ArrowDown, ArrowUp, Check, Cherry, Copy, GitMerge, SlidersHorizontal, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Trash2, Undo, User, X,
+  ArrowUpFromLine, GitPullRequestArrow, Archive, ArchiveRestore, ArrowDown, ArrowUp, Check, Cherry, Copy, GitMerge, SlidersHorizontal, GitBranchPlus, Loader2, Pencil, RotateCcw, Search, Tag, Trash2, Undo, User, X,
 } from '@/lib/icons'
 import GraphCell from './GraphCell.vue'
 import RefPill from './RefPill.vue'
@@ -254,21 +254,79 @@ function checkoutRef(r: RefLabel) {
   if (r.kind === 'local') return git.checkout(r.name)
   if (r.kind === 'remote') {
     const remote = r.name.split('/')[0]
+    const branch = r.name.slice(remote.length + 1)
+    const owner = commits.value.find((x) => x.refs.includes(r))
+    // Already on this branch: "go back to the server's version" means moving the branch, not checking out
+    if (branch === snapshot.value?.currentBranch && owner) {
+      if (owner.hash === headOid.value) return
+      return git.reset(owner.hash, 'hard')
+    }
     return git.checkoutRemote(r.name, remote)
   }
 }
-function refMenu(e: MouseEvent, r: RefLabel, label: string) {
+function refMenu(e: MouseEvent, r: RefLabel, _label?: string) {
+  const owner = commits.value.find((x) => x.refs.includes(r))
   if (r.kind === 'stash') {
-    const c = commits.value.find((x) => x.refs.includes(r))
-    if (c) stashMenu(e, c)
+    if (owner) stashMenu(e, owner)
     return
   }
-  const items: MenuItem[] = []
-  if (!r.current && r.kind !== 'tag' && r.kind !== 'head') {
-    items.push({ label: `Checkout ${label}`, icon: Check, action: () => checkoutRef(r) }, { separator: true })
+  const current = snapshot.value?.currentBranch ?? 'HEAD'
+  const items: MenuItem[] = [{ heading: true, mono: true, label: r.name }]
+  const copy: MenuItem = { label: 'Copy name', icon: Copy, action: () => git.copyText(r.name, 'Copied name') }
+
+  if (r.kind === 'local') {
+    const branch = snapshot.value?.branches.find((b) => b.name === r.name)
+    if (!r.current) {
+      items.push(
+        { label: `Checkout ${r.name}`, icon: Check, action: () => checkoutRef(r) },
+        { separator: true },
+        { label: `Merge ${r.name} into ${current}`, icon: GitMerge, action: () => git.merge(r.name) },
+        { label: `Fast-forward ${current} to ${r.name}`, icon: ArrowUpFromLine, action: () => git.fastForward(r.name) },
+        { label: `Rebase ${current} onto ${r.name}`, icon: GitPullRequestArrow, action: () => git.rebase(r.name) },
+        { separator: true },
+      )
+    }
+    items.push(
+      { label: 'New branch from here…', icon: GitBranchPlus, action: () => git.createBranch({ ref: r.name, label: r.name }) },
+      { label: 'New tag here…', icon: Tag, action: () => git.createTag({ ref: r.name, label: r.name }) },
+      { label: 'Rename…', icon: Pencil, action: () => git.renameBranch(r.name) },
+    )
+    if (branch) items.push({ label: branch.upstream ? 'Push' : 'Push and set upstream', icon: ArrowUpFromLine, action: () => git.pushBranch(branch) })
+    items.push(copy)
+    if (!r.current) items.push({ separator: true }, { label: `Delete ${r.name}…`, icon: Trash2, danger: true, action: () => git.deleteBranch(r.name) })
+  } else if (r.kind === 'remote') {
+    const slash = r.name.indexOf('/')
+    const remote = r.name.slice(0, slash)
+    const branch = r.name.slice(slash + 1)
+    if (branch === current && owner) {
+      items.push(
+        { label: `Reset ${current} to ${r.name}…`, icon: RotateCcw, action: () => git.reset(owner.hash, 'hard') },
+        { separator: true },
+      )
+    } else items.push({ label: `Checkout ${branch}`, icon: Check, action: () => checkoutRef(r) }, { separator: true })
+    items.push(
+      { label: `Merge ${r.name} into ${current}`, icon: GitMerge, action: () => git.merge(r.name) },
+      { label: `Fast-forward ${current} to ${r.name}`, icon: ArrowUpFromLine, action: () => git.fastForward(r.name) },
+      { label: `Rebase ${current} onto ${r.name}`, icon: GitPullRequestArrow, action: () => git.rebase(r.name) },
+      { separator: true },
+      { label: 'New branch from here…', icon: GitBranchPlus, action: () => git.createBranch({ ref: r.name, label: r.name }) },
+      copy,
+      { separator: true },
+      { label: `Delete ${r.name} on remote…`, icon: Trash2, danger: true, action: () => git.deleteRemoteBranch(remote, branch) },
+    )
+  } else if (r.kind === 'tag') {
+    if (owner) items.push({ label: `Checkout ${r.name}`, icon: Check, action: () => git.checkoutCommit(owner.hash) })
+    items.push(
+      { label: `Merge ${r.name} into ${current}`, icon: GitMerge, action: () => git.merge(r.name) },
+      { separator: true },
+      { label: 'New branch from tag…', icon: GitBranchPlus, action: () => git.createBranch({ ref: r.name, label: r.name }) },
+      copy,
+      { separator: true },
+      { label: `Delete ${r.name}…`, icon: Trash2, danger: true, action: () => git.deleteTag(r.name) },
+    )
+  } else {
+    items.push(copy)
   }
-  items.push({ label: 'Copy name', icon: Copy, action: () => git.copyText(label, 'Copied name') })
-  if (r.kind === 'remote') items.push({ label: 'Copy full name', icon: Copy, shortcut: r.name, action: () => git.copyText(r.name, 'Copied name') })
   ui.openMenu(e, items)
 }
 

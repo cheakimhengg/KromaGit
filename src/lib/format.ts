@@ -66,13 +66,15 @@ export function avatarHue(key: string): number {
 }
 
 export function languageFromPath(path: string): string {
+  if (/(^|\/)dockerfile$/i.test(path)) return 'dockerfile'
   const ext = path.split('.').pop()?.toLowerCase() ?? ''
   const map: Record<string, string> = {
     ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript',
     vue: 'xml', html: 'xml', xml: 'xml', svg: 'xml',
     rs: 'rust', cs: 'csharp', py: 'python', go: 'go', java: 'java', kt: 'kotlin',
     json: 'json', css: 'css', scss: 'scss', md: 'markdown', yml: 'yaml', yaml: 'yaml',
-    sql: 'sql', sh: 'bash', toml: 'ini',
+    sql: 'sql', sh: 'bash', toml: 'ini', ini: 'ini', less: 'less', sass: 'scss', swift: 'swift', php: 'php', rb: 'ruby',
+    c: 'c', h: 'c', cpp: 'cpp', hpp: 'cpp', cc: 'cpp', graphql: 'graphql', gql: 'graphql', svelte: 'xml', htm: 'xml', zsh: 'bash', bash: 'bash',
   }
   return map[ext] ?? 'plaintext'
 }

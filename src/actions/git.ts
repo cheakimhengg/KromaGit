@@ -327,9 +327,19 @@ export async function push(opts: { force?: boolean; setUpstream?: boolean } = {}
 
 // ---------- history ----------
 
+/** Always records a merge commit, so the merge shows up as its own line in the graph. */
 export async function merge(target: string) {
   const current = snapshot()?.currentBranch ?? 'HEAD'
-  return ops().run(`Merge ${target} into ${current}`, { type: 'merge', target }, { undo: moveHeadUndo, onError: conflictHandler })
+  return ops().run(`Merge ${target} into ${current}`, { type: 'merge', target, mode: 'noFf' }, { undo: moveHeadUndo, onError: conflictHandler })
+}
+
+/** Moves the current branch forward to `target` without a merge commit; refuses if the branches have split. */
+export function fastForward(target: string) {
+  const current = snapshot()?.currentBranch ?? 'HEAD'
+  return ops().run(`Fast-forward ${current} to ${target}`, { type: 'merge', target, mode: 'ffOnly' }, {
+    success: `${current} is now at ${target}`,
+    undo: moveHeadUndo,
+  })
 }
 
 export async function rebase(onto: string) {

@@ -42,6 +42,7 @@ function branchMenu(e: MouseEvent, b: Branch) {
       { label: `Checkout ${b.name}`, icon: Check, action: () => git.checkout(b.name) },
       { separator: true },
       { label: `Merge ${b.name} into ${current}`, icon: GitMerge, action: () => git.merge(b.name) },
+      { label: `Fast-forward ${current} to ${b.name}`, icon: ArrowUpFromLine, action: () => git.fastForward(b.name) },
       { label: `Rebase ${current} onto ${b.name}`, icon: GitPullRequestArrow, action: () => git.rebase(b.name) },
       { separator: true },
     )
@@ -63,6 +64,7 @@ function remoteMenu(e: MouseEvent, remote: string, branch: string) {
     { label: `Checkout ${branch} (tracking ${full})`, icon: Check, action: () => git.checkoutRemote(full, remote) },
     { separator: true },
     { label: `Merge ${full} into ${current}`, icon: GitMerge, action: () => git.merge(full) },
+    { label: `Fast-forward ${current} to ${full}`, icon: ArrowUpFromLine, action: () => git.fastForward(full) },
     { label: `Rebase ${current} onto ${full}`, icon: GitPullRequestArrow, action: () => git.rebase(full) },
     { separator: true },
     { label: 'Copy name', icon: Copy, action: () => git.copyText(full) },

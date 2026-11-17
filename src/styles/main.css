@@ -454,41 +454,246 @@ a:focus-visible {
   }
 }
 
-.hljs-keyword,
-.hljs-built_in,
-.hljs-literal { color: #c792ea; }
-.hljs-string,
-.hljs-regexp { color: #a5d6a7; }
-.hljs-number { color: #f78c6c; }
-.hljs-comment { color: #5e6780; font-style: italic; }
-.hljs-title,
-.hljs-title.function_ { color: #82aaff; }
-.hljs-type,
-.hljs-title.class_ { color: #ffcb6b; }
-.hljs-attr,
-.hljs-property { color: #89ddff; }
-.hljs-variable,
-.hljs-params { color: #e4e8f1; }
-.hljs-tag,
-.hljs-name { color: #f07178; }
+/* diff and selection colours come from each editor theme's own green / red / accent */
+:root[data-theme='vscode-dark'],
+:root[data-theme='github-dark'],
+:root[data-theme='one-dark'],
+:root[data-theme='tokyo-night'],
+:root[data-theme='catppuccin-mocha'],
+:root[data-theme='dracula'],
+:root[data-theme='nord'],
+:root[data-theme='ayu-dark'] {
+  --gw-add-bg: color-mix(in srgb, var(--gw-success) 13%, transparent);
+  --gw-add-strong: color-mix(in srgb, var(--gw-success) 30%, transparent);
+  --gw-del-bg: color-mix(in srgb, var(--gw-danger) 13%, transparent);
+  --gw-del-strong: color-mix(in srgb, var(--gw-danger) 30%, transparent);
+  --gw-select: color-mix(in srgb, var(--gw-accent) 22%, transparent);
+}
+:root[data-theme='vscode-light'],
+:root[data-theme='github-light'],
+:root[data-theme='catppuccin-latte'],
+:root[data-theme='ayu-light'] {
+  --gw-add-bg: color-mix(in srgb, var(--gw-success) 11%, transparent);
+  --gw-add-strong: color-mix(in srgb, var(--gw-success) 24%, transparent);
+  --gw-del-bg: color-mix(in srgb, var(--gw-danger) 9%, transparent);
+  --gw-del-strong: color-mix(in srgb, var(--gw-danger) 21%, transparent);
+  --gw-select: color-mix(in srgb, var(--gw-accent) 16%, transparent);
+}
 
-.light .hljs-keyword,
-.light .hljs-built_in,
-.light .hljs-literal { color: #8b2fc9; }
-.light .hljs-string,
-.light .hljs-regexp { color: #22863a; }
-.light .hljs-number { color: #c04a12; }
-.light .hljs-comment { color: #8a92a4; }
-.light .hljs-title,
-.light .hljs-title.function_ { color: #2f5bd3; }
-.light .hljs-type,
-.light .hljs-title.class_ { color: #a35b00; }
-.light .hljs-attr,
-.light .hljs-property { color: #0b7285; }
-.light .hljs-variable,
-.light .hljs-params { color: #1a1e27; }
-.light .hljs-tag,
-.light .hljs-name { color: #c92a4b; }
+/* code colours follow the selected theme: editor themes use their official palettes, Kroma themes their own */
+:root {
+  --syn-keyword: #b49ae8;
+  --syn-string: #8fd4a8;
+  --syn-number: #e8a36a;
+  --syn-comment: #6f7581;
+  --syn-function: #8aa2f2;
+  --syn-type: #e2b25c;
+  --syn-attr: #66c7c0;
+  --syn-variable: #d9dce1;
+  --syn-tag: #e08bb8;
+  --syn-builtin: #66c7c0;
+  --syn-param: #e0a3c4;
+  --syn-italic: normal;
+}
+.light {
+  --syn-keyword: #7a4bc4;
+  --syn-string: #1f7a4a;
+  --syn-number: #b5521b;
+  --syn-comment: #8a909c;
+  --syn-function: #3d63c9;
+  --syn-type: #9c6512;
+  --syn-attr: #19807a;
+  --syn-variable: #23272e;
+  --syn-tag: #b8457f;
+  --syn-builtin: #19807a;
+  --syn-param: #a1497a;
+}
+:root[data-theme='paper'] {
+  --syn-keyword: #8a3a8f;
+  --syn-string: #4f7a28;
+  --syn-number: #b5521b;
+  --syn-comment: #9a8f7e;
+  --syn-function: #2f5aa8;
+  --syn-type: #946200;
+  --syn-attr: #2a7a73;
+  --syn-variable: #2e2a23;
+  --syn-tag: #b73a3a;
+  --syn-builtin: #2a7a73;
+  --syn-param: #a15c2a;
+}
+:root[data-theme='vscode-dark'] {
+  --syn-keyword: #569cd6;
+  --syn-string: #ce9178;
+  --syn-number: #b5cea8;
+  --syn-comment: #6a9955;
+  --syn-function: #dcdcaa;
+  --syn-type: #4ec9b0;
+  --syn-attr: #9cdcfe;
+  --syn-variable: #9cdcfe;
+  --syn-tag: #569cd6;
+  --syn-builtin: #4ec9b0;
+  --syn-param: #9cdcfe;
+}
+:root[data-theme='vscode-light'] {
+  --syn-keyword: #0000ff;
+  --syn-string: #a31515;
+  --syn-number: #098658;
+  --syn-comment: #008000;
+  --syn-function: #795e26;
+  --syn-type: #267f99;
+  --syn-attr: #e50000;
+  --syn-variable: #001080;
+  --syn-tag: #800000;
+  --syn-builtin: #267f99;
+  --syn-param: #001080;
+}
+:root[data-theme='github-dark'] {
+  --syn-keyword: #ff7b72;
+  --syn-string: #a5d6ff;
+  --syn-number: #79c0ff;
+  --syn-comment: #8b949e;
+  --syn-function: #d2a8ff;
+  --syn-type: #ffa657;
+  --syn-attr: #79c0ff;
+  --syn-variable: #e6edf3;
+  --syn-tag: #7ee787;
+  --syn-builtin: #79c0ff;
+  --syn-param: #ffa657;
+}
+:root[data-theme='github-light'] {
+  --syn-keyword: #cf222e;
+  --syn-string: #0a3069;
+  --syn-number: #0550ae;
+  --syn-comment: #6e7781;
+  --syn-function: #8250df;
+  --syn-type: #953800;
+  --syn-attr: #0550ae;
+  --syn-variable: #1f2328;
+  --syn-tag: #116329;
+  --syn-builtin: #0550ae;
+  --syn-param: #953800;
+}
+:root[data-theme='one-dark'] {
+  --syn-keyword: #c678dd;
+  --syn-string: #98c379;
+  --syn-number: #d19a66;
+  --syn-comment: #7f848e;
+  --syn-function: #61afef;
+  --syn-type: #e5c07b;
+  --syn-attr: #d19a66;
+  --syn-variable: #e06c75;
+  --syn-tag: #e06c75;
+  --syn-builtin: #e5c07b;
+  --syn-param: #e06c75;
+}
+:root[data-theme='tokyo-night'] {
+  --syn-keyword: #bb9af7;
+  --syn-string: #9ece6a;
+  --syn-number: #ff9e64;
+  --syn-comment: #565f89;
+  --syn-function: #7aa2f7;
+  --syn-type: #2ac3de;
+  --syn-attr: #73daca;
+  --syn-variable: #c0caf5;
+  --syn-tag: #f7768e;
+  --syn-builtin: #2ac3de;
+  --syn-param: #e0af68;
+  --syn-italic: italic;
+}
+:root[data-theme='catppuccin-mocha'] {
+  --syn-keyword: #cba6f7;
+  --syn-string: #a6e3a1;
+  --syn-number: #fab387;
+  --syn-comment: #6c7086;
+  --syn-function: #89b4fa;
+  --syn-type: #f9e2af;
+  --syn-attr: #89dceb;
+  --syn-variable: #cdd6f4;
+  --syn-tag: #f38ba8;
+  --syn-builtin: #f38ba8;
+  --syn-param: #eba0ac;
+  --syn-italic: italic;
+}
+:root[data-theme='catppuccin-latte'] {
+  --syn-keyword: #8839ef;
+  --syn-string: #40a02b;
+  --syn-number: #fe640b;
+  --syn-comment: #9ca0b0;
+  --syn-function: #1e66f5;
+  --syn-type: #df8e1d;
+  --syn-attr: #04a5e5;
+  --syn-variable: #4c4f69;
+  --syn-tag: #d20f39;
+  --syn-builtin: #d20f39;
+  --syn-param: #e64553;
+  --syn-italic: italic;
+}
+:root[data-theme='dracula'] {
+  --syn-keyword: #ff79c6;
+  --syn-string: #f1fa8c;
+  --syn-number: #bd93f9;
+  --syn-comment: #6272a4;
+  --syn-function: #50fa7b;
+  --syn-type: #8be9fd;
+  --syn-attr: #50fa7b;
+  --syn-variable: #f8f8f2;
+  --syn-tag: #ff79c6;
+  --syn-builtin: #8be9fd;
+  --syn-param: #ffb86c;
+  --syn-italic: italic;
+}
+:root[data-theme='nord'] {
+  --syn-keyword: #81a1c1;
+  --syn-string: #a3be8c;
+  --syn-number: #b48ead;
+  --syn-comment: #616e88;
+  --syn-function: #88c0d0;
+  --syn-type: #8fbcbb;
+  --syn-attr: #8fbcbb;
+  --syn-variable: #d8dee9;
+  --syn-tag: #81a1c1;
+  --syn-builtin: #88c0d0;
+  --syn-param: #d8dee9;
+}
+:root[data-theme='ayu-dark'] {
+  --syn-keyword: #ff8f40;
+  --syn-string: #aad94c;
+  --syn-number: #d2a6ff;
+  --syn-comment: #626a73;
+  --syn-function: #ffb454;
+  --syn-type: #59c2ff;
+  --syn-attr: #59c2ff;
+  --syn-variable: #bfbdb6;
+  --syn-tag: #39bae6;
+  --syn-builtin: #e6b673;
+  --syn-param: #d2a6ff;
+  --syn-italic: italic;
+}
+:root[data-theme='ayu-light'] {
+  --syn-keyword: #fa8d3e;
+  --syn-string: #86b300;
+  --syn-number: #a37acc;
+  --syn-comment: #adaeb1;
+  --syn-function: #f2ae49;
+  --syn-type: #399ee6;
+  --syn-attr: #399ee6;
+  --syn-variable: #5c6166;
+  --syn-tag: #55b4d4;
+  --syn-builtin: #e6ba7e;
+  --syn-param: #a37acc;
+  --syn-italic: italic;
+}
+.hljs-keyword, .hljs-literal, .hljs-meta .hljs-keyword { color: var(--syn-keyword); }
+.hljs-built_in { color: var(--syn-builtin); font-style: var(--syn-italic); }
+.hljs-string, .hljs-regexp, .hljs-template-string { color: var(--syn-string); }
+.hljs-number, .hljs-symbol { color: var(--syn-number); }
+.hljs-comment, .hljs-quote { color: var(--syn-comment); font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-function .hljs-title { color: var(--syn-function); }
+.hljs-type, .hljs-title.class_, .hljs-class .hljs-title { color: var(--syn-type); }
+.hljs-attr, .hljs-attribute, .hljs-property, .hljs-selector-class, .hljs-selector-id { color: var(--syn-attr); }
+.hljs-variable, .hljs-template-variable, .hljs-variable.language_ { color: var(--syn-variable); }
+.hljs-params { color: var(--syn-param); font-style: var(--syn-italic); }
+.hljs-tag, .hljs-name, .hljs-selector-tag, .hljs-deletion { color: var(--syn-tag); }
 
 /* one checkbox style for the whole app (the native macOS box ignores sizing and overlaps its neighbours) */
 @layer components {
@@ -555,3 +760,18 @@ a:focus-visible {
     cursor: not-allowed;
   }
 }
+
+/* loading placeholders: a soft shimmer, shown after a short delay so fast loads don't flash */
+.gw-skel-wrap { animation: gw-skel-in .2s ease-out .12s both; }
+.gw-skel {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--gw-surface-2) 0%, var(--gw-surface-3) 50%, var(--gw-surface-2) 100%);
+  background-size: 200% 100%;
+  animation: gw-skel-shine 1.3s ease-in-out infinite;
+}
+@keyframes gw-skel-shine { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes gw-skel-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gw-skel { animation: none; } }
+
+/* split diff: both halves shift together by --sx */
+.sx-on .split-code { transform: translateX(calc(var(--sx, 0px) * -1)); }

@@ -55,6 +55,15 @@ watch(
         </span>
       </button>
       <div v-if="error" class="m-3 rounded-md border border-danger/30 bg-danger/10 p-2 text-[12px] text-danger select-text">{{ error }}</div>
+      <div v-else-if="loading && !entries.length" class="gw-skel-wrap" role="status" aria-label="Loading history">
+        <div v-for="i in 7" :key="i" class="flex items-center gap-2.5 border-b border-line/60 px-3 py-2.5">
+          <span class="gw-skel h-7 w-7 shrink-0 rounded-full" />
+          <span class="min-w-0 flex-1 space-y-1.5">
+            <span class="gw-skel block h-2.5" :style="{ width: `${55 + ((i * 17) % 35)}%` }" />
+            <span class="gw-skel block h-2 w-1/3 opacity-60" />
+          </span>
+        </div>
+      </div>
       <p v-else-if="!loading && !entries.length" class="p-4 text-center text-[12px] text-faint">No commits touch this file yet.</p>
       <button
         v-for="e in entries" :key="e.commit.hash" type="button"

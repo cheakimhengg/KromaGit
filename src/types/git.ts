@@ -233,7 +233,7 @@ export type GitAction =
   | { type: 'fetch'; remote: string | null }
   | { type: 'pull'; mode: PullMode }
   | { type: 'push'; remote: string | null; branch: string | null; setUpstream: boolean; force: boolean }
-  | { type: 'merge'; target: string }
+  | { type: 'merge'; target: string; mode?: 'noFf' | 'ffOnly' }
   | { type: 'rebase'; onto: string }
   | { type: 'cherryPick'; hash: string }
   | { type: 'revert'; hash: string }

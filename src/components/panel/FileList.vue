@@ -60,6 +60,21 @@ const virtualizer = useVirtualizer(
   })),
 )
 
+/** ↑ / ↓ move to the previous / next file and open it (folders are skipped). */
+function onListKeydown(e: KeyboardEvent) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+  if (e.target instanceof HTMLInputElement && e.target.type !== 'checkbox') return
+  const fileRows = rows.value.map((r, i) => (r.file ? i : -1)).filter((i) => i !== -1)
+  if (!fileRows.length) return
+  e.preventDefault()
+  const at = fileRows.findIndex((i) => rows.value[i].file!.path === props.activePath)
+  const step = e.key === 'ArrowDown' ? 1 : -1
+  const next = at === -1 ? (step > 0 ? 0 : fileRows.length - 1) : Math.max(0, Math.min(fileRows.length - 1, at + step))
+  const index = fileRows[next]
+  virtualizer.value.scrollToIndex(index, { align: 'auto' })
+  emit('open', rows.value[index].file!)
+}
+
 function split(path: string) {
   const i = path.lastIndexOf('/')
   return i === -1 ? { dir: '', name: path } : { dir: path.slice(0, i + 1), name: path.slice(i + 1) }
@@ -67,7 +82,7 @@ function split(path: string) {
 </script>
 
 <template>
-  <div ref="scrollEl" class="h-full overflow-y-auto">
+  <div ref="scrollEl" class="h-full overflow-y-auto outline-none" tabindex="0" @keydown="onListKeydown">
     <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
       <template v-for="v in virtualizer.getVirtualItems()" :key="rows[v.index].key">
         <div
@@ -83,7 +98,7 @@ function split(path: string) {
           class="group absolute left-0 flex w-full cursor-pointer items-center gap-1.5 pr-2 text-[13px]"
           :class="activePath === rows[v.index].file!.path ? 'bg-select' : 'hover:bg-hover'"
           :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + (mode === 'tree' ? 22 : 8)}px`, paddingRight: '10px' }"
-          @click="emit('open', rows[v.index].file!)"
+          @click="emit('open', rows[v.index].file!); scrollEl?.focus({ preventScroll: true })"
           @contextmenu="emit('menu', $event, rows[v.index].file!)"
         >
           <input

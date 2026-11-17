@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Columns2, Copy, FileView, Files, Info, Loader2, SlidersHorizontal, Space, TextFont, TextWrap, Check, Minus, Plus, Rows3, Undo2, User, X } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
@@ -9,7 +10,7 @@ import ImageDiff from './ImageDiff.vue'
 import { wordDiffHtml } from '@/lib/word-diff'
 import FileHistory from './FileHistory.vue'
 import BlameView from './BlameView.vue'
-import { highlightLine } from '@/lib/highlight'
+import { highlightLine, isMixedMarkup, mixedLanguages } from '@/lib/highlight'
 import { toSplitRows } from '@/lib/diff-split'
 import type { DiffLine, DiffTarget, FileChange, FileDiff, FileHistoryEntry, HunkSelection } from '@/types/git'
 import { useOpsStore } from '@/stores/ops'
@@ -27,6 +28,7 @@ watch(() => props.target, () => (histTarget.value = null))
 const tgt = computed<DiffTarget>(() => histTarget.value ?? props.target)
 const isImage = computed(() => isImagePath(tgt.value.path))
 const loading = ref(false)
+const SKELETON_WIDTHS = [42, 68, 55, 0, 74, 61, 38, 80, 52, 0, 66, 47, 71, 35, 58, 0, 63, 49]
 const error = ref<string | null>(null)
 const selected = ref(new Set<string>())
 let anchor: { hunk: number; line: number } | null = null
@@ -37,6 +39,7 @@ watch(
     let cancelled = false
     onCleanup(() => (cancelled = true))
     if (!old || old[0] !== target) selected.value = new Set()
+    if (old && old[0].path !== target.path) diff.value = null
     loading.value = true
     error.value = null
     try {
@@ -63,8 +66,24 @@ const focused = ref<number | null>(null)
 async function focusLine(line: number) {
   focused.value = line
   await nextTick()
-  const el = scroller.value?.querySelector(`[data-new="${line}"]`) ?? scroller.value?.querySelector(`[data-near="${line}"]`)
-  el?.scrollIntoView({ block: 'center' })
+  const at = (pick: (l: DiffLine) => number | null | undefined) => {
+    for (let hi = 0; hi < hunks.value.length; hi++) {
+      const lines = hunks.value[hi].lines
+      if (ui.diffMode === 'split') {
+        const rows = splitRows.value[hi]
+        for (let ri = 0; ri < rows.length; ri++) {
+          const c = rows[ri].right ?? rows[ri].left
+          if (c && pick(lines[c.index]) === line) return rowIndex(hi, ri)
+        }
+      } else {
+        for (let li = 0; li < lines.length; li++) if (pick(lines[li]) === line) return rowIndex(hi, li)
+      }
+    }
+    return -1
+  }
+  let row = at((l) => l.newNo)
+  if (row === -1) row = at((l) => l.oldNo)
+  if (row !== -1) scrollToRow(row)
 }
 
 const language = computed(() => languageFromPath(tgt.value.path))
@@ -160,8 +179,38 @@ const changeBlocks = computed<ChangeBlock[]>(() => {
 })
 const currentChange = ref(0)
 watch(tgt, () => (currentChange.value = 0))
-function jumpToRow(row: number) {
-  scroller.value?.querySelector(`[data-row="${row}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+/** Split view scrolls sideways as one: both halves shift by the same offset (a single CSS variable, so it stays fast). */
+const splitX = ref(0)
+const hbar = ref<HTMLElement | null>(null)
+const splitSideways = computed(() => ui.diffMode === 'split' && !ui.diffOptions.wrap)
+const widestLine = computed(() => {
+  let max = 0
+  for (const h of hunks.value) {
+    for (const l of h.lines) {
+      let w = 0
+      for (const ch of l.text) w += ch === '\t' ? 4 : /[\u1100-\uFFDC]/.test(ch) ? 2 : 1
+      if (w > max) max = w
+    }
+  }
+  return max
+})
+const halfWidth = ref(600)
+const maxSplitX = computed(() => Math.max(0, widestLine.value * 7.83 + 24 - (halfWidth.value - 68)))
+function setSplitX(x: number) {
+  splitX.value = Math.max(0, Math.min(maxSplitX.value, x))
+  if (hbar.value && Math.abs(hbar.value.scrollLeft - splitX.value) > 1) hbar.value.scrollLeft = splitX.value
+}
+function onDiffWheel(e: WheelEvent) {
+  if (!splitSideways.value) return
+  const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX
+  if (!dx || Math.abs(dx) < Math.abs(e.deltaY) * (e.shiftKey ? 0 : 1)) return
+  e.preventDefault()
+  setSplitX(splitX.value + dx)
+}
+watch(() => [tgt.value.path, ui.diffMode] as const, () => setSplitX(0))
+
+async function jumpToRow(row: number) {
+  scrollToRow(row)
 }
 async function goChange(delta: number) {
   const n = changeBlocks.value.length
@@ -238,7 +287,8 @@ const sourceLabel = computed(() => {
 })
 
 const hunks = computed(() => diff.value?.hunks ?? [])
-const html = computed(() => hunks.value.map((h) => h.lines.map((l) => highlightLine(l.text, language.value))))
+const lineLanguages = computed(() => (isMixedMarkup(tgt.value.path) ? mixedLanguages(hunks.value) : null))
+const html = computed(() => hunks.value.map((h, hi) => h.lines.map((l, li) => highlightLine(l.text, lineLanguages.value?.[hi][li] ?? language.value))))
 const wordHtml = computed(() => (ui.diffOptions.wordDiff ? hunks.value.map((h) => wordDiffHtml(h.lines)) : null))
 const lineHtml = (hi: number, li: number) => wordHtml.value?.[hi]?.get(li) ?? html.value[hi][li]
 const optionsOpen = ref(false)
@@ -254,20 +304,49 @@ function toggleView(v: 'history' | 'blame') {
 }
 const splitRows = computed(() => hunks.value.map((h) => toSplitRows(h.lines)))
 
+/** Only the rows on screen exist in the page, so a 3,000-line file opens as fast as a 30-line one. */
+interface DiffItem { hi: number; ri: number }
+const items = computed<DiffItem[]>(() => {
+  const out: DiffItem[] = []
+  hunks.value.forEach((h, hi) => {
+    out.push({ hi, ri: -1 })
+    const n = ui.diffMode === 'split' ? splitRows.value[hi].length : h.lines.length
+    for (let ri = 0; ri < n; ri++) out.push({ hi, ri })
+  })
+  return out
+})
+const HEADER_H = 30
+const virtualizer = useVirtualizer(
+  computed(() => ({
+    count: items.value.length,
+    getScrollElement: () => scroller.value,
+    estimateSize: (i: number) => (items.value[i]?.ri === -1 ? (items.value[i].hi > 0 ? HEADER_H + 12 : HEADER_H) : 22),
+    overscan: 30,
+  })),
+)
+const measureRow = (el: unknown) => {
+  if (el instanceof Element && ui.diffOptions.wrap) virtualizer.value.measureElement(el)
+}
+watch(() => [hunks.value, ui.diffMode, ui.diffOptions.wrap] as const, () => void nextTick(() => virtualizer.value.measure()))
+const unifiedWidth = computed(() => (ui.diffMode === 'unified' && !ui.diffOptions.wrap ? `max(100%, ${Math.ceil(widestLine.value * 7.83 + 160)}px)` : '100%'))
+function scrollToRow(row: number) {
+  virtualizer.value.scrollToIndex(row, { align: 'center' })
+}
+
 /** Where each change block really sits in the scrolled content (wrapped lines make rows taller), as % of the full height. */
 const blockPos = ref<{ top: number; height: number }[]>([])
 function measureBlocks() {
   const el = scroller.value
   if (!el) return
-  const total = Math.max(el.scrollHeight, 1)
-  const base = el.getBoundingClientRect().top - el.scrollTop
+  halfWidth.value = el.clientWidth / 2
+  const v = virtualizer.value
+  const total = Math.max(v.getTotalSize(), 1)
+  const m = v.measurementsCache
   blockPos.value = changeBlocks.value.map((b) => {
-    const first = el.querySelector<HTMLElement>(`[data-row="${b.row}"]`)
-    const last = el.querySelector<HTMLElement>(`[data-row="${b.row + b.len - 1}"]`) ?? first
+    const first = m[b.row]
+    const last = m[b.row + b.len - 1] ?? first
     if (!first || !last) return { top: (b.row / rowOffsets.value.total) * 100, height: Math.max((b.len / rowOffsets.value.total) * 100, 0.4) }
-    const top = first.getBoundingClientRect().top - base
-    const bottom = last.getBoundingClientRect().bottom - base
-    return { top: (top / total) * 100, height: Math.max(((bottom - top) / total) * 100, 0.4) }
+    return { top: (first.start / total) * 100, height: Math.max(((last.end - first.start) / total) * 100, 0.4) }
   })
 }
 let measureFrame = 0
@@ -411,6 +490,13 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
       :target="tgt"
       :refresh-key="tgt.source === 'commit' ? null : repos.active?.snapshot.workingCopy"
     />
+    <div v-else-if="loading && !diff" class="gw-skel-wrap flex-1 overflow-hidden py-3" role="status" aria-label="Loading diff">
+      <div class="mx-3 mb-3 h-5 w-64 max-w-[60%] gw-skel opacity-70" />
+      <div v-for="(w, i) in SKELETON_WIDTHS" :key="i" class="flex h-[22px] items-center gap-4 px-3">
+        <span class="gw-skel h-2.5 w-7 shrink-0 opacity-50" />
+        <span v-if="w" class="gw-skel h-2.5" :style="{ width: `${w}%` }" />
+      </div>
+    </div>
     <div v-else-if="error" class="m-4 rounded-md border border-danger/30 bg-danger/10 p-3 text-[13px] text-danger select-text">{{ error }}</div>
     <div v-else-if="diff?.binary" class="p-8 text-center text-[13px] text-muted">Binary file — no text diff to show.</div>
     <div v-else-if="diff && !hunks.length && !loading" class="p-8 text-center text-[13px] text-muted">
@@ -419,80 +505,92 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
     </div>
 
     <div v-else class="relative flex min-h-0 flex-1">
-    <div ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading }">
+    <div ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading, 'sx-on': splitX > 0 }" :style="{ '--sx': `${splitX}px` }" @wheel="onDiffWheel">
       <div v-if="diff?.truncated" class="border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
         Diff is very large; showing the first 20,000 lines.
       </div>
-      <div v-for="(hunk, hi) in hunks" :key="hi" class="mb-3 scroll-mt-1" :data-hunk="hi">
-        <div class="sticky top-0 z-10 flex items-center gap-2 border-y border-line bg-surface-2 px-3 py-1 text-[12px] text-accent/80">
-          <span class="min-w-0 truncate">{{ hunk.header }}</span>
-          <div class="flex-1" />
-          <template v-if="canStage">
-            <button
-              v-if="canDiscard"
-              type="button" :disabled="busy"
-              class="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-danger/90 hover:bg-danger/10 disabled:opacity-40"
-              @click="applyHunk(hi, 'discard')"
-            >
-              <Undo2 :size="12" />Discard hunk
-            </button>
-            <button
-              type="button" :disabled="busy"
-              class="flex shrink-0 items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
-              @click="applyHunk(hi, tgt.source === 'staged' ? 'unstage' : 'stage')"
-            >
-              <component :is="tgt.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} hunk
-            </button>
-          </template>
-        </div>
-
-        <template v-if="ui.diffMode === 'unified'">
-          <div
-            v-for="(l, li) in hunk.lines" :key="li"
-            :data-row="rowIndex(hi, li)"
-            class="flex" :data-kind="l.kind" :class="[ui.diffOptions.wrap ? '' : 'min-w-max', lineClass(l, selected.has(key(hi, li))), focused !== null && l.newNo === focused ? 'ring-1 ring-accent-2 ring-inset' : '']"
-            :data-new="l.newNo" :data-near="l.oldNo"
-          >
-            <span
-              class="w-12 shrink-0 pr-2 text-right text-faint select-none"
-              :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
-              :title="canStage && l.kind !== 'context' ? 'Click to select line (shift-click for range)' : undefined"
-              @click="toggleLine($event, hi, li, l)"
-            >{{ l.oldNo ?? '' }}</span>
-            <span
-              class="w-12 shrink-0 pr-2 text-right text-faint select-none"
-              :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
-              @click="toggleLine($event, hi, li, l)"
-            >{{ l.newNo ?? '' }}</span>
-            <span class="w-5 shrink-0 text-center select-none" :class="signColor(l)">{{ sign(l) }}</span>
-            <!-- eslint-disable-next-line vue/no-v-html -->
-            <span class="pr-6 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'whitespace-pre'" v-html="lineHtml(hi, li) || ' '" />
-          </div>
-        </template>
-
-        <template v-else>
-          <div v-for="(row, ri) in splitRows[hi]" :key="ri" class="grid grid-cols-2" :data-row="rowIndex(hi, ri)">
-            <div
-              v-for="side in (['left', 'right'] as const)" :key="side"
-              class="flex min-w-0 overflow-hidden"
-              :data-kind="row[side]?.kind"
-              :data-new="side === 'right' ? row.right?.newNo : undefined"
-              :data-near="side === 'left' ? row.left?.oldNo : undefined"
-              :class="[row[side] ? lineClass(row[side]!, selected.has(key(hi, row[side]!.index))) : 'bg-surface/40', side === 'left' ? 'border-r border-line' : '']"
-            >
-              <template v-if="row[side]">
-                <span
-                  class="w-12 shrink-0 pr-2 text-right text-faint select-none"
-                  :class="canStage && row[side]!.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
-                  @click="toggleLine($event, hi, row[side]!.index, row[side]!)"
-                >{{ side === 'left' ? row[side]!.oldNo : row[side]!.newNo }}</span>
-                <span class="w-5 shrink-0 text-center select-none" :class="signColor(row[side]!)">{{ sign(row[side]!) }}</span>
-                <!-- eslint-disable-next-line vue/no-v-html -->
-                <span class="pr-4 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'truncate whitespace-pre'" v-html="lineHtml(hi, row[side]!.index) || ' '" />
+      <div class="relative" :style="{ height: `${virtualizer.getTotalSize()}px`, width: unifiedWidth }">
+        <div
+          v-for="v in virtualizer.getVirtualItems()" :key="v.index"
+          :ref="measureRow" :data-index="v.index"
+          class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${v.start}px)` }"
+        >
+          <template v-for="it in [items[v.index]]" :key="v.index">
+            <div v-if="it.ri === -1" :class="it.hi > 0 ? 'pt-3' : ''">
+            <div class="flex h-[30px] items-center gap-2 border-y border-line bg-surface-2 px-3 py-1 text-[12px] text-accent/80">
+              <span class="min-w-0 truncate">{{ hunks[it.hi].header }}</span>
+              <div class="flex-1" />
+              <template v-if="canStage">
+                <button
+                  v-if="canDiscard"
+                  type="button" :disabled="busy"
+                  class="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-danger/90 hover:bg-danger/10 disabled:opacity-40"
+                  @click="applyHunk(it.hi, 'discard')"
+                >
+                  <Undo2 :size="12" />Discard hunk
+                </button>
+                <button
+                  type="button" :disabled="busy"
+                  class="flex shrink-0 items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
+                  @click="applyHunk(it.hi, tgt.source === 'staged' ? 'unstage' : 'stage')"
+                >
+                  <component :is="tgt.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} hunk
+                </button>
               </template>
             </div>
-          </div>
-        </template>
+            </div>
+
+            <div
+              v-else-if="ui.diffMode === 'unified'"
+              v-for="l in [hunks[it.hi].lines[it.ri]]" :key="'u'"
+              :data-row="v.index"
+              class="flex" :data-kind="l.kind" :class="[lineClass(l, selected.has(key(it.hi, it.ri))), focused !== null && l.newNo === focused ? 'ring-1 ring-accent-2 ring-inset' : '']"
+            >
+              <span
+                class="w-12 shrink-0 pr-2 text-right text-faint select-none"
+                :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
+                :title="canStage && l.kind !== 'context' ? 'Click to select line (shift-click for range)' : undefined"
+                @click="toggleLine($event, it.hi, it.ri, l)"
+              >{{ l.oldNo ?? '' }}</span>
+              <span
+                class="w-12 shrink-0 pr-2 text-right text-faint select-none"
+                :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
+                @click="toggleLine($event, it.hi, it.ri, l)"
+              >{{ l.newNo ?? '' }}</span>
+              <span class="w-5 shrink-0 text-center select-none" :class="signColor(l)">{{ sign(l) }}</span>
+              <!-- eslint-disable-next-line vue/no-v-html -->
+              <span class="pr-6 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'whitespace-pre'" v-html="lineHtml(it.hi, it.ri) || ' '" />
+            </div>
+
+            <div
+              v-else
+              v-for="row in [splitRows[it.hi][it.ri]]" :key="'s'"
+              class="grid grid-cols-2" :class="ui.diffOptions.wrap ? '' : 'h-[22px]'" :data-row="v.index"
+            >
+              <div
+                v-for="side in (['left', 'right'] as const)" :key="side"
+                class="flex min-w-0 overflow-hidden"
+                :data-kind="row[side]?.kind"
+                :class="[row[side] ? lineClass(row[side]!, selected.has(key(it.hi, row[side]!.index))) : 'bg-surface/40', side === 'left' ? 'border-r border-line' : '']"
+              >
+                <template v-for="cell in [row[side]]" :key="side">
+                  <template v-if="cell">
+                    <span
+                      class="relative z-[1] w-12 shrink-0 bg-inherit pr-2 text-right text-faint select-none"
+                      :class="canStage && cell.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
+                      @click="toggleLine($event, it.hi, cell.index, cell)"
+                    >{{ side === 'left' ? cell.oldNo : cell.newNo }}</span>
+                    <span class="relative z-[1] w-5 shrink-0 bg-inherit text-center select-none" :class="signColor(cell)">{{ sign(cell) }}</span>
+                    <!-- eslint-disable-next-line vue/no-v-html -->
+                    <span v-if="ui.diffOptions.wrap" class="min-w-0 break-all whitespace-pre-wrap pr-4 text-fg select-text" v-html="lineHtml(it.hi, cell.index) || ' '" />
+                    <!-- eslint-disable-next-line vue/no-v-html -->
+                    <span v-else class="min-w-0 flex-1 overflow-hidden"><span class="split-code inline-block pr-6 whitespace-pre text-fg select-text" v-html="lineHtml(it.hi, cell.index) || ' '" /></span>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
       <div v-if="canStage && hunks.length" class="px-3 pb-4 font-sans text-[12px] text-faint">
         Tip: click a line number to select lines (shift-click for a range), then {{ stageVerb.toLowerCase() }} only those lines.
@@ -508,6 +606,12 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         @click="jumpToBlock(i)"
       />
     </div>
+    <div
+      v-if="splitSideways && maxSplitX > 0"
+      ref="hbar"
+      class="absolute right-3 bottom-0 left-0 z-20 h-3 overflow-x-auto overflow-y-hidden"
+      @scroll="setSplitX(($event.target as HTMLElement).scrollLeft)"
+    ><div class="h-px" :style="{ width: `calc(100% + ${maxSplitX}px)` }" /></div>
     </div>
   </div>
     </div>

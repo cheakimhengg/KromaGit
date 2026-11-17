@@ -70,7 +70,7 @@ export const useUpdatesStore = defineStore('updates', () => {
       if (pending) {
         latest.value = pending.version
         status.value = 'available'
-        if (!opts.silent) void promptInstall()
+        promptInstall()
       } else {
         latest.value = current
         status.value = 'upToDate'
@@ -87,15 +87,19 @@ export const useUpdatesStore = defineStore('updates', () => {
     return status.value
   }
 
-  async function promptInstall() {
+  let availableToast: number | null = null
+  /** A message that stays until closed: "KromaGit X is available" with an Update now button. */
+  function promptInstall() {
     if (!pending) return
     const ui = useUiStore()
-    const ok = await ui.confirm({
-      title: `Update to KromaGit ${pending.version}?`,
-      message: `You have ${current}. KromaGit downloads the update and restarts, with your tabs right where you left them.`,
-      confirmLabel: 'Update and restart',
+    if (availableToast !== null) ui.dismissToast(availableToast)
+    availableToast = ui.toast({
+      kind: 'info',
+      title: `KromaGit ${pending.version} is available`,
+      detail: 'Download and restart to update.',
+      sticky: true,
+      action: { label: 'Update now', run: () => void install() },
     })
-    if (ok) await install()
   }
 
   async function install() {

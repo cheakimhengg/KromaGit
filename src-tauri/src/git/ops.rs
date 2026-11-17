@@ -39,7 +39,7 @@ pub enum Action {
     Fetch { remote: Option<String> },
     Pull { mode: String },
     Push { remote: Option<String>, branch: Option<String>, set_upstream: bool, force: bool },
-    Merge { target: String },
+    Merge { target: String, #[serde(default)] mode: Option<String> },
     Rebase { onto: String },
     CherryPick { hash: String },
     Revert { hash: String },
@@ -368,7 +368,16 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             }
             network(git, &args)?
         }
-        Merge { target } => Out { data: None, text: text(git.run(&["merge", "--no-edit", target])?) },
+        Merge { target, mode } => {
+            let mut args = vec!["merge", "--no-edit"];
+            match mode.as_deref() {
+                Some("noFf") => args.push("--no-ff"),
+                Some("ffOnly") => args.push("--ff-only"),
+                _ => {}
+            }
+            args.push(target);
+            Out { data: None, text: text(git.run(&args)?) }
+        }
         Rebase { onto } => Out { data: None, text: text(git.run(&["rebase", onto])?) },
         CherryPick { hash } => {
             let mut args = vec!["cherry-pick"];
