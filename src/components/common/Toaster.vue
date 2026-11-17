@@ -8,7 +8,7 @@ const colors = { info: 'text-accent', success: 'text-success', error: 'text-dang
 </script>
 
 <template>
-  <div class="pointer-events-none fixed bottom-10 left-4 z-50 flex w-80 flex-col gap-2">
+  <div class="pointer-events-none fixed bottom-10 left-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-start gap-2">
     <TransitionGroup
       enter-from-class="translate-y-2 opacity-0"
       leave-to-class="opacity-0"
@@ -18,7 +18,8 @@ const colors = { info: 'text-accent', success: 'text-success', error: 'text-dang
       <div
         v-for="t in ui.toasts"
         :key="t.id"
-        class="pointer-events-auto flex items-start gap-2 rounded-lg border border-line-strong bg-surface-2 p-3 shadow-xl shadow-black/40"
+        class="pointer-events-auto flex w-max max-w-[min(560px,100%)] min-w-[260px] items-start gap-2.5 rounded-lg border border-line-strong bg-surface-2 px-4 py-3 shadow-xl shadow-black/40"
+        :class="t.action ? 'items-center' : ''"
       >
         <component :is="icons[t.kind]" :size="18" class="mt-0.5 shrink-0" :class="colors[t.kind]" />
         <div class="min-w-0 flex-1">
@@ -27,7 +28,7 @@ const colors = { info: 'text-accent', success: 'text-success', error: 'text-dang
         </div>
         <button
           v-if="t.action" type="button"
-          class="shrink-0 self-center rounded-md bg-fg px-3 py-1.5 text-[12px] font-semibold text-bg hover:opacity-90"
+          class="ml-3 shrink-0 self-center rounded-md bg-fg px-2.5 py-1 text-[11.5px] font-semibold leading-4 text-bg hover:opacity-90"
           @click="t.action.run(); ui.dismissToast(t.id)"
         >{{ t.action.label }}</button>
         <button type="button" class="shrink-0 text-faint hover:text-fg" aria-label="Close" @click="ui.dismissToast(t.id)"><X :size="16" /></button>
