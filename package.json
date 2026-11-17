@@ -1,7 +1,7 @@
 {
   "name": "kromagit",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Local-first Git desktop client with optional AI (Ollama or your own API key)",
   "license": "MIT",
   "author": "Chea KimHeng",
