@@ -26,6 +26,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
 import { useUpdatesStore } from '@/stores/updates'
+import { hideSplash } from '@/lib/splash'
 import CommandPalette from '@/components/common/CommandPalette.vue'
 import RepoSwitcher from '@/components/common/RepoSwitcher.vue'
 import { useCommands } from '@/commands/registry'
@@ -106,6 +107,14 @@ function onFocus() {
   lastFocusRefresh = now
   void repos.softRefresh()
 }
+
+const appReady = computed(() => {
+  if (!settings.loaded) return false
+  const r = repos.active
+  return ui.home || !r || r.loaded || !!r.error
+})
+watch(appReady, (ready) => ready && hideSplash(), { immediate: true })
+setTimeout(hideSplash, 5000)
 
 onMounted(() => {
   void settings.load()

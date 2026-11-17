@@ -46,6 +46,7 @@ const MAP = {
   CheckCircle2: 'checkmark-circle-02',
   ChevronDown: 'arrow-down-01',
   ChevronRight: 'arrow-right-01',
+  ChevronLeft: 'arrow-left-01',
   ChevronsDownUp: 'list-collapse',
   ChevronsUpDown: 'unfold-more',
   Clock: 'clock-01',

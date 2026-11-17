@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { clone } from '@/lib/clone'
 import {
   AppWindow, CalendarClock, Check, CloudDownload, FolderGit2, Keyboard, KeyRound, Loader2, Monitor, Moon, Palette, RefreshCw, Search, ShieldCheck, Sparkles, Sun, X,
@@ -176,6 +176,14 @@ async function save() {
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && !ui.dialog) ui.settingsOpen = false
 }
+function onWindowEscape(e: KeyboardEvent) {
+  if (e.key !== 'Escape' || !ui.settingsOpen || ui.dialog || ui.menu) return
+  e.preventDefault()
+  e.stopPropagation()
+  ui.settingsOpen = false
+}
+onMounted(() => window.addEventListener('keydown', onWindowEscape, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowEscape, true))
 </script>
 
 <template>

@@ -19,8 +19,58 @@
   </script>
   <link rel="icon" type="image/png" href="assets/favicon.png" />
   <link rel="stylesheet" href="styles.css" />
+  <style>
+      #kg-splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--kg-splash-bg, #121419); transition: opacity .35s ease, visibility .35s; }
+      #kg-splash.kg-done { opacity: 0; visibility: hidden; pointer-events: none; }
+      .kg-splash-box { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+      .kg-splash-k { width: 76px; height: auto; overflow: visible; filter: drop-shadow(0 10px 28px rgba(124, 156, 255, .35)); animation: kg-breathe 1.6s ease-in-out 1.15s infinite; }
+      .kg-l { stroke-dasharray: 1; stroke-dashoffset: 1; animation: kg-draw .55s cubic-bezier(.6, 0, .2, 1) forwards; }
+      .kg-l1 { animation-delay: .05s; }
+      .kg-l2 { animation-delay: .35s; }
+      .kg-l3 { animation-delay: .55s; }
+      .kg-n { transform-box: fill-box; transform-origin: center; transform: scale(0); animation: kg-pop .4s cubic-bezier(.3, 1.6, .5, 1) forwards; }
+      .kg-n1 { animation-delay: .1s; }
+      .kg-n2 { animation-delay: .45s; }
+      .kg-n3 { animation-delay: .75s; }
+      .kg-n4 { animation-delay: .9s; }
+      .kg-splash-bar { width: 72px; height: 3px; border-radius: 3px; overflow: hidden; background: rgba(127, 135, 160, .18); }
+      .kg-splash-bar::after { content: ''; display: block; width: 40%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7c9cff, #b47cff, #f472b6); animation: kg-slide 1.1s ease-in-out infinite; }
+      @keyframes kg-draw { to { stroke-dashoffset: 0; } }
+      @keyframes kg-pop { to { transform: scale(1); } }
+      @keyframes kg-breathe { 50% { transform: scale(1.06); filter: drop-shadow(0 12px 34px rgba(180, 124, 255, .5)); } }
+      @keyframes kg-slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+      @media (prefers-reduced-motion: reduce) {
+        .kg-l, .kg-n, .kg-splash-k, .kg-splash-bar::after { animation: none; stroke-dashoffset: 0; transform: none; }
+      }
+    :root[data-theme='light'] { --kg-splash-bg: #f6f7f9; }
+    :root[data-theme='dark'] { --kg-splash-bg: #121419; }
+  </style>
 </head>
 <body>
+  <div id="kg-splash" role="status" aria-label="Loading KromaGit">
+      <div class="kg-splash-box">
+      <svg class="kg-splash-k" viewBox="250 150 550 724" aria-hidden="true">
+        <defs>
+          <linearGradient id="kg-splash-grad" gradientUnits="userSpaceOnUse" x1="300" y1="220" x2="740" y2="820"><stop offset="0" stop-color="#7c9cff" /><stop offset=".5" stop-color="#b47cff" /><stop offset="1" stop-color="#f472b6" /></linearGradient>
+          <mask id="kg-splash-holes" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><rect width="1024" height="1024" fill="#fff" /><circle cx="360" cy="260" r="42" /><circle cx="690" cy="300" r="42" /><circle cx="690" cy="764" r="42" /><circle cx="360" cy="764" r="42" /></mask>
+        </defs>
+        <g mask="url(#kg-splash-holes)">
+          <g fill="none" stroke="url(#kg-splash-grad)" stroke-width="84" stroke-linecap="round" stroke-linejoin="round">
+            <path class="kg-l kg-l1" pathLength="1" d="M360 260V764" />
+            <path class="kg-l kg-l2" pathLength="1" d="M360 590C360 470 470 430 560 384L690 310" />
+            <path class="kg-l kg-l3" pathLength="1" d="M478 482L630 616C672 652 690 700 690 764" />
+          </g>
+          <g fill="url(#kg-splash-grad)">
+            <circle class="kg-n kg-n1" cx="360" cy="260" r="80" />
+            <circle class="kg-n kg-n2" cx="360" cy="764" r="80" />
+            <circle class="kg-n kg-n3" cx="690" cy="300" r="80" />
+            <circle class="kg-n kg-n4" cx="690" cy="764" r="80" />
+          </g>
+        </g>
+      </svg>
+        <div class="kg-splash-bar"></div>
+      </div>
+    </div>
   <a class="skip" href="#main">Skip to content</a>
 
   <header class="nav">
@@ -370,6 +420,20 @@
 
   <script>
     (() => {
+      const splash = document.getElementById('kg-splash')
+      const started = performance.now()
+      let seen = false
+      try { seen = sessionStorage.getItem('kromagit-site-splash') === '1'; sessionStorage.setItem('kromagit-site-splash', '1') } catch {}
+      const hide = () => { splash.classList.add('kg-done'); setTimeout(() => splash.remove(), 400) }
+      if (seen) hide()
+      else {
+        const done = () => setTimeout(hide, Math.max(0, 1150 - (performance.now() - started)))
+        if (document.readyState === 'complete') done()
+        else addEventListener('load', done, { once: true })
+        setTimeout(hide, 3000)
+      }
+    })()
+    ;(() => {
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
       const io = new IntersectionObserver((entries) => entries.forEach((e) => {
         if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) }

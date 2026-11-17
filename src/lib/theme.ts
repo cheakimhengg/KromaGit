@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { AccentId, ThemeId, ThemePref } from '@/types/ai'
+import { rememberSplashTheme } from '@/lib/splash'
 
 export type ResolvedTheme = 'dark' | 'light'
 
@@ -62,6 +63,7 @@ function paint(pref: ThemePref) {
   root.classList.toggle('light', kind === 'light')
   root.classList.toggle('dark', kind === 'dark')
   root.dataset.theme = palette
+  rememberSplashTheme(kind)
 }
 
 export function applyTheme(pref: ThemePref) {

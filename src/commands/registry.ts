@@ -6,7 +6,7 @@
 import { computed } from 'vue'
 import type { Component } from 'vue'
 import {
-  Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, Brush, CalendarClock, Check, CloudDownload, Code2, FolderOpen, FolderSearch, GitBranch, GitBranchPlus, GitCommitHorizontal, House, Layers, LayoutList, Minus, Moon, PanelLeft, Plus, Redo2, RefreshCw, ScanSearch, Search, Settings, Sparkles, Split, Tag, Terminal, Undo2, X, ZoomIn, ZoomOut,
+  Archive, ArchiveRestore, ArrowDownToLine, ChevronLeft, ChevronRight, ArrowUpFromLine, Brush, CalendarClock, Check, CloudDownload, Code2, FolderOpen, FolderSearch, GitBranch, GitBranchPlus, GitCommitHorizontal, House, Layers, LayoutList, Minus, Moon, PanelLeft, Plus, Redo2, RefreshCw, ScanSearch, Search, Settings, Sparkles, Split, Tag, Terminal, Undo2, X, ZoomIn, ZoomOut,
 } from '@/lib/icons'
 import * as git from '@/actions/git'
 import { useAiStore } from '@/stores/ai'
@@ -64,8 +64,8 @@ export function useCommands() {
     { id: 'switch-repo', title: 'Switch repository…', group: 'Repository', icon: FolderSearch, keywords: 'recent project open quick', shortcut: 'Mod+P', global: true, run: () => (ui.switcherOpen = true) },
     { id: 'home', title: 'Home', group: 'Repository', icon: House, keywords: 'welcome start recent', shortcut: 'Mod+Shift+H', global: true, run: () => (ui.home = !!repos.activeTab && !ui.home) },
     { id: 'close-tab', title: 'Close tab', group: 'Repository', icon: X, shortcut: 'Mod+W', global: true, enabled: () => hasRepo() && !ui.home, run: () => repos.closeTab(repos.activeTabId) },
-    { id: 'next-tab', title: 'Next tab', group: 'Repository', shortcut: 'Mod+Shift+]', global: true, run: () => cycleTab(1) },
-    { id: 'prev-tab', title: 'Previous tab', group: 'Repository', shortcut: 'Mod+Shift+[', global: true, run: () => cycleTab(-1) },
+    { id: 'next-tab', title: 'Next tab', group: 'Repository', icon: ChevronRight, shortcut: 'Mod+Shift+]', global: true, run: () => cycleTab(1) },
+    { id: 'prev-tab', title: 'Previous tab', group: 'Repository', icon: ChevronLeft, shortcut: 'Mod+Shift+[', global: true, run: () => cycleTab(-1) },
     { id: 'new-group', title: 'New tab group…', group: 'Repository', icon: Layers, enabled: hasRepo, run: () => repos.promptNewGroup(repos.activeTabId) },
     { id: 'refresh', title: 'Refresh', group: 'Repository', icon: RefreshCw, shortcut: 'Mod+R', global: true, enabled: idle, run: () => repos.load(repos.activeTabId) },
     { id: 'terminal', title: 'Toggle terminal', group: 'Repository', icon: Terminal, keywords: 'shell console command line', shortcut: 'Ctrl+`', global: true, enabled: hasRepo, run: () => (ui.terminalOpen = !ui.terminalOpen) },

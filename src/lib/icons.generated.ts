@@ -165,6 +165,11 @@ export const ICONS: Record<string, { body: string; w: number; h: number }> = {
   "w": 24,
   "h": 24
  },
+ "ChevronLeft": {
+  "body": "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.5\" d=\"M15 6s-6 4.419-6 6s6 6 6 6\"/>",
+  "w": 24,
+  "h": 24
+ },
  "ChevronsDownUp": {
   "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"1.5\"><path d=\"M9.996 4h11m-11 8h11m-11 8h11\"/><path stroke-linejoin=\"round\" d=\"m2.996 4.5l3 3l-3 3m0 3l3 3l-3 3\"/></g>",
   "w": 24,

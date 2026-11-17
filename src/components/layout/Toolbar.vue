@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import BranchPicker from './BranchPicker.vue'
+import { computed, ref } from 'vue'
 import {
-  Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, Check, ChevronDown, CloudDownload, Code2, GitBranch,
+  Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, ChevronDown, CloudDownload, Code2, GitBranch,
   Command, GitBranchPlus, PanelLeft, Redo2, RefreshCw, Settings, Tag, Terminal, Undo2, CalendarClock, Brush,
 } from '@/lib/icons'
 import ToolButton from '@/components/common/ToolButton.vue'
 import RepoMenu from './RepoMenu.vue'
 import { useReposStore } from '@/stores/repos'
 import { useOpsStore } from '@/stores/ops'
-import { useUiStore, type MenuItem } from '@/stores/ui'
+import { useUiStore } from '@/stores/ui'
 import * as git from '@/actions/git'
 import { formatCombo } from '@/lib/shortcuts'
 
@@ -21,17 +22,8 @@ const hasRemote = computed(() => (snapshot.value?.remotes.length ?? 0) > 0)
 const ahead = computed(() => snapshot.value?.head.ahead ?? 0)
 const behind = computed(() => snapshot.value?.head.behind ?? 0)
 
-function branchMenu(e: MouseEvent) {
-  if (!snapshot.value) return
-  const items: MenuItem[] = snapshot.value.branches.map((b) => ({
-    label: b.name,
-    icon: b.current ? Check : GitBranch,
-    action: () => !b.current && git.checkout(b.name),
-  }))
-  if (!items.length) items.push({ label: 'No local branches' })
-  items.push({ separator: true }, { label: 'New branch…', icon: GitBranchPlus, action: () => git.createBranch() })
-  ui.openMenuBelow(e.currentTarget as Element, items)
-}
+const branchPickerOpen = ref(false)
+const branchButton = ref<HTMLElement | null>(null)
 
 function pullMenu(e: MouseEvent) {
   ui.openMenuBelow((e.currentTarget as Element).parentElement!, [
@@ -64,9 +56,10 @@ function pushMenu(e: MouseEvent) {
       <button
         type="button"
         class="ml-1 flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-accent/15 px-2.5 text-[13px] font-medium text-accent hover:bg-accent/25 disabled:opacity-50"
+        ref="branchButton"
         title="Switch branch"
         :disabled="busy"
-        @click="branchMenu"
+        @click="branchPickerOpen = !branchPickerOpen"
       >
         <GitBranch :size="14" class="shrink-0" />
         <span class="max-w-[180px] truncate">{{ snapshot.currentBranch }}</span>
@@ -115,6 +108,7 @@ function pushMenu(e: MouseEvent) {
       <ToolButton :icon="RefreshCw" :title="`Refresh (${formatCombo('Mod+R')})`" :loading="repos.busy" :disabled="busy" @click="repos.load(repos.activeTabId)" />
     </div>
     <ToolButton :icon="Settings" :title="`Settings (${formatCombo('Mod+,')})`" @click="ui.settingsOpen = true" />
+    <BranchPicker v-model="branchPickerOpen" :anchor="branchButton" />
   </div>
 </template>
 
