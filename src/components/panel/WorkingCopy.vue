@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Check, FolderTree, List, Loader2, Minus, Pencil, Plus, Split, Trash2, Undo2 } from '@/lib/icons'
+import { AlertTriangle, Check, FolderTree, List, Loader2, Minus, Pencil, Plus, Split, Trash2, Undo2 } from '@/lib/icons'
 import { useAiStore } from '@/stores/ai'
 import FileList from './FileList.vue'
 import CommitBox from './CommitBox.vue'
@@ -19,6 +19,8 @@ const repos = useReposStore()
 const ui = useUiStore()
 
 const wc = computed(() => repos.active?.snapshot.workingCopy ?? { staged: [], unstaged: [] })
+const conflicts = computed(() => wc.value.unstaged.filter((f) => f.status === 'U'))
+const changes = computed(() => wc.value.unstaged.filter((f) => f.status !== 'U'))
 const loading = computed(() => !!repos.active?.loading.status)
 const amending = ref(false)
 const hasHead = computed(() => !!repos.active?.snapshot.head.oid)
@@ -27,6 +29,10 @@ const showClean = computed(() => clean.value && !amending.value)
 const activePath = (source: 'staged' | 'unstaged') => (ui.centerView === 'diff' && ui.diffSource === source ? ui.diffPath : null)
 
 function open(file: FileChange, staged: boolean, toggle = true) {
+  if (file.status === 'U') {
+    ui.conflictPath = file.path
+    return
+  }
   ui.selectCommit(null)
   ;(toggle ? ui.toggleDiff : ui.openDiff)({ path: file.path, oldPath: file.oldPath, source: staged ? 'staged' : 'unstaged', untracked: file.status === '?' })
 }
@@ -85,10 +91,37 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
     </div>
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
-      <div class="flex min-h-0 flex-1 flex-col">
+      <div v-if="conflicts.length" class="shrink-0 border-b border-line pb-2">
+        <div class="flex h-9 items-center gap-2 px-3">
+          <AlertTriangle :size="14" class="text-danger" />
+          <span class="text-[13px] font-semibold text-danger">Conflicts</span>
+          <CountBadge :count="conflicts.length" />
+          <div class="flex-1" />
+          <button type="button" class="rounded px-1.5 py-0.5 text-[12px] font-medium text-danger hover:bg-danger/10" @click="ui.conflictPath = conflicts[0].path">Resolve</button>
+        </div>
+        <p class="px-3 pb-1.5 text-[12px] text-faint">Resolve each file, then {{ repos.active?.snapshot.operation === 'merge' ? 'commit to finish the merge' : 'continue' }}.</p>
+        <button
+          v-for="f in conflicts" :key="f.path" type="button"
+          class="group flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-danger/10"
+          :title="`Resolve ${f.path}`"
+          @click="ui.conflictPath = f.path"
+        >
+          <span class="grid h-4 w-4 shrink-0 place-items-center rounded bg-danger/20 text-[10px] font-bold text-danger">!</span>
+          <span class="min-w-0 flex-1 truncate text-fg">{{ f.path.split('/').pop() }} <span class="text-faint">{{ f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : '' }}</span></span>
+          <span class="shrink-0 text-[12px] font-medium text-danger opacity-70 group-hover:opacity-100">Resolve</span>
+        </button>
+      </div>
+      <div v-if="!changes.length && !loading" class="shrink-0 pb-2">
+        <div class="flex h-9 items-center gap-2 px-3">
+          <span class="text-[13px] font-semibold text-fg">Changes</span>
+          <CountBadge :count="0" />
+        </div>
+        <p class="px-3 text-[12px] text-faint">Working tree clean.</p>
+      </div>
+      <div v-else class="flex min-h-0 flex-1 flex-col">
         <div class="flex h-9 shrink-0 items-center gap-2 px-3">
           <span class="text-[13px] font-semibold text-fg">Changes</span>
-          <CountBadge :count="wc.unstaged.length" />
+          <CountBadge :count="changes.length" />
           <div class="flex-1" />
           <button
             type="button" :disabled="!wc.unstaged.length || !!ops.running"
@@ -103,7 +136,7 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
         </div>
         <FileList
           class="min-h-0 flex-1"
-          :files="wc.unstaged" :mode="ui.fileViewMode" :checked="false" :active-path="activePath('unstaged')"
+          :files="changes" :mode="ui.fileViewMode" :checked="false" :active-path="activePath('unstaged')"
           @open="(f) => open(f, false)" @toggle="(f) => git.stage([f])" @menu="(e, f) => fileMenu(e, f, false)"
         >
           <template #empty><div v-if="!loading" class="px-3 py-2 text-[12px] text-faint italic">No unstaged changes</div></template>
@@ -115,6 +148,12 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
           <span class="text-[13px] font-semibold text-fg">Staged</span>
           <CountBadge :count="wc.staged.length" />
           <div class="flex-1" />
+          <button
+            type="button" :disabled="!wc.staged.length || !!ops.running || !hasHead"
+            class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-30"
+            title="Throw away the staged changes (back to the last commit)"
+            @click="git.discardStaged()"
+          ><Trash2 :size="12" />Discard all</button>
           <button
             type="button" :disabled="!wc.staged.length || !!ops.running"
             class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-muted hover:bg-hover hover:text-fg disabled:opacity-30"

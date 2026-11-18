@@ -304,3 +304,162 @@ fn diff_can_ignore_whitespace_and_show_the_whole_file() {
     assert_eq!(full.hunks.len(), 1);
     assert_eq!(full.hunks[0].lines.len(), 22, "every line of the file is shown");
 }
+
+#[test]
+fn conflicted_file_shows_the_conflict_markers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "f.txt", "a\nb\nc\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "base"]);
+    sh(d, &["checkout", "-qb", "other"]);
+    write(d, "f.txt", "a\nX\nc\n");
+    sh(d, &["commit", "-qam", "x"]);
+    sh(d, &["checkout", "-q", "main"]);
+    write(d, "f.txt", "a\nY\nc\n");
+    sh(d, &["commit", "-qam", "y"]);
+    let _ = std::process::Command::new("git").args(["merge", "other"]).current_dir(d).output();
+
+    let diff = git::diff::get_file_diff(&Git::new(d), &req("f.txt", "unstaged", false, None, None)).unwrap();
+    let added: Vec<_> = diff.hunks.iter().flat_map(|h| &h.lines).filter(|l| l.kind == "add").map(|l| l.text.as_str()).collect();
+    assert!(added.iter().any(|t| t.starts_with("<<<<<<<")), "{added:?}");
+    assert!(added.contains(&"=======") && added.contains(&"X"), "{added:?}");
+}
+
+#[test]
+fn reads_and_writes_a_conflicted_file_safely() {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "f.txt", "a\nb\nc\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "base"]);
+    sh(d, &["checkout", "-qb", "other"]);
+    write(d, "f.txt", "a\nX\nc\n");
+    sh(d, &["commit", "-qam", "x"]);
+    sh(d, &["checkout", "-q", "main"]);
+    write(d, "f.txt", "a\nY\nc\n");
+    sh(d, &["commit", "-qam", "y"]);
+    let _ = std::process::Command::new("git").args(["merge", "other"]).current_dir(d).output();
+
+    let g = Git::new(d);
+    let c = git::conflict::read(&g, "f.txt").unwrap();
+    assert_eq!(c.ours, "main");
+    assert_eq!(c.theirs, "other");
+    assert!(c.text.contains("<<<<<<< HEAD"));
+    git::conflict::write(&g, "f.txt", "a\nX\nY\nc\n").unwrap();
+    assert_eq!(std::fs::read_to_string(d.join("f.txt")).unwrap(), "a\nX\nY\nc\n");
+    assert!(git::conflict::read(&g, "../outside.txt").is_err());
+    assert!(git::conflict::write(&g, "/etc/hosts", "x").is_err());
+}
+
+#[test]
+fn discard_staged_returns_files_to_the_last_commit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "a.txt", "one\n");
+    write(d, "r.txt", "move me\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "base"]);
+    write(d, "a.txt", "changed\n");
+    write(d, "new.txt", "brand new\n");
+    sh(d, &["mv", "r.txt", "moved.txt"]);
+    sh(d, &["add", "-A"]);
+
+    let g = Git::new(d);
+    let paths = ["a.txt", "new.txt", "moved.txt", "r.txt"].map(String::from).to_vec();
+    let out = git::ops::run_action(&g, &git::ops::Action::DiscardStaged { paths }).unwrap();
+    assert!(out.data.is_some(), "a backup stash is kept for undo");
+    assert_eq!(std::fs::read_to_string(d.join("a.txt")).unwrap(), "one\n");
+    assert!(!d.join("new.txt").exists());
+    assert!(!d.join("moved.txt").exists());
+    assert!(d.join("r.txt").exists());
+    assert_eq!(sh_out(d, &["status", "--porcelain"]).trim(), "");
+}
+
+#[test]
+fn discarding_everything_staged_ends_a_merge() {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "f.txt", "a\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "base"]);
+    sh(d, &["checkout", "-qb", "other"]);
+    write(d, "g.txt", "new\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "g"]);
+    sh(d, &["checkout", "-q", "main"]);
+    write(d, "f.txt", "b\n");
+    sh(d, &["commit", "-qam", "b"]);
+    sh(d, &["merge", "--no-commit", "--no-ff", "other"]);
+
+    let g = Git::new(d);
+    assert_eq!(git::ops::operation_in_progress(&g).unwrap(), Some("merge"));
+    git::ops::run_action(&g, &git::ops::Action::DiscardStaged { paths: vec!["g.txt".into()] }).unwrap();
+    assert_eq!(git::ops::operation_in_progress(&g).unwrap(), None);
+    sh(d, &["switch", "-q", "other"]);
+}
+
+#[test]
+fn staging_buttons_keep_a_conflicted_merge_intact() {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "f.txt", "a\nb\nc\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "base"]);
+    sh(d, &["checkout", "-qb", "other"]);
+    write(d, "f.txt", "a\nX\nc\n");
+    write(d, "g.txt", "from other\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "x"]);
+    sh(d, &["checkout", "-q", "main"]);
+    write(d, "f.txt", "a\nY\nc\n");
+    sh(d, &["commit", "-qam", "y"]);
+    let _ = std::process::Command::new("git").args(["merge", "other"]).current_dir(d).output();
+
+    use git::ops::{operation_in_progress, run_action, Action};
+    let g = Git::new(d);
+    let unmerged = || sh_out(d, &["diff", "--name-only", "--diff-filter=U"]).trim().to_string();
+    assert_eq!(unmerged(), "f.txt");
+
+    run_action(&g, &Action::UnstageAll).unwrap();
+    assert_eq!(operation_in_progress(&g).unwrap(), Some("merge"), "unstage all must not cancel the merge");
+    assert_eq!(unmerged(), "f.txt");
+
+    run_action(&g, &Action::StageAll).unwrap();
+    assert_eq!(unmerged(), "f.txt", "a file with markers is not staged by stage all");
+    assert!(sh_out(d, &["diff", "--cached", "--name-only"]).contains("g.txt"));
+    assert!(run_action(&g, &Action::Stage { paths: vec!["f.txt".into()] }).is_err());
+
+    let out = run_action(&g, &Action::DiscardStaged { paths: vec!["g.txt".into()] }).unwrap();
+    assert!(!d.join("g.txt").exists());
+    let b: serde_json::Value = serde_json::from_str(out.data.as_deref().unwrap()).unwrap();
+    assert!(b["index"].as_str().unwrap().contains("from other"));
+    assert_eq!(operation_in_progress(&g).unwrap(), Some("merge"), "a conflict is left, so the merge stays");
+}
+
+#[test]
+fn reword_changes_only_the_message_of_the_last_commit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "a.txt", "one\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "first"]);
+    write(d, "a.txt", "two\n");
+    sh(d, &["commit", "-qam", "old title"]);
+    let before = sh_out(d, &["rev-parse", "HEAD^{tree}"]);
+    write(d, "staged.txt", "keep me staged\n");
+    sh(d, &["add", "staged.txt"]);
+
+    let g = Git::new(d);
+    git::ops::run_action(&g, &git::ops::Action::RewordHead { message: "new title\n\nnew body".into() }).unwrap();
+    assert_eq!(sh_out(d, &["log", "-1", "--format=%s|%b"]).trim(), "new title|new body");
+    assert_eq!(sh_out(d, &["rev-list", "--count", "HEAD"]).trim(), "2", "no extra commit");
+    assert_eq!(sh_out(d, &["rev-parse", "HEAD^{tree}"]), before, "the files in the commit are unchanged");
+    assert_eq!(sh_out(d, &["diff", "--cached", "--name-only"]).trim(), "staged.txt");
+}

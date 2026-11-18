@@ -121,6 +121,8 @@ export const useUiStore = defineStore('ui', () => {
   const fileViewMode = ref<'list' | 'tree'>(stored('kromagit.fileViewMode', ['list', 'tree'] as const, 'list'))
   watch(fileViewMode, (v) => localStorage.setItem('kromagit.fileViewMode', v))
   const settingsOpen = ref(false)
+  /** path of the conflicted file open in the full-screen resolver */
+  const conflictPath = ref<string | null>(null)
   const paletteOpen = ref(false)
   const switcherOpen = ref(false)
   const repoMenuOpen = ref(false)
@@ -253,7 +255,7 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     sidebarCollapsed, sidebarSections, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, diffView, diffOptions, fileViewMode,
-    settingsOpen, settingsTab, paletteOpen, switcherOpen, repoMenuOpen, terminalOpen, terminalHeight, home, commitRequest, amendPending, generateRequest, searchRequest, previousView, menu, toasts, dialog,
+    settingsOpen, conflictPath, settingsTab, paletteOpen, switcherOpen, repoMenuOpen, terminalOpen, terminalHeight, home, commitRequest, amendPending, generateRequest, searchRequest, previousView, menu, toasts, dialog,
     selectCommit, openDiff, toggleDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
     openDialog, closeDialog, confirm, prompt,
   }

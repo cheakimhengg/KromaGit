@@ -9,6 +9,7 @@ import FileList from './FileList.vue'
 import { fullDate, reflowMessage, relativeTime, shortDate } from '@/lib/format'
 import { laneColor } from '@/lib/lanes'
 import { errorMessage, gitApi } from '@/api/git'
+import * as git from '@/actions/git'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore, type MenuItem } from '@/stores/ui'
 import { useAiStore } from '@/stores/ai'
@@ -114,9 +115,48 @@ function fileMenu(e: MouseEvent, f: FileChange) {
   ui.openMenu(e, items)
 }
 
+const editing = ref(false)
+const draftSubject = ref('')
+const draftBody = ref('')
+const subjectInput = ref<HTMLInputElement | null>(null)
 function editMessage() {
-  ui.selectCommit(null)
-  ui.amendPending = true
+  const d = shown.value
+  if (!d || !isHead.value) return
+  draftSubject.value = d.subject
+  draftBody.value = d.body.trim()
+  editing.value = true
+  void nextTick(() => subjectInput.value?.select())
+}
+async function saveMessage() {
+  const subject = draftSubject.value.trim()
+  if (!subject) return
+  const message = draftBody.value.trim() ? `${subject}\n\n${draftBody.value.trim()}` : subject
+  const d = shown.value
+  if (d && message === (d.body.trim() ? `${d.subject}\n\n${d.body.trim()}` : d.subject)) {
+    editing.value = false
+    return
+  }
+  const outcome = await git.rewordHead(message)
+  if (outcome) {
+    editing.value = false
+    if (outcome.after.oid) ui.selectCommit(outcome.after.oid)
+  }
+}
+watch(() => props.hash, () => (editing.value = false))
+const generating = ref(false)
+async function generateMessage() {
+  const d = shown.value
+  if (!d || generating.value) return
+  generating.value = true
+  try {
+    const msg = await ai.generateCommitMessage(d.hash)
+    if (msg) {
+      draftSubject.value = msg.summary
+      draftBody.value = msg.description
+    }
+  } finally {
+    generating.value = false
+  }
 }
 
 const explanation = computed(() => (ai.explain.hash === props.hash ? ai.explain : null))
@@ -153,8 +193,48 @@ function review() {
 
     <template v-else>
       <div class="max-h-[60%] shrink-0 overflow-y-auto border-b border-line px-4 pt-3.5 pb-3">
-        <div class="flex items-start gap-2">
-          <div class="min-w-0 flex-1 text-[15px] leading-snug font-semibold text-fg select-text">{{ shown.subject }}</div>
+        <div
+          v-if="editing"
+          class="overflow-hidden rounded-lg border border-accent bg-surface-2/60 ring-2 ring-accent/25"
+          @keydown.meta.enter.prevent="saveMessage" @keydown.ctrl.enter.prevent="saveMessage" @keydown.esc.stop.prevent="editing = false"
+        >
+          <div class="flex items-center gap-2 border-b border-line px-3">
+            <input
+              ref="subjectInput" v-model="draftSubject"
+              class="h-10 min-w-0 flex-1 bg-transparent text-[14px] font-semibold text-fg outline-none placeholder:text-faint"
+              placeholder="Summary" spellcheck="false"
+              @keydown.enter.exact.prevent="saveMessage"
+            />
+            <button
+              type="button" class="shrink-0 rounded-md p-1 text-accent-2 hover:bg-accent-2/15 disabled:opacity-40"
+              title="Write the message with AI from this commit's changes" :disabled="generating"
+              @click="generateMessage"
+            >
+              <Loader2 v-if="generating" :size="17" class="animate-spin" />
+              <Sparkles v-else :size="17" />
+            </button>
+          </div>
+          <textarea
+            v-model="draftBody" rows="4"
+            class="block w-full resize-y bg-transparent px-3 py-2 text-[13px] leading-relaxed text-fg outline-none placeholder:text-faint"
+            placeholder="Description" spellcheck="false"
+          />
+          <div class="flex items-center gap-2 border-t border-line px-3 py-2">
+            <span class="min-w-0 flex-1 text-[12px] text-faint">⌘↵ to save · Esc to cancel</span>
+            <button type="button" class="flex h-8 shrink-0 items-center rounded-md px-2.5 text-[13px] text-muted hover:bg-hover hover:text-fg" @click="editing = false">Cancel</button>
+            <button
+              type="button" :disabled="!draftSubject.trim() || generating"
+              class="flex h-8 shrink-0 items-center whitespace-nowrap rounded-md bg-accent px-3 text-[13px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
+              @click="saveMessage"
+            >Save message</button>
+          </div>
+        </div>
+        <div v-else class="flex items-start gap-2">
+          <div
+            class="min-w-0 flex-1 text-[15px] leading-snug font-semibold text-fg select-text"
+            :title="isHead ? 'Double-click to edit the message' : undefined"
+            @dblclick="editMessage"
+          >{{ shown.subject }}</div>
           <button
             v-if="isHead" type="button"
             class="-mt-0.5 shrink-0 rounded p-1 text-faint hover:bg-hover hover:text-fg"
@@ -163,8 +243,9 @@ function review() {
           ><Pencil :size="15" /></button>
         </div>
 
-        <template v-if="paragraphs.length">
+        <template v-if="paragraphs.length && !editing">
           <div
+            @dblclick="editMessage"
             class="mt-2 space-y-1.5 text-[13px] leading-relaxed break-words text-muted select-text"
             :class="{ 'line-clamp-4': longBody && !expanded }"
           >

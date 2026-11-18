@@ -71,6 +71,12 @@ export interface Submodule {
 
 export type FileStatus = 'M' | 'A' | 'D' | 'R' | '?' | 'U'
 
+export interface ConflictFile {
+  text: string
+  ours: string
+  theirs: string
+}
+
 export interface FileChange {
   path: string
   oldPath?: string
@@ -215,9 +221,11 @@ export type GitAction =
   | { type: 'unstageAll' }
   | { type: 'discard'; paths: string[]; untracked: string[] }
   | { type: 'discardAll' }
+  | { type: 'discardStaged'; paths: string[] }
   | { type: 'applySelection'; path: string; source: 'unstaged' | 'staged'; hunks: HunkSelection[]; discard: boolean }
   | { type: 'applyPatch'; patch: string; cached: boolean; reverse: boolean }
   | { type: 'commit'; message: string; amend: boolean }
+  | { type: 'rewordHead'; message: string }
   | { type: 'checkout'; branch: string }
   | { type: 'checkoutDetached'; target: string }
   | { type: 'checkoutRemote'; remoteBranch: string; name: string }

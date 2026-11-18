@@ -1,3 +1,4 @@
+pub mod conflict;
 pub mod diff;
 pub mod history;
 pub mod image;

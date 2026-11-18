@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { ChevronDown } from '@/lib/icons'
+import { ChevronDown, Loader2 } from '@/lib/icons'
 
 defineProps<{
   icon: Component
@@ -11,6 +11,8 @@ defineProps<{
   dropdown?: boolean
   active?: boolean
   loading?: boolean
+  /** shown instead of the label while loading, e.g. "Fetching…" */
+  loadingLabel?: string
   /** e.g. commits behind/ahead, shown as "↓3" next to the label */
   count?: number
   countPrefix?: string
@@ -26,11 +28,12 @@ defineEmits<{ click: [MouseEvent]; dropdown: [MouseEvent] }>()
       :title="title ?? label"
       :aria-label="title ?? label"
       class="relative flex items-center gap-1.5 rounded-md text-[13px] font-medium whitespace-nowrap transition-colors hover:bg-hover hover:text-fg disabled:pointer-events-none disabled:opacity-35"
-      :class="[label ? 'px-2.5' : 'w-8 justify-center', dropdown ? 'rounded-r-none' : '', active ? 'text-accent' : '']"
+      :class="[label ? 'px-2.5' : 'w-8 justify-center', dropdown ? 'rounded-r-none' : '', active ? 'text-accent' : '', loading ? 'disabled:opacity-100' : '']"
       @click="$emit('click', $event)"
     >
-      <component :is="icon" :size="17" :stroke-width="1.85" :class="{ 'animate-spin': loading }" />
-      <span v-if="label">{{ label }}</span>
+      <Loader2 v-if="loading" :size="17" :stroke-width="1.85" class="animate-spin text-accent" />
+      <component :is="icon" v-else :size="17" :stroke-width="1.85" />
+      <span v-if="label" :class="{ 'text-accent': loading }">{{ loading && loadingLabel ? loadingLabel : label }}</span>
       <span v-if="count" class="font-mono text-[12px] font-semibold text-accent">{{ countPrefix }}{{ count > 999 ? '999+' : count }}</span>
     </button>
     <button

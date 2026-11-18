@@ -1,0 +1,23 @@
+/* startup animation (kept out of index.html so Tauri does not lock down inline styles, which the terminal needs) */
+#kg-splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--kg-splash-bg, #1b1d24); transition: opacity .35s ease, visibility .35s; }
+#kg-splash.kg-done { opacity: 0; visibility: hidden; pointer-events: none; }
+.kg-splash-box { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.kg-splash-k { width: 76px; height: auto; overflow: visible; filter: drop-shadow(0 10px 28px rgba(124, 156, 255, .35)); animation: kg-breathe 1.6s ease-in-out 1.15s infinite; }
+.kg-l { stroke-dasharray: 1; stroke-dashoffset: 1; animation: kg-draw .55s cubic-bezier(.6, 0, .2, 1) forwards; }
+.kg-l1 { animation-delay: .05s; }
+.kg-l2 { animation-delay: .35s; }
+.kg-l3 { animation-delay: .55s; }
+.kg-n { transform-box: fill-box; transform-origin: center; transform: scale(0); animation: kg-pop .4s cubic-bezier(.3, 1.6, .5, 1) forwards; }
+.kg-n1 { animation-delay: .1s; }
+.kg-n2 { animation-delay: .45s; }
+.kg-n3 { animation-delay: .75s; }
+.kg-n4 { animation-delay: .9s; }
+.kg-splash-bar { width: 72px; height: 3px; border-radius: 3px; overflow: hidden; background: rgba(127, 135, 160, .18); }
+.kg-splash-bar::after { content: ''; display: block; width: 40%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7c9cff, #b47cff, #f472b6); animation: kg-slide 1.1s ease-in-out infinite; }
+@keyframes kg-draw { to { stroke-dashoffset: 0; } }
+@keyframes kg-pop { to { transform: scale(1); } }
+@keyframes kg-breathe { 50% { transform: scale(1.06); filter: drop-shadow(0 12px 34px rgba(180, 124, 255, .5)); } }
+@keyframes kg-slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+@media (prefers-reduced-motion: reduce) {
+  .kg-l, .kg-n, .kg-splash-k, .kg-splash-bar::after { animation: none; stroke-dashoffset: 0; transform: none; }
+}

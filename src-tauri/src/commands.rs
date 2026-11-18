@@ -218,6 +218,21 @@ pub async fn file_history(repo: String, path: String, limit: Option<usize>) -> A
 }
 
 #[tauri::command]
+pub async fn read_conflict(repo: String, path: String) -> AppResult<git::conflict::ConflictFile> {
+    blocking(move || git::conflict::read(&Git::new(repo), &path)).await
+}
+
+#[tauri::command]
+pub async fn merge_message(repo: String) -> AppResult<Option<String>> {
+    blocking(move || git::conflict::merge_message(&Git::new(repo))).await
+}
+
+#[tauri::command]
+pub async fn write_resolved(repo: String, path: String, text: String) -> AppResult<()> {
+    blocking(move || git::conflict::write(&Git::new(repo), &path, &text)).await
+}
+
+#[tauri::command]
 pub async fn blame_file(repo: String, path: String, rev: Option<String>) -> AppResult<Vec<git::history::BlameLine>> {
     blocking(move || git::history::blame(&Git::new(repo), &path, rev.as_deref())).await
 }

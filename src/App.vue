@@ -13,7 +13,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import Toaster from '@/components/common/Toaster.vue'
 import Dialog from '@/components/common/Dialog.vue'
 import WhatsNew from '@/components/common/WhatsNew.vue'
-import OperationBanner from '@/components/layout/OperationBanner.vue'
+import ConflictResolver from '@/components/diff/ConflictResolver.vue'
 import WelcomeScreen from '@/components/layout/WelcomeScreen.vue'
 import ResizeHandle from '@/components/layout/ResizeHandle.vue'
 import TerminalPanel from '@/components/terminal/TerminalPanel.vue'
@@ -152,7 +152,6 @@ onBeforeUnmount(() => {
       </div>
       <template v-else>
         <Toolbar />
-        <OperationBanner />
         <div class="flex min-h-0 flex-1">
           <Sidebar v-show="!ui.sidebarCollapsed && ui.centerView !== 'diff'" class="shrink-0" :style="{ width: `${panes.sidebar}px` }" />
           <ResizeHandle
@@ -189,5 +188,6 @@ onBeforeUnmount(() => {
     <RepoSwitcher />
     <Dialog />
     <WhatsNew />
+    <ConflictResolver v-if="ui.conflictPath && repos.active" :key="ui.conflictPath" />
   </div>
 </template>

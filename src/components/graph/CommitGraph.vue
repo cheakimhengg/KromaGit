@@ -133,7 +133,8 @@ const wipPaths = computed(() => {
   })
 })
 const stagedCount = computed(() => snapshot.value?.workingCopy.staged.length ?? 0)
-const unstagedCount = computed(() => snapshot.value?.workingCopy.unstaged.length ?? 0)
+const conflictCount = computed(() => snapshot.value?.workingCopy.unstaged.filter((f) => f.status === 'U').length ?? 0)
+const unstagedCount = computed(() => (snapshot.value?.workingCopy.unstaged.length ?? 0) - conflictCount.value)
 const wipActive = computed(() => !ui.selectedCommit && ui.centerView !== 'diff')
 function openWip() {
   ui.selectCommit(null)
@@ -491,6 +492,7 @@ function rowIndex(virtualIndex: number) {
       <span class="flex items-center gap-2 px-2 text-[13px] whitespace-nowrap" :class="{ 'pl-3': !show.refs && !show.graph }">
         <Pencil :size="14" class="shrink-0 text-accent" />
         <span class="text-fg">{{ changeCount }} uncommitted {{ changeCount === 1 ? 'change' : 'changes' }}</span>
+        <span v-if="conflictCount" class="rounded-full bg-danger/15 px-2 py-px text-[12px] font-medium text-danger">{{ conflictCount }} conflicted</span>
         <span v-if="stagedCount" class="rounded-full bg-success/15 px-2 py-px text-[12px] font-medium text-success">{{ stagedCount }} staged</span>
         <span v-if="unstagedCount" class="rounded-full bg-accent/15 px-2 py-px text-[12px] font-medium text-accent">{{ unstagedCount }} modified</span>
       </span>

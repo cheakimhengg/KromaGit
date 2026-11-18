@@ -22,9 +22,11 @@ pub enum Action {
     UnstageAll,
     Discard { paths: Vec<String>, untracked: Vec<String> },
     DiscardAll,
+    DiscardStaged { paths: Vec<String> },
     ApplySelection { path: String, source: String, hunks: Vec<HunkSelection>, discard: bool },
     ApplyPatch { patch: String, cached: bool, reverse: bool },
     Commit { message: String, amend: bool },
+    RewordHead { message: String },
     Checkout { branch: String },
     CheckoutDetached { target: String },
     CheckoutRemote { remote_branch: String, name: String },
@@ -110,6 +112,32 @@ fn text(bytes: Vec<u8>) -> String {
     String::from_utf8_lossy(&bytes).trim().to_string()
 }
 
+/// Paths git still lists as conflicted (unmerged index entries).
+fn unmerged_paths(git: &Git) -> AppResult<Vec<String>> {
+    let out = git.run(&["diff", "--name-only", "--diff-filter=U", "-z"])?;
+    Ok(out.split(|b| *b == 0).filter(|p| !p.is_empty()).map(|p| String::from_utf8_lossy(p).into_owned()).collect())
+}
+
+/// True while the working-tree file still contains <<<<<<< / >>>>>>> lines.
+fn has_conflict_markers(git: &Git, rel: &str) -> bool {
+    let Ok(text) = std::fs::read(git.cwd().join(rel)) else { return false };
+    let text = String::from_utf8_lossy(&text);
+    let mut open = false;
+    for l in text.lines() {
+        if l.starts_with("<<<<<<<") && (l.len() == 7 || l.as_bytes()[7] == b' ') {
+            open = true;
+        } else if open && l.starts_with(">>>>>>>") {
+            return true;
+        }
+    }
+    false
+}
+
+/// Re-checks file timestamps so git does not fail with "Entry … not uptodate" after files were touched.
+fn refresh_index(git: &Git) {
+    let _ = git.run_with_codes(&["update-index", "-q", "--refresh"], &[0, 1]);
+}
+
 fn nul_list(paths: &[String]) -> Vec<u8> {
     let mut buf = Vec::new();
     for p in paths {
@@ -166,6 +194,13 @@ fn validate_ref_name(git: &Git, name: &str) -> AppResult<()> {
 
 pub fn run_action(git: &Git, action: &Action) -> AppResult<OpOutcome> {
     let before = head_state(git)?;
+    if matches!(
+        action,
+        Action::Checkout { .. } | Action::CheckoutDetached { .. } | Action::CheckoutRemote { .. } | Action::Pull { .. }
+            | Action::Merge { .. } | Action::Rebase { .. } | Action::CherryPick { .. } | Action::Revert { .. } | Action::Reset { .. }
+    ) {
+        refresh_index(git);
+    }
     let out = perform(git, action)?;
     let after = head_state(git)?;
     Ok(OpOutcome { before, after, data: out.data, output: out.text })
@@ -175,10 +210,20 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
     use Action::*;
     Ok(match action {
         Stage { paths } => {
+            let unmerged = unmerged_paths(git)?;
+            if let Some(p) = paths.iter().find(|p| unmerged.contains(p) && has_conflict_markers(git, p)) {
+                return Err(AppError::Internal(format!("{p} still has conflict markers. Resolve it first.")));
+            }
             git.run_with_input(&["add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul"], &nul_list(paths))?;
             Out::none()
         }
         Unstage { paths } => {
+            let unmerged = unmerged_paths(git)?;
+            let paths: Vec<String> = paths.iter().filter(|p| !unmerged.contains(p)).cloned().collect();
+            if paths.is_empty() {
+                return Ok(Out::none());
+            }
+            let paths = &paths;
             if has_head(git)? {
                 git.run_with_input(&["restore", "--staged", "--pathspec-from-file=-", "--pathspec-file-nul"], &nul_list(paths))?;
             } else {
@@ -187,11 +232,33 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             Out::none()
         }
         StageAll => {
-            git.run(&["add", "-A"])?;
+            let skip: Vec<String> = unmerged_paths(git)?.into_iter().filter(|p| has_conflict_markers(git, p)).collect();
+            if skip.is_empty() {
+                git.run(&["add", "-A"])?;
+            } else {
+                // `git add -A` resolves conflicted files even when excluded by pathspec, so list the rest explicitly
+                let split = |out: Vec<u8>| -> Vec<String> {
+                    out.split(|b| *b == 0).filter(|p| !p.is_empty()).map(|p| String::from_utf8_lossy(p).into_owned()).collect()
+                };
+                let mut paths = split(git.run(&["diff", "--name-only", "--no-renames", "-z"])?);
+                paths.extend(split(git.run(&["ls-files", "--others", "--exclude-standard", "-z"])?));
+                paths.retain(|p| !skip.contains(p));
+                paths.dedup();
+                if !paths.is_empty() {
+                    git.run_with_input(&["add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul"], &nul_list(&paths))?;
+                }
+            }
             Out::none()
         }
         UnstageAll => {
-            if has_head(git)? {
+            if has_head(git)? && operation_in_progress(git)?.is_some() {
+                // `git reset` would also cancel the merge/rebase, so only unstage the plain staged files
+                let out = git.run(&["diff", "--cached", "--no-renames", "--name-only", "--diff-filter=ACDMRTXB", "-z"])?;
+                let paths: Vec<String> = out.split(|b| *b == 0).filter(|p| !p.is_empty()).map(|p| String::from_utf8_lossy(p).into_owned()).collect();
+                if !paths.is_empty() {
+                    git.run_with_input(&["restore", "--staged", "--pathspec-from-file=-", "--pathspec-file-nul"], &nul_list(&paths))?;
+                }
+            } else if has_head(git)? {
                 git.run(&["reset", "-q"])?;
             } else {
                 git.run_with_codes(&["rm", "--cached", "-r", "-q", "--ignore-unmatch", "."], &[0])?;
@@ -214,6 +281,29 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             let backup = backup_stash(git)?;
             git.run(&["restore", "--worktree", "--", "."])?;
             git.run(&["clean", "-f", "-d", "-q"])?;
+            Out { data: backup, text: String::new() }
+        }
+        DiscardStaged { paths } => {
+            if paths.is_empty() {
+                return Err(AppError::Internal("Nothing staged to discard.".into()));
+            }
+            // a patch backup instead of a stash: `git stash create` refuses while any file is conflicted
+            let mut idx_args = vec!["diff", "--cached", "--binary", "--no-renames", "HEAD", "--"];
+            idx_args.extend(paths.iter().map(String::as_str));
+            let mut wt_args = vec!["diff", "--binary", "--no-renames", "HEAD", "--"];
+            wt_args.extend(paths.iter().map(String::as_str));
+            let index = String::from_utf8_lossy(&git.run(&idx_args)?).into_owned();
+            let worktree = String::from_utf8_lossy(&git.run(&wt_args)?).into_owned();
+            let backup = Some(serde_json::json!({ "index": index, "worktree": worktree }).to_string());
+            git.run_with_input(
+                &["restore", "--source=HEAD", "--staged", "--worktree", "--pathspec-from-file=-", "--pathspec-file-nul"],
+                &nul_list(paths),
+            )?;
+            let nothing_left = git.run_string(&["diff", "--cached", "--name-only"])?.trim().is_empty()
+                && git.run_string(&["ls-files", "--unmerged"])?.trim().is_empty();
+            if nothing_left && operation_in_progress(git)? == Some("merge") {
+                git.run(&["merge", "--quit"])?;
+            }
             Out { data: backup, text: String::new() }
         }
         ApplySelection { path, source, hunks, discard } => {
@@ -257,6 +347,14 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             args.push("-");
             git.run_with_input(&args, patch.as_bytes())?;
             Out::none()
+        }
+        RewordHead { message } => {
+            if message.trim().is_empty() {
+                return Err(AppError::Internal("Commit message is empty.".into()));
+            }
+            // --only with no paths: change the message only, staged changes stay staged
+            let out = git.run_with_input(&["commit", "--amend", "--only", "--allow-empty", "--cleanup=strip", "-F", "-"], message.as_bytes())?;
+            Out { data: None, text: text(out) }
         }
         Commit { message, amend } => {
             if message.trim().is_empty() {
@@ -444,11 +542,13 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
         }
         AbortOperation => {
             let op = operation_in_progress(git)?.ok_or_else(|| AppError::Internal("Nothing to abort.".into()))?;
+            refresh_index(git);
             git.run(&[op_command(op), "--abort"])?;
             Out::none()
         }
         ContinueOperation => {
             let op = operation_in_progress(git)?.ok_or_else(|| AppError::Internal("Nothing to continue.".into()))?;
+            refresh_index(git);
             Out { data: None, text: text(git.run(&[op_command(op), "--continue"])?) }
         }
     })
@@ -507,10 +607,12 @@ mod tests {
             {"type":"stashStore","oid":"abc","message":"m"},
             {"type":"abortOperation"},
             {"type":"continueOperation"},
-            {"type":"submoduleUpdate","path":"libs/x"}
+            {"type":"submoduleUpdate","path":"libs/x"},
+            {"type":"discardStaged","paths":["a.txt"]},
+            {"type":"rewordHead","message":"m"}
         ]"#;
         let actions: Vec<Action> = serde_json::from_str(samples).expect("all frontend action shapes deserialize");
-        assert_eq!(actions.len(), 37);
+        assert_eq!(actions.len(), 39);
         assert!(matches!(&actions[11], Action::CheckoutRemote { remote_branch, .. } if remote_branch == "origin/x"));
         assert!(matches!(&actions[28], Action::StashPush { include_untracked: true, .. }));
     }

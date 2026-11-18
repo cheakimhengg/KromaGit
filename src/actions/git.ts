@@ -71,10 +71,7 @@ export async function discard(files: FileChange[]) {
   const tracked = files.filter((f) => f.status !== '?').map((f) => f.path)
   const ok = await ui().confirm({
     title: files.length === 1 ? `Discard changes to ${files[0].path}?` : `Discard changes in ${files.length} files?`,
-    message: untracked.length
-      ? `Tracked changes can be restored with Undo. ${untracked.length} untracked ${untracked.length === 1 ? 'file' : 'files'} will be deleted permanently.`
-      : 'You can restore them with Undo.',
-    detail: files.map((f) => `${f.status}  ${f.path}`),
+    message: untracked.length ? `New files are deleted for good.` : 'You can undo this.',
     confirmLabel: 'Discard',
     danger: true,
   })
@@ -92,8 +89,7 @@ export async function discardAll() {
   const untracked = files.filter((f) => f.status === '?').length
   const ok = await ui().confirm({
     title: `Discard all ${files.length} unstaged changes?`,
-    message: `Staged changes are kept. Tracked changes can be restored with Undo${untracked ? `; ${untracked} untracked ${untracked === 1 ? 'file' : 'files'} will be deleted permanently` : ''}.`,
-    detail: files.map((f) => `${f.status}  ${f.path}`),
+    message: untracked ? 'New files are deleted for good.' : 'You can undo this.',
     confirmLabel: 'Discard all',
     danger: true,
   })
@@ -101,6 +97,31 @@ export async function discardAll() {
   return ops().run('Discard all changes', { type: 'discardAll' }, {
     refresh: 'status',
     undo: (o) => (o.data ? { undo: [{ type: 'stashApplyOid', oid: o.data }], redo: [{ type: 'discardAll' }] } : null),
+  })
+}
+
+export async function discardStaged() {
+  const files = snapshot()?.workingCopy.staged ?? []
+  if (!files.length) return
+  const ok = await ui().confirm({
+    title: `Discard all ${files.length} staged ${files.length === 1 ? 'change' : 'changes'}?`,
+    message: 'You can undo this.',
+    confirmLabel: 'Discard all',
+    danger: true,
+  })
+  if (!ok) return
+  const paths = [...new Set(files.flatMap((f) => (f.oldPath ? [f.path, f.oldPath] : [f.path])))]
+  const action: GitAction = { type: 'discardStaged', paths }
+  return ops().run('Discard staged changes', action, {
+    refresh: 'status',
+    undo: (o) => {
+      if (!o.data) return null
+      const b = JSON.parse(o.data) as { index: string; worktree: string }
+      const undo: GitAction[] = []
+      if (b.worktree) undo.push({ type: 'applyPatch', patch: b.worktree, cached: false, reverse: false })
+      if (b.index) undo.push({ type: 'applyPatch', patch: b.index, cached: true, reverse: false })
+      return undo.length ? { undo, redo: [action] } : null
+    },
   })
 }
 
@@ -145,6 +166,26 @@ export function commit(message: string, amend: boolean) {
   })
 }
 
+/** Changes the latest commit's message in place; staged changes are not added to it. */
+export async function rewordHead(message: string) {
+  const head = snapshot()?.head
+  if (head?.upstream && head.ahead === 0) {
+    const ok = await ui().confirm({
+      title: 'This commit is already pushed',
+      message: 'Changing it means you have to force push.',
+      confirmLabel: 'Change anyway',
+    })
+    if (!ok) return
+  }
+  return ops().run('Edit commit message', { type: 'rewordHead', message }, {
+    success: 'Commit message updated',
+    undo: (o) => ({
+      undo: o.before.oid ? [{ type: 'reset', target: o.before.oid, mode: 'soft' }] : [],
+      redo: o.after.oid ? [{ type: 'reset', target: o.after.oid, mode: 'soft' }] : [],
+    }),
+  })
+}
+
 // ---------- branches & checkout ----------
 
 function checkoutUndo(redo: GitAction) {
@@ -154,12 +195,28 @@ function checkoutUndo(redo: GitAction) {
   }
 }
 
+/** git refuses most commands mid-merge/rebase; say so plainly and offer the way out. */
+function blockedByOperation(what: string) {
+  const op = snapshot()?.operation
+  if (!op) return false
+  const name = ({ merge: 'merge', rebase: 'rebase', cherryPick: 'cherry-pick', revert: 'revert' })[op]
+  ui().toast({
+    kind: 'error',
+    title: `Can't ${what} during a ${name}`,
+    detail: `Commit or abort the ${name} first.`,
+    action: { label: `Abort ${name}`, run: () => void abortOperation() },
+  }, 8000)
+  return true
+}
+
 export function checkout(branch: string) {
+  if (blockedByOperation('switch branch')) return
   const action: GitAction = { type: 'checkout', branch }
   return ops().run(`Checkout ${branch}`, action, { success: `Switched to ${branch}`, undo: checkoutUndo(action) })
 }
 
 export function checkoutRemote(remoteBranch: string, remote: string) {
+  if (blockedByOperation('switch branch')) return
   const name = remoteBranch.slice(remote.length + 1)
   const local = useReposStore().active?.snapshot.branches.find((b) => b.name === name)
   if (local) return local.current ? undefined : checkout(name)
@@ -168,6 +225,7 @@ export function checkoutRemote(remoteBranch: string, remote: string) {
 }
 
 export function checkoutCommit(hash: string) {
+  if (blockedByOperation('check out a commit')) return
   const action: GitAction = { type: 'checkoutDetached', target: hash }
   return ops().run(`Checkout ${hash.slice(0, 7)}`, action, { success: `Detached HEAD at ${hash.slice(0, 7)}`, undo: checkoutUndo(action) })
 }
@@ -286,6 +344,7 @@ export function fetchAll() {
 }
 
 export function pull(mode: PullMode = 'merge') {
+  if (blockedByOperation('pull')) return
   const label = { merge: 'Pull', rebase: 'Pull (rebase)', ffOnly: 'Pull (fast-forward only)' }[mode]
   return ops().run(label, { type: 'pull', mode }, { undo: moveHeadUndo })
 }
@@ -329,12 +388,14 @@ export async function push(opts: { force?: boolean; setUpstream?: boolean } = {}
 
 /** Always records a merge commit, so the merge shows up as its own line in the graph. */
 export async function merge(target: string) {
+  if (blockedByOperation('start another merge')) return
   const current = snapshot()?.currentBranch ?? 'HEAD'
   return ops().run(`Merge ${target} into ${current}`, { type: 'merge', target, mode: 'noFf' }, { undo: moveHeadUndo, onError: conflictHandler })
 }
 
 /** Moves the current branch forward to `target` without a merge commit; refuses if the branches have split. */
 export function fastForward(target: string) {
+  if (blockedByOperation('fast-forward')) return
   const current = snapshot()?.currentBranch ?? 'HEAD'
   return ops().run(`Fast-forward ${current} to ${target}`, { type: 'merge', target, mode: 'ffOnly' }, {
     success: `${current} is now at ${target}`,
@@ -343,6 +404,7 @@ export function fastForward(target: string) {
 }
 
 export async function rebase(onto: string) {
+  if (blockedByOperation('rebase')) return
   const current = snapshot()?.currentBranch ?? 'HEAD'
   const ok = await ui().confirm({
     title: `Rebase ${current} onto ${onto}?`,
@@ -354,10 +416,12 @@ export async function rebase(onto: string) {
 }
 
 export function cherryPick(hash: string) {
+  if (blockedByOperation('cherry-pick')) return
   return ops().run(`Cherry-pick ${hash.slice(0, 7)}`, { type: 'cherryPick', hash }, { undo: moveHeadUndo, onError: conflictHandler })
 }
 
 export function revert(hash: string) {
+  if (blockedByOperation('revert')) return
   return ops().run(`Revert ${hash.slice(0, 7)}`, { type: 'revert', hash }, { undo: moveHeadUndo, onError: conflictHandler })
 }
 
@@ -385,10 +449,9 @@ export async function reset(hash: string, mode: Exclude<ResetMode, 'keep'>) {
   })
 }
 
+/** Conflicts are not an error: the Conflicts section in the working copy shows them. */
 async function conflictHandler(msg: string): Promise<boolean> {
-  if (!/conflict/i.test(msg)) return false
-  ui().toast({ kind: 'error', title: 'Conflicts need your attention', detail: 'Resolve the conflicted files (U), stage them, then Continue — or Abort to go back.' }, 10000)
-  return true
+  return /conflict/i.test(msg)
 }
 
 export async function abortOperation() {

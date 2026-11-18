@@ -4,7 +4,7 @@ use super::status::parse_numstat;
 use crate::error::AppResult;
 
 pub const SHOW_FORMAT: &str = "%H%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%B";
-const MAX_DIFF_LINES: usize = 20_000;
+const MAX_DIFF_LINES: usize = 2_000_000;
 
 pub fn get_commit_details(git: &Git, hash: &str) -> AppResult<CommitDetails> {
     let format = format!("--format={SHOW_FORMAT}");
@@ -27,6 +27,10 @@ pub fn get_commit_details(git: &Git, hash: &str) -> AppResult<CommitDetails> {
     }
     details.files = files;
     Ok(details)
+}
+
+fn is_unmerged(git: &Git, path: &str) -> AppResult<bool> {
+    Ok(!git.run(&["ls-files", "--unmerged", "--", path])?.is_empty())
 }
 
 pub fn get_file_diff(git: &Git, req: &DiffRequest) -> AppResult<FileDiff> {
@@ -65,6 +69,11 @@ pub fn get_file_diff(git: &Git, req: &DiffRequest) -> AppResult<FileDiff> {
                 args.push("--cached");
             }
             args.extend(common);
+            // A conflicted file has no single index version, so git prints a combined (`@@@`) diff.
+            // Comparing with HEAD instead shows the conflict markers as ordinary added lines.
+            if source != "staged" && is_unmerged(git, &req.path)? {
+                args.push("HEAD");
+            }
             args.push("--");
             args.extend(&paths);
             git.run(&args)?

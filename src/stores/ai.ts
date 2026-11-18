@@ -56,15 +56,16 @@ export const useAiStore = defineStore('ai', () => {
 
   // ---------- commit message ----------
 
-  async function generateCommitMessage(): Promise<{ summary: string; description: string } | null> {
+  /** From the staged changes, or from one existing commit's diff when `commit` is given. */
+  async function generateCommitMessage(commit?: string): Promise<{ summary: string; description: string } | null> {
     if (!(await ensureReady('AI commit messages'))) return null
     const tab = repo()
     const snap = useReposStore().active?.snapshot
     if (!tab || !snap) return null
-    progress.value = 'Reading staged changes…'
+    progress.value = commit ? 'Reading the commit…' : 'Reading staged changes…'
     try {
-      const bundle = await collect('staged')
-      if (!bundle.files.length) throw new Error('Nothing is staged. Stage the changes you want to commit first.')
+      const bundle = await collect(commit ? `commit:${commit}` : 'staged')
+      if (!bundle.files.length) throw new Error(commit ? 'This commit has no file changes.' : 'Nothing is staged. Stage the changes you want to commit first.')
       const recent = await aiApi.recentMessages(tab.path, 20)
       const ctx = { template: useSettingsStore().templateFor(tab.path), branch: snap.head.branch ?? '', recent, files: bundle.files }
       const { summaries } = await diffOrSummaries(bundle.files, (files) => previewOf(buildCommitPrompt({ ...ctx, files })))

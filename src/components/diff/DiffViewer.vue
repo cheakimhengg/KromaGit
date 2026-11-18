@@ -88,7 +88,8 @@ async function focusLine(line: number) {
 
 const language = computed(() => languageFromPath(tgt.value.path))
 const displayOnly = computed(() => ui.diffOptions.ignoreWhitespace || ui.diffOptions.fullFile)
-const canStage = computed(() => tgt.value.source !== 'commit' && !tgt.value.untracked && !tgt.value.oldPath && !displayOnly.value)
+const isConflict = computed(() => fileEntry.value?.status === 'U')
+const canStage = computed(() => tgt.value.source !== 'commit' && !tgt.value.untracked && !tgt.value.oldPath && !displayOnly.value && !isConflict.value)
 const stageVerb = computed(() => (tgt.value.source === 'staged' ? 'Unstage' : 'Stage'))
 const canDiscard = computed(() => tgt.value.source === 'unstaged')
 const busy = computed(() => !!ops.running)
@@ -394,7 +395,9 @@ function toggleLine(e: MouseEvent, hunk: number, line: number, l: DiffLine) {
   selected.value = next
 }
 
+const CONFLICT_MARK = /^(<{7}|={7}|>{7}|\|{7})( |$)/
 const lineClass = (l: DiffLine, sel: boolean) => {
+  if (isConflict.value && CONFLICT_MARK.test(l.text)) return 'bg-[color-mix(in_srgb,var(--gw-warning)_22%,transparent)] font-semibold'
   if (l.kind === 'add') return sel ? 'bg-[var(--gw-add-strong)]' : 'bg-[var(--gw-add-bg)]'
   if (l.kind === 'del') return sel ? 'bg-[var(--gw-del-strong)]' : 'bg-[var(--gw-del-bg)]'
   return ''
@@ -506,6 +509,9 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
 
     <div v-else class="relative flex min-h-0 flex-1">
     <div ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading, 'sx-on': splitX > 0 }" :style="{ '--sx': `${splitX}px` }" @wheel="onDiffWheel">
+      <div v-if="isConflict" class="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
+      This file has conflicts. Keep the lines you want, remove the <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> <code>=======</code> <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> markers in your editor, then Stage file to mark it resolved.
+      </div>
       <div v-if="diff?.truncated" class="border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
         Diff is very large; showing the first 20,000 lines.
       </div>

@@ -64,6 +64,19 @@ export const mockApi: GitApi = {
     return delay(details)
   },
   getFileDiff: (_path, target) => delay({ ...mockDiff(target.path), path: target.path }),
+  mergeMessage: () => delay("Merge branch 'demo' into staging"),
+  readConflict: (_repo, path) => {
+    const body = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `  line ${i + 1} of ${path}${tag}`)
+    const text = [
+      ...body(40, ''),
+      '<<<<<<< HEAD', '  undici@8.12.3:', "    engines: {node: '>=22.19.0'}", '=======', '  undici@7.30.2:', "    engines: {node: '>=20.18.1'}", '>>>>>>> demo',
+      ...body(60, ' (shared)'),
+      '<<<<<<< HEAD', '  version: 2', '=======', '  version: 3', '  channel: beta', '>>>>>>> demo',
+      ...body(20, ' (end)'),
+    ].join('\n') + '\n'
+    return delay({ text, ours: 'staging', theirs: 'demo' })
+  },
+  writeResolved: () => delay(undefined),
   getFileImage: (_path, target) => delay(mockImage(target.path)),
   fileHistory: (path, file) => {
     const all = repo(path).commits
@@ -104,6 +117,8 @@ function mockAction(path: string, action: GitAction): OpOutcome {
     case 'unstageAll': wc.unstaged.push(...wc.staged.splice(0)); break
     case 'discard': wc.unstaged = wc.unstaged.filter((f) => !action.paths.includes(f.path) && !action.untracked.includes(f.path)); break
     case 'discardAll': wc.unstaged = []; break
+    case 'rewordHead': break
+    case 'discardStaged': wc.staged = wc.staged.filter((f) => !action.paths.includes(f.path)); break
     case 'commit': wc.staged = []; break
   }
   return { before: head, after: head, data: null, output: '' }
