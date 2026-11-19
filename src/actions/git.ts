@@ -537,10 +537,13 @@ export async function openInTerminal() {
   await gitApi.openInTerminal(path).catch((e) => ui().toast({ kind: 'error', title: 'Could not open terminal', detail: errorMessage(e) }))
 }
 
-export async function openInEditor() {
+/** Opens the repository, plus `file` or the working-copy file shown in the diff. */
+export async function openInEditor(file?: string) {
   const path = useReposStore().activeTab?.path
   if (!path) return
-  await gitApi.openInEditor(path).catch((e) => ui().toast({ kind: 'error', title: 'Could not open editor', detail: errorMessage(e) }))
+  const u = ui()
+  const shownFile = u.centerView === 'diff' && u.diffSource !== 'commit' ? u.diffPath ?? undefined : undefined
+  await gitApi.openInEditor(path, file ?? shownFile).catch((e) => ui().toast({ kind: 'error', title: 'Could not open editor', detail: errorMessage(e) }))
 }
 
 export async function copyText(text: string, what = 'Copied') {

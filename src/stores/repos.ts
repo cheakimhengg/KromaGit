@@ -281,6 +281,59 @@ export const useReposStore = defineStore('repos', () => {
     else await Promise.all([loadStatus(tab), loadRefs(tab), loadCommits(tab)])
   }
 
+  /** Silent fetch so new remote commits are already downloaded when the user pulls (like other Git apps' auto-fetch). */
+  const bgFetches = new Map<string, Promise<void>>()
+  const lastBgFetch = new Map<string, number>()
+  function backgroundFetch(tabId = activeTabId.value, minAgeMs = 0): Promise<void> {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    const state = tab && states.get(tab.id)
+    if (!tab || !state?.loaded || !state.snapshot.remotes.length) return Promise.resolve()
+    const running = bgFetches.get(tab.id)
+    if (running) return running
+    if (Date.now() - (lastBgFetch.get(tab.id) ?? 0) < minAgeMs) return Promise.resolve()
+    lastBgFetch.set(tab.id, Date.now())
+    const p = (async () => {
+      try {
+        const out = await gitApi.runAction(tab.path, { type: 'fetch', remote: null })
+        await loadRefs(tab)
+        if (out.output.trim()) await loadCommits(tab)
+      } catch {
+        /* offline or no access: the user's own Fetch/Pull will show the error */
+      } finally {
+        bgFetches.delete(tab.id)
+      }
+    })()
+    bgFetches.set(tab.id, p)
+    return p
+  }
+  /** A user action waits for a background fetch on the same repo instead of fighting it for git's locks. */
+  const backgroundDone = (tabId: string) => bgFetches.get(tabId) ?? Promise.resolve()
+
+  /** Background check for changes made outside the app (editor, AI tools, terminal); quiet unless something changed. */
+  let polling = false
+  async function pollStatus(tabId = activeTabId.value) {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    const state = tab && states.get(tab.id)
+    if (polling || !tab || !state?.loaded || state.loading.status || state.loading.commits) return
+    polling = true
+    const gen = generations.get(tab.id)!.status
+    try {
+      const status = await gitApi.getStatus(tab.path)
+      if (generations.get(tab.id)?.status !== gen) return
+      const before = state.snapshot
+      const wcChanged = JSON.stringify([before.workingCopy.staged, before.workingCopy.unstaged]) !== JSON.stringify([status.staged, status.unstaged])
+      const headChanged = status.head.oid !== before.head.oid || status.head.branch !== before.head.branch
+      if (wcChanged || headChanged || (status.operation ?? null) !== before.operation) {
+        patch(state, { head: status.head, workingCopy: { staged: status.staged, unstaged: status.unstaged }, operation: status.operation ?? null })
+      }
+      if (headChanged) await softRefresh(tab.id)
+    } catch {
+      /* the next poll or a manual refresh will report it */
+    } finally {
+      polling = false
+    }
+  }
+
   async function softRefresh(tabId = activeTabId.value) {
     const tab = tabs.value.find((t) => t.id === tabId)
     const state = tab && states.get(tab.id)
@@ -574,7 +627,7 @@ export const useReposStore = defineStore('repos', () => {
 
   return {
     groups, tabs, activeTabId, activeTab, active, busy, recent, forgetRecent,
-    activate, openRepo, openRepoAt, cloneRepo, cloning, loadMoreCommits, loadAllCommits, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh,
+    activate, openRepo, openRepoAt, cloneRepo, cloning, loadMoreCommits, loadAllCommits, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh, pollStatus, backgroundFetch, backgroundDone,
     createGroup, promptNewGroup, editGroup, groupMembers, openRestOfGroup, collapseOtherGroups, expandAllGroups, renameTab, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, moveGroup, closeOtherTabs,
   }
 })

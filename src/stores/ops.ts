@@ -68,6 +68,7 @@ export const useOpsStore = defineStore('ops', () => {
     running.value = label
     let outcome: OpOutcome | null = null
     try {
+      await repos.backgroundDone(tab.id)
       outcome = await gitApi.runAction(tab.path, action)
       const plan = opts.undo?.(outcome) ?? null
       const stack = stackFor(tab.id)
@@ -188,7 +189,9 @@ export const useOpsStore = defineStore('ops', () => {
   return { running, stacks, nextUndo, nextRedo, run, batch, undo: () => replay('undo'), redo: () => replay('redo') }
 })
 
+/** git's progress chatter (branch updates, "From <url>", redirects) is not worth showing in a message */
+const CHATTER = /( -> )|^(From |To |Fetching submodule |warning: redirecting to )/
 function lastLine(output: string): string | undefined {
-  const lines = output.split('\n').map((l) => l.trim()).filter(Boolean)
+  const lines = output.split('\n').map((l) => l.trim()).filter((l) => l && (!CHATTER.test(l) || l.startsWith('!')))
   return lines.length ? lines[lines.length - 1] : undefined
 }

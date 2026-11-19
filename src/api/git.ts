@@ -21,7 +21,7 @@ export interface GitApi {
   mergeMessage(repo: string): Promise<string | null>
   runAction(repo: string, action: GitAction): Promise<OpOutcome>
   openInTerminal(path: string): Promise<void>
-  openInEditor(path: string): Promise<void>
+  openInEditor(path: string, file?: string): Promise<void>
 }
 
 export interface DiffOptions {
@@ -92,7 +92,7 @@ const tauriApi: GitApi = {
   mergeMessage: (repo) => invoke<string | null>('merge_message', { repo }),
   runAction: (repo, action) => invoke<OpOutcome>('git_action', { repo, action }),
   openInTerminal: (path) => invoke<void>('open_in_terminal', { path }),
-  openInEditor: (path) => invoke<void>('open_in_editor', { path }),
+  openInEditor: (path, file) => invoke<void>('open_in_editor', { path, file: file ?? null }),
 }
 
 export const gitApi: GitApi = inTauri ? tauriApi : mockApi

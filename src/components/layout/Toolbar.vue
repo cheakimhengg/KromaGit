@@ -73,17 +73,15 @@ function pushMenu(e: MouseEvent) {
     </div>
 
     <div class="island">
-      <ToolButton :icon="CloudDownload" label="Fetch" loading-label="Fetching…" :title="`Fetch all remotes (${formatCombo('Mod+Shift+F')})`" :disabled="busy || !hasRemote" :loading="ops.running === 'Fetch'" @click="git.fetchAll()" />
+      <ToolButton :icon="CloudDownload" label="Fetch" :title="`Fetch all remotes (${formatCombo('Mod+Shift+F')})`" :disabled="busy || !hasRemote" @click="git.fetchAll()" />
       <ToolButton
-        :icon="ArrowDownToLine" label="Pull" loading-label="Pulling…" dropdown :disabled="busy || !hasRemote"
-        :loading="!!ops.running?.startsWith('Pull')"
+        :icon="ArrowDownToLine" label="Pull" dropdown :disabled="busy || !hasRemote"
         :title="`Pull (${formatCombo('Mod+Shift+L')})${behind ? ` — ${behind} new on the remote` : ''}`"
         :count="behind" count-prefix="↓"
         @click="git.pull('merge')" @dropdown="pullMenu"
       />
       <ToolButton
-        :icon="ArrowUpFromLine" label="Push" loading-label="Pushing…" dropdown :disabled="busy || !hasRemote"
-        :loading="!!ops.running && /^(Force push|Push)\b/.test(ops.running)"
+        :icon="ArrowUpFromLine" label="Push" dropdown :disabled="busy || !hasRemote"
         :title="`Push (${formatCombo('Mod+Shift+P')})${ahead ? ` — ${ahead} not pushed yet` : ''}`"
         :count="ahead" count-prefix="↑"
         @click="git.push()" @dropdown="pushMenu"

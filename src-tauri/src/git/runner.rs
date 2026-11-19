@@ -67,6 +67,27 @@ fn login_shell_path() -> Option<String> {
     (!path.is_empty()).then_some(path)
 }
 
+/// Keeps what explains a failure and drops git's progress chatter: branch-update lines
+/// (`* [new branch] a -> b`), "From/To <url>", submodule fetch notices, redirect warnings.
+pub fn clean_message(raw: &str) -> String {
+    let noise = |l: &str| {
+        let t = l.trim();
+        t.is_empty()
+            || (t.contains(" -> ") && !t.starts_with('!'))
+            || t.starts_with("From ")
+            || t.starts_with("To ")
+            || t.starts_with("Fetching submodule ")
+            || t.starts_with("warning: redirecting to ")
+            || (t.starts_with("remote: ") && ["Enumerating", "Counting", "Compressing", "Total"].iter().any(|p| t[8..].starts_with(p)))
+    };
+    let kept: Vec<&str> = raw.lines().filter(|l| !noise(l)).map(str::trim_end).collect();
+    if kept.is_empty() {
+        raw.lines().map(str::trim).rfind(|l| !l.is_empty()).unwrap_or_default().to_string()
+    } else {
+        kept.join("\n")
+    }
+}
+
 /// Resolves the git executable once. GUI apps on macOS start with a minimal
 /// PATH, so prefer Homebrew installs before falling back to `git` on PATH.
 pub fn git_binary() -> &'static str {
@@ -209,7 +230,7 @@ impl Git {
         if ok_codes.contains(&code) {
             Ok(RunOutput { stdout, stderr })
         } else {
-            let msg = String::from_utf8_lossy(&stderr).trim().to_string();
+            let msg = clean_message(String::from_utf8_lossy(&stderr).trim());
             let msg = if msg.is_empty() { String::from_utf8_lossy(&stdout).trim().to_string() } else { msg };
             Err(AppError::Git {
                 command: format!("git {}", args.join(" ")),
@@ -241,4 +262,27 @@ pub fn split_nul(raw: &[u8]) -> Vec<String> {
         parts.pop();
     }
     parts
+}
+
+#[cfg(test)]
+mod clean_message_tests {
+    use super::clean_message;
+
+    #[test]
+    fn keeps_the_error_and_drops_fetch_chatter() {
+        let raw = "From http://gitlab/wl/wl-project\n - [deleted]         (none)     -> origin/Feature/test\n * [new branch]      feature/test -> origin/feature/test\n + 7592f8d0...eb8755b4 Feature/TopPay -> origin/Feature/TopPay  (forced update)\nFetching submodule backend/hermes\nwarning: redirecting to http://gitlab/wl/hermes.git/\nfatal: remote error: upload-pack: not our ref b596db8\nErrors during submodule fetch:\n\tbackend/hermes";
+        assert_eq!(clean_message(raw), "fatal: remote error: upload-pack: not our ref b596db8\nErrors during submodule fetch:\n\tbackend/hermes");
+    }
+
+    #[test]
+    fn keeps_push_rejections_and_hook_errors() {
+        let raw = "To http://gitlab/wl/kirby\n ! [rejected]        main -> main (fetch first)\nerror: failed to push some refs";
+        assert_eq!(clean_message(raw), " ! [rejected]        main -> main (fetch first)\nerror: failed to push some refs");
+        assert_eq!(clean_message(".husky/_/pre-push: line 17: node: command not found"), ".husky/_/pre-push: line 17: node: command not found");
+    }
+
+    #[test]
+    fn falls_back_to_the_last_line_when_everything_is_chatter() {
+        assert_eq!(clean_message("From http://x\n * [new branch] a -> origin/a"), "* [new branch] a -> origin/a");
+    }
 }

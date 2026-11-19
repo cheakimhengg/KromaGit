@@ -93,9 +93,9 @@ pub async fn open_in_terminal(app: tauri::AppHandle, path: String) -> AppResult<
 }
 
 #[tauri::command]
-pub async fn open_in_editor(app: tauri::AppHandle, path: String) -> AppResult<()> {
+pub async fn open_in_editor(app: tauri::AppHandle, path: String, file: Option<String>) -> AppResult<()> {
     let choice = crate::settings::load(&config_dir(&app)?).general.editor_app;
-    blocking(move || crate::system::open_editor(&path, &choice)).await
+    blocking(move || crate::system::open_editor(&path, file.as_deref(), &choice)).await
 }
 
 // ---------- settings, keychain, AI ----------

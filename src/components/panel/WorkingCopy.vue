@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { AlertTriangle, Check, FolderTree, List, Loader2, Minus, Pencil, Plus, Split, Trash2, Undo2 } from '@/lib/icons'
+import { AlertTriangle, Check, Code2, Copy, FileDiff, FolderTree, List, Loader2, Minus, Pencil, Plus, Split, Trash2, Undo2 } from '@/lib/icons'
 import { useAiStore } from '@/stores/ai'
 import FileList from './FileList.vue'
 import CommitBox from './CommitBox.vue'
@@ -40,8 +40,9 @@ function open(file: FileChange, staged: boolean, toggle = true) {
 function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
   ui.openMenu(e, [
     { label: staged ? 'Unstage file' : 'Stage file', icon: staged ? Minus : Plus, action: () => (staged ? git.unstage([file]) : git.stage([file])) },
-    { label: 'Open diff', action: () => open(file, staged, false) },
-    { label: 'Copy path', action: () => git.copyText(file.path) },
+    { label: 'Open diff', icon: FileDiff, action: () => open(file, staged, false) },
+    { label: 'Open in editor', icon: Code2, disabled: file.status === 'D', action: () => git.openInEditor(file.path) },
+    { label: 'Copy path', icon: Copy, action: () => git.copyText(file.path) },
     ...(staged ? [] : [{ separator: true }, { label: 'Discard changes…', icon: Undo2, danger: true, action: () => git.discard([file]) }]),
   ])
 }

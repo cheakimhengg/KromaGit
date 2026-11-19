@@ -25,6 +25,7 @@ import CleanupPanel from '@/components/ai/CleanupPanel.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useReposStore } from '@/stores/repos'
 import { useUiStore } from '@/stores/ui'
+import { useOpsStore } from '@/stores/ops'
 import { useUpdatesStore } from '@/stores/updates'
 import { hideSplash } from '@/lib/splash'
 import CommandPalette from '@/components/common/CommandPalette.vue'
@@ -101,6 +102,18 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
+const ops = useOpsStore()
+const POLL_MS = 4000
+const AUTO_FETCH_MS = 5 * 60_000
+let fetchTimer: number | undefined
+watch(
+  () => [repos.activeTabId, repos.active?.loaded] as const,
+  ([id, loaded]) => loaded && void repos.backgroundFetch(id, 60_000),
+  { immediate: true },
+)
+let pollTimer: number | undefined
+let unlistenFocus: (() => void) | undefined
+const inTauri = '__TAURI_INTERNALS__' in window
 let lastFocusRefresh = 0
 function onFocus() {
   const now = Date.now()
@@ -125,11 +138,28 @@ onMounted(() => {
   window.addEventListener('keydown', onEscapeCapture, true)
   window.addEventListener('keydown', onKey)
   window.addEventListener('focus', onFocus)
+  if (inTauri) {
+    void import('@tauri-apps/api/window')
+      .then(({ getCurrentWindow }) => getCurrentWindow().onFocusChanged(({ payload }) => payload && onFocus()))
+      .then((u) => (unlistenFocus = u))
+      .catch(() => {})
+  }
+  fetchTimer = window.setInterval(() => {
+    if (document.hidden || ops.running || ui.home) return
+    void repos.backgroundFetch(repos.activeTabId, AUTO_FETCH_MS - 5000)
+  }, AUTO_FETCH_MS)
+  pollTimer = window.setInterval(() => {
+    if (document.hidden || ops.running || ui.home) return
+    void repos.pollStatus()
+  }, POLL_MS)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onEscapeCapture, true)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('focus', onFocus)
+  unlistenFocus?.()
+  clearInterval(pollTimer)
+  clearInterval(fetchTimer)
 })
 </script>
 

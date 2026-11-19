@@ -17,13 +17,15 @@ fn spawn(program: &str, args: &[&str]) -> bool {
 
 /// A user-chosen app: on macOS an application name for `open -a`; elsewhere a
 /// command line where `{path}` is replaced by the folder (appended if absent).
-fn spawn_custom(app: &str, path: &str) -> bool {
+fn spawn_custom(app: &str, path: &str, extra: &[&str]) -> bool {
     let app = app.trim();
     if app.is_empty() {
         return false;
     }
     if cfg!(target_os = "macos") && !app.contains("{path}") && !app.starts_with('/') {
-        return spawn("open", &["-a", app, path]);
+        let mut args = vec!["-a", app, path];
+        args.extend(extra);
+        return spawn("open", &args);
     }
     let parts = split_command(app);
     let Some((program, rest)) = parts.split_first() else { return false };
@@ -31,6 +33,7 @@ fn spawn_custom(app: &str, path: &str) -> bool {
     if !app.contains("{path}") {
         args.push(path.to_string());
     }
+    args.extend(extra.iter().map(|s| s.to_string()));
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     spawn(program, &args)
 }
@@ -68,7 +71,7 @@ fn ensure_dir(path: &str) -> AppResult<()> {
 pub fn open_terminal(path: &str, app: &str) -> AppResult<()> {
     ensure_dir(path)?;
     if !app.trim().is_empty() {
-        return if spawn_custom(app, path) { Ok(()) } else { Err(AppError::Internal(format!("Could not start “{app}”. Check Settings → General."))) };
+        return if spawn_custom(app, path, &[]) { Ok(()) } else { Err(AppError::Internal(format!("Could not start “{app}”. Check Settings → General."))) };
     }
     let ok = if cfg!(target_os = "macos") {
         spawn("open", &["-a", "Terminal", path])
@@ -84,23 +87,30 @@ pub fn open_terminal(path: &str, app: &str) -> AppResult<()> {
     if ok { Ok(()) } else { Err(AppError::Internal("No terminal application found.".into())) }
 }
 
-pub fn open_editor(path: &str, app: &str) -> AppResult<()> {
+/// Opens the repository in the editor, and `file` (repo-relative) in it when given.
+pub fn open_editor(path: &str, file: Option<&str>, app: &str) -> AppResult<()> {
     ensure_dir(path)?;
+    let file_path = file
+        .filter(|f| Path::new(f).components().all(|c| matches!(c, std::path::Component::Normal(_))))
+        .map(|f| Path::new(path).join(f))
+        .filter(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned());
+    let extra: Vec<&str> = file_path.as_deref().into_iter().collect();
     if !app.trim().is_empty() {
-        return if spawn_custom(app, path) { Ok(()) } else { Err(AppError::Internal(format!("Could not start “{app}”. Check Settings → General."))) };
+        return if spawn_custom(app, path, &extra) { Ok(()) } else { Err(AppError::Internal(format!("Could not start “{app}”. Check Settings → General."))) };
     }
     let ok = if cfg!(target_os = "macos") {
         let vscode = ["/Applications/Visual Studio Code.app", "/Applications/Cursor.app"]
             .into_iter()
             .find(|a| Path::new(a).exists());
         match vscode {
-            Some(app) => spawn("open", &["-a", app, path]),
-            None => spawn("open", &[path]),
+            Some(app) => spawn("open", &[&["-a", app, path][..], &extra].concat()),
+            None => spawn("open", &[&[path][..], &extra].concat()),
         }
     } else if cfg!(windows) {
-        spawn("cmd", &["/C", "code", path]) || spawn("explorer", &[path])
+        spawn("cmd", &[&["/C", "code", path][..], &extra].concat()) || spawn("explorer", &[path])
     } else {
-        spawn("code", &[path]) || spawn("xdg-open", &[path])
+        spawn("code", &[&[path][..], &extra].concat()) || spawn("xdg-open", &[path])
     };
     if ok { Ok(()) } else { Err(AppError::Internal("No editor found.".into())) }
 }
