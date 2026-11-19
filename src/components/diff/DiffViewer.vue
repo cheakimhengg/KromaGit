@@ -12,7 +12,7 @@ import FileHistory from './FileHistory.vue'
 import BlameView from './BlameView.vue'
 import { highlightLine, isMixedMarkup, mixedLanguages } from '@/lib/highlight'
 import { toSplitRows } from '@/lib/diff-split'
-import { markMatches } from '@/lib/find-in-html'
+import { lineMatches, markMatches } from '@/lib/find-in-html'
 import type { DiffLine, DiffTarget, FileChange, FileDiff, FileHistoryEntry, HunkSelection } from '@/types/git'
 import { useOpsStore } from '@/stores/ops'
 import * as git from '@/actions/git'
@@ -29,6 +29,8 @@ watch(() => props.target, () => (histTarget.value = null))
 const tgt = computed<DiffTarget>(() => histTarget.value ?? props.target)
 const isImage = computed(() => isImagePath(tgt.value.path))
 const loading = ref(false)
+/** a reload of the same file (e.g. after an outside edit) stays visually still */
+const quietReload = ref(false)
 const SKELETON_WIDTHS = [42, 68, 55, 0, 74, 61, 38, 80, 52, 0, 66, 47, 71, 35, 58, 0, 63, 49]
 const error = ref<string | null>(null)
 const selected = ref(new Set<string>())
@@ -41,6 +43,8 @@ watch(
     onCleanup(() => (cancelled = true))
     if (!old || old[0] !== target) selected.value = new Set()
     if (old && old[0].path !== target.path) diff.value = null
+    quietReload.value = !!old && old[0] === target && old[4] === ui.diffOptions.fullFile
+    const freshView = !old || old[0] !== target || old[4] !== ui.diffOptions.fullFile
     loading.value = true
     error.value = null
     try {
@@ -48,6 +52,7 @@ watch(
       if (!cancelled) {
         diff.value = d
         if (target.line && (!old || old[0] !== target)) void focusLine(target.line)
+        else if (freshView && (ui.diffOptions.fullFile || target.unchanged)) void jumpToFirstChange()
       }
     } catch (e) {
       if (!cancelled) {
@@ -139,6 +144,8 @@ interface ChangeBlock {
   row: number
   len: number
   kind: 'add' | 'del' | 'mod'
+  adds: number
+  dels: number
 }
 const rowOffsets = computed(() => {
   const out: number[] = []
@@ -172,9 +179,11 @@ const changeBlocks = computed<ChangeBlock[]>(() => {
         cur.len++
         if (cur.kind !== k) cur.kind = 'mod'
       } else {
-        cur = { row: rowIndex(hi, i), len: 1, kind: k as ChangeBlock['kind'] }
+        cur = { row: rowIndex(hi, i), len: 1, kind: k as ChangeBlock['kind'], adds: 0, dels: 0 }
         out.push(cur)
       }
+      if (k !== 'del') cur.adds++
+      if (k !== 'add') cur.dels++
     })
   })
   return out
@@ -211,6 +220,13 @@ function onDiffWheel(e: WheelEvent) {
 }
 watch(() => [tgt.value.path, ui.diffMode] as const, () => setSplitX(0))
 
+/** In whole-file view, open at the first change rather than line 1. */
+async function jumpToFirstChange() {
+  await nextTick()
+  if (!changeBlocks.value.length) return
+  currentChange.value = 0
+  scrollToRow(changeBlocks.value[0].row)
+}
 async function jumpToRow(row: number) {
   scrollToRow(row)
 }
@@ -225,7 +241,31 @@ function jumpToBlock(i: number) {
   currentChange.value = i
   jumpToRow(changeBlocks.value[i].row)
 }
-const RULER_COLOR = { add: 'var(--gw-success)', del: 'var(--gw-danger)', mod: 'var(--gw-accent)' }
+function onRulerClick(e: MouseEvent) {
+  const el = e.currentTarget as HTMLElement
+  const rect = el.getBoundingClientRect()
+  if (!rect.height || !changeBlocks.value.length) return
+  const y = ((e.clientY - rect.top) / rect.height) * 100
+  let best = 0
+  let bestDist = Infinity
+  changeBlocks.value.forEach((b, i) => {
+    const top = blockPos.value[i]?.top ?? (b.row / rowOffsets.value.total) * 100
+    const height = blockPos.value[i]?.height ?? 0
+    const dist = y < top ? top - y : y > top + height ? y - top - height : 0
+    if (dist < bestDist) {
+      bestDist = dist
+      best = i
+    }
+  })
+  jumpToBlock(best)
+}
+/** A mixed block shows its removed part in red above its added part in green, in proportion. */
+function rulerColor(b: ChangeBlock) {
+  if (b.kind === 'add') return 'var(--gw-success)'
+  if (b.kind === 'del') return 'var(--gw-danger)'
+  const red = Math.round((b.dels / (b.dels + b.adds)) * 100)
+  return `linear-gradient(to bottom, var(--gw-danger) 0 ${red}%, var(--gw-success) ${red}% 100%)`
+}
 
 const commitFiles = shallowRef<{ hash: string; files: FileChange[]; parent?: string } | null>(null)
 watch(
@@ -250,6 +290,26 @@ const fileList = computed<FileChange[]>(() => {
   return (t.source === 'staged' ? wc?.staged : wc?.unstaged) ?? []
 })
 const fileIndex = computed(() => fileList.value.findIndex((f) => f.path === tgt.value.path))
+/** Once the open file has been fully staged (or unstaged), move on to the next one so review keeps flowing. */
+let lastIndex = -1
+watch(fileIndex, (i) => {
+  if (i >= 0) lastIndex = i
+}, { immediate: true })
+watch(fileList, (list) => {
+  const t = tgt.value
+  if (t.source === 'commit' || lastIndex < 0 || list.some((f) => f.path === t.path)) return
+  const candidates = list.filter((f) => f.status !== 'U')
+  const next = candidates[Math.min(lastIndex, candidates.length - 1)]
+  lastIndex = -1
+  if (next) {
+    ui.openDiff({ path: next.path, oldPath: next.oldPath, source: t.source, untracked: next.status === '?' })
+    return
+  }
+  const wc = repos.active?.snapshot.workingCopy
+  const other = t.source === 'unstaged' ? 'staged' : 'unstaged'
+  const moved = (other === 'staged' ? wc?.staged : wc?.unstaged)?.find((f) => f.path === t.path)
+  if (moved) ui.openDiff({ path: moved.path, oldPath: moved.oldPath, source: other, untracked: moved.status === '?' })
+})
 function goFile(delta: number) {
   const list = fileList.value
   if (list.length < 2) return
@@ -323,7 +383,7 @@ const virtualizer = useVirtualizer(
     count: items.value.length,
     getScrollElement: () => scroller.value,
     estimateSize: (i: number) => (items.value[i]?.ri === -1 ? (items.value[i].hi > 0 ? HEADER_H + 12 : HEADER_H) : 22),
-    overscan: 30,
+    overscan: 8,
   })),
 )
 const measureRow = (el: unknown) => {
@@ -340,21 +400,27 @@ const findOpen = ref(false)
 const findQuery = ref('')
 const findCur = ref(0)
 const findInput = ref<HTMLInputElement | null>(null)
+const findCase = ref(localStorage.getItem('kromagit.findCase') === '1')
+const findWord = ref(localStorage.getItem('kromagit.findWord') === '1')
+watch(findCase, (v) => localStorage.setItem('kromagit.findCase', v ? '1' : '0'))
+watch(findWord, (v) => localStorage.setItem('kromagit.findWord', v ? '1' : '0'))
+const findOpts = computed(() => ({ caseSensitive: findCase.value, wholeWord: findWord.value }))
 const findHits = computed(() => {
-  const q = findOpen.value ? findQuery.value.toLowerCase() : ''
+  const q = findOpen.value ? findQuery.value : ''
   if (!q) return []
+  const opts = findOpts.value
   const out: number[] = []
   items.value.forEach((it, i) => {
     if (it.ri < 0) return
     const lines = hunks.value[it.hi].lines
     const idx = ui.diffMode === 'split' ? [splitRows.value[it.hi][it.ri].left?.index, splitRows.value[it.hi][it.ri].right?.index] : [it.ri]
-    if (idx.some((li) => li !== undefined && lines[li].text.toLowerCase().includes(q))) out.push(i)
+    if (idx.some((li) => li !== undefined && lineMatches(lines[li].text, q, opts))) out.push(i)
   })
   return out
 })
 const findSet = computed(() => new Set(findHits.value))
 const findRow = computed(() => findHits.value[findCur.value] ?? -1)
-const shown = (h: string) => (findOpen.value && findQuery.value ? markMatches(h, findQuery.value) : h)
+const shown = (h: string) => (findOpen.value && findQuery.value ? markMatches(h, findQuery.value, findOpts.value) : h)
 function openFind() {
   findOpen.value = true
   void nextTick(() => findInput.value?.select())
@@ -444,8 +510,8 @@ const lineClass = (l: DiffLine, sel: boolean) => {
   if (l.kind === 'del') return sel ? 'bg-[var(--gw-del-strong)]' : 'bg-[var(--gw-del-bg)]'
   return ''
 }
-const sign = (l: DiffLine) => (l.kind === 'add' ? '+' : l.kind === 'del' ? '−' : ' ')
-const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind === 'del' ? 'text-danger' : 'text-faint')
+/** No +/− column: the row colour says it, and changed line numbers take the same tint. */
+const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind === 'del' ? 'text-danger/80' : 'text-faint')
 </script>
 
 <template>
@@ -563,6 +629,14 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         placeholder="Find in diff" spellcheck="false"
         @keydown.enter.exact.prevent="findStep(1)" @keydown.shift.enter.prevent="findStep(-1)" @keydown.esc.prevent="closeFind"
       />
+      <button
+        type="button" class="find-opt" :class="{ on: findCase }" title="Match case"
+        @mousedown.prevent @click="findCase = !findCase"
+      >Aa</button>
+      <button
+        type="button" class="find-opt" :class="{ on: findWord }" title="Match whole word"
+        @mousedown.prevent @click="findWord = !findWord"
+      ><span class="underline decoration-1 underline-offset-2">ab</span></button>
       <span class="min-w-[56px] shrink-0 text-right text-[12px] tabular-nums" :class="findQuery && !findHits.length ? 'text-danger' : 'text-faint'">
         {{ findQuery ? (findHits.length ? `${findCur + 1} of ${findHits.length}` : 'No results') : '' }}
       </span>
@@ -570,7 +644,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
       <button type="button" class="tb-icon" title="Next (↵)" :disabled="!findHits.length" @click="findStep(1)"><ChevronDown :size="15" /></button>
       <button type="button" class="tb-icon" title="Close (Esc)" @click="closeFind"><X :size="15" /></button>
     </div>
-    <div ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading, 'sx-on': splitX > 0 }" :style="{ '--sx': `${splitX}px` }" @wheel="onDiffWheel">
+    <div ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading && !quietReload, 'sx-on': splitX > 0 }" :style="{ '--sx': `${splitX}px` }" @wheel="onDiffWheel">
       <div v-if="isConflict" class="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
       This file has conflicts. Keep the lines you want, remove the <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> <code>=======</code> <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> markers in your editor, then Stage file to mark it resolved.
       </div>
@@ -578,10 +652,11 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
         Diff is very large; showing the first 20,000 lines.
       </div>
       <div class="relative" :style="{ height: `${virtualizer.getTotalSize()}px`, width: unifiedWidth }">
+        <div class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)` }">
         <div
           v-for="v in virtualizer.getVirtualItems()" :key="v.index"
           :ref="measureRow" :data-index="v.index"
-          class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${v.start}px)` }"
+          class="w-full"
         >
           <template v-for="it in [items[v.index]]" :key="v.index">
             <div v-if="it.ri === -1" :class="it.hi > 0 ? 'pt-3' : ''">
@@ -615,17 +690,16 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
               class="flex" :data-kind="l.kind" :class="[lineClass(l, selected.has(key(it.hi, it.ri))), focused !== null && l.newNo === focused ? 'ring-1 ring-accent-2 ring-inset' : '', findSet.has(v.index) ? (findRow === v.index ? 'kg-find-cur' : 'kg-find-row') : '']"
             >
               <span
-                class="w-12 shrink-0 pr-2 text-right text-faint select-none"
-                :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
+                class="w-12 shrink-0 pr-2 text-right select-none"
+                :class="[numColor(l), canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : '']"
                 :title="canStage && l.kind !== 'context' ? 'Click to select line (shift-click for range)' : undefined"
                 @click="toggleLine($event, it.hi, it.ri, l)"
               >{{ l.oldNo ?? '' }}</span>
               <span
-                class="w-12 shrink-0 pr-2 text-right text-faint select-none"
-                :class="canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
+                class="mr-3 w-12 shrink-0 pr-2 text-right select-none"
+                :class="[numColor(l), canStage && l.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : '']"
                 @click="toggleLine($event, it.hi, it.ri, l)"
               >{{ l.newNo ?? '' }}</span>
-              <span class="w-5 shrink-0 text-center select-none" :class="signColor(l)">{{ sign(l) }}</span>
               <!-- eslint-disable-next-line vue/no-v-html -->
               <span class="pr-6 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'whitespace-pre'" v-html="shown(lineHtml(it.hi, it.ri)) || ' '" />
             </div>
@@ -644,11 +718,10 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
                 <template v-for="cell in [row[side]]" :key="side">
                   <template v-if="cell">
                     <span
-                      class="relative z-[1] w-12 shrink-0 bg-inherit pr-2 text-right text-faint select-none"
-                      :class="canStage && cell.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : ''"
+                      class="relative z-[1] mr-3 w-12 shrink-0 bg-inherit pr-2 text-right select-none"
+                      :class="[numColor(cell), canStage && cell.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : '']"
                       @click="toggleLine($event, it.hi, cell.index, cell)"
                     >{{ side === 'left' ? cell.oldNo : cell.newNo }}</span>
-                    <span class="relative z-[1] w-5 shrink-0 bg-inherit text-center select-none" :class="signColor(cell)">{{ sign(cell) }}</span>
                     <!-- eslint-disable-next-line vue/no-v-html -->
                     <span v-if="ui.diffOptions.wrap" class="min-w-0 break-all whitespace-pre-wrap pr-4 text-fg select-text" v-html="shown(lineHtml(it.hi, cell.index)) || ' '" />
                     <!-- eslint-disable-next-line vue/no-v-html -->
@@ -659,25 +732,26 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
             </div>
           </template>
         </div>
+        </div>
       </div>
       <div v-if="canStage && hunks.length" class="px-3 pb-4 font-sans text-[12px] text-faint">
         Tip: click a line number to select lines (shift-click for a range), then {{ stageVerb.toLowerCase() }} only those lines.
       </div>
     </div>
-    <div v-if="changeBlocks.length" class="relative w-3 shrink-0 border-l border-line bg-surface/60" title="Change map — click to jump">
+    <div v-if="changeBlocks.length" class="relative w-4 shrink-0 cursor-pointer border-l border-line bg-surface/60 hover:bg-surface-2/70" title="Change map — click to jump" @click="onRulerClick">
       <button
         v-for="(b, i) in changeBlocks" :key="i" type="button"
-        class="absolute right-0.5 left-0.5 min-h-[3px] rounded-sm hover:brightness-125"
+        class="absolute right-0.5 left-0.5 min-h-[6px] rounded-sm hover:brightness-125"
         :class="{ 'ring-1 ring-fg': i === currentChange }"
-        :style="{ top: `${blockPos[i]?.top ?? (b.row / rowOffsets.total) * 100}%`, height: `${blockPos[i]?.height ?? Math.max((b.len / rowOffsets.total) * 100, 0.4)}%`, background: RULER_COLOR[b.kind] }"
-        :title="`${b.kind === 'add' ? 'Added' : b.kind === 'del' ? 'Removed' : 'Changed'} · ${b.len} ${b.len === 1 ? 'line' : 'lines'}`"
-        @click="jumpToBlock(i)"
+        :style="{ top: `${blockPos[i]?.top ?? (b.row / rowOffsets.total) * 100}%`, height: `${blockPos[i]?.height ?? Math.max((b.len / rowOffsets.total) * 100, 0.4)}%`, background: rulerColor(b) }"
+        :title="b.kind === 'mod' ? `Changed · −${b.dels} +${b.adds}` : `${b.kind === 'add' ? 'Added' : 'Removed'} · ${b.len} ${b.len === 1 ? 'line' : 'lines'}`"
+        @click.stop="jumpToBlock(i)"
       />
     </div>
     <div
       v-if="splitSideways && maxSplitX > 0"
       ref="hbar"
-      class="absolute right-3 bottom-0 left-0 z-20 h-3 overflow-x-auto overflow-y-hidden"
+      class="absolute right-4 bottom-0 left-0 z-20 h-3 overflow-x-auto overflow-y-hidden"
       @scroll="setSplitX(($event.target as HTMLElement).scrollLeft)"
     ><div class="h-px" :style="{ width: `calc(100% + ${maxSplitX}px)` }" /></div>
     </div>
@@ -688,6 +762,12 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
 
 <style scoped>
 @reference '../../styles/main.css';
+.find-opt {
+  @apply flex h-6 min-w-6 shrink-0 items-center justify-center rounded px-1 font-mono text-[11.5px] text-faint hover:bg-hover hover:text-fg;
+}
+.find-opt.on {
+  @apply bg-accent/20 text-accent ring-1 ring-accent/50 ring-inset;
+}
 .tb-icon {
   @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-fg disabled:opacity-30;
 }

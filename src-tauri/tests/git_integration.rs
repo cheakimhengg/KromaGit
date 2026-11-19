@@ -544,3 +544,27 @@ fn checking_out_a_remote_branch_can_replace_a_diverged_local_copy() {
     assert_eq!(sh_out(&d, &["branch", "--show-current"]).trim(), "demo");
     assert_eq!(sh_out(&d, &["log", "-1", "--format=%s"]).trim(), "newer demo");
 }
+
+#[test]
+fn pull_links_a_branch_that_has_no_upstream_yet() {
+    let tmp = tempfile::tempdir().unwrap();
+    let origin = tmp.path().join("origin");
+    std::fs::create_dir(&origin).unwrap();
+    sh(&origin, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(&origin, "a.txt", "one\n");
+    sh(&origin, &["add", "-A"]);
+    sh(&origin, &["commit", "-qm", "base"]);
+    let d = tmp.path().join("clone");
+    sh(tmp.path(), &["clone", "-q", origin.to_str().unwrap(), "clone"]);
+    sh(&d, &["switch", "-q", "--no-track", "-c", "topic", "origin/main"]);
+    sh(&origin, &["switch", "-q", "-c", "topic"]);
+    write(&origin, "a.txt", "two\n");
+    sh(&origin, &["commit", "-qam", "remote topic"]);
+    sh(&d, &["fetch", "-q"]);
+
+    let g = Git::new(&d);
+    let action = git::ops::Action::Pull { mode: "merge".into(), track: Some("origin/topic".into()) };
+    git::ops::run_action(&g, &action).unwrap();
+    assert_eq!(sh_out(&d, &["log", "-1", "--format=%s"]).trim(), "remote topic");
+    assert_eq!(sh_out(&d, &["rev-parse", "--abbrev-ref", "@{u}"]).trim(), "origin/topic");
+}

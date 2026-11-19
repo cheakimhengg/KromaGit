@@ -365,7 +365,23 @@ export function fetchAll() {
 export function pull(mode: PullMode = 'merge') {
   if (blockedByOperation('pull')) return
   const label = { merge: 'Pull', rebase: 'Pull (rebase)', ffOnly: 'Pull (fast-forward only)' }[mode]
-  return ops().run(label, { type: 'pull', mode }, { undo: moveHeadUndo })
+  const snap = snapshot()
+  const branch = snap?.head.branch
+  let track: string | undefined
+  if (branch && !snap?.head.upstream) {
+    const remote = snap?.remotes.find((r) => r.name === 'origin' && r.branches.includes(branch)) ?? snap?.remotes.find((r) => r.branches.includes(branch))
+    if (!remote) {
+      ui().toast({
+        kind: 'info',
+        title: 'Nothing to pull yet',
+        detail: `${branch} isn't on the remote. Push it first.`,
+        action: { label: 'Push', run: () => void push() },
+      }, 6000)
+      return
+    }
+    track = `${remote.name}/${branch}`
+  }
+  return ops().run(label, { type: 'pull', mode, ...(track ? { track } : {}) }, { undo: moveHeadUndo })
 }
 
 export async function push(opts: { force?: boolean; setUpstream?: boolean } = {}) {

@@ -115,7 +115,7 @@ function split(path: string) {
             :title="rows[v.index].file!.oldPath ? `${rows[v.index].file!.oldPath} → ${rows[v.index].file!.path}` : rows[v.index].file!.path"
           >
             <span class="truncate" :class="{ 'line-through opacity-60': rows[v.index].file!.status === 'D', 'text-muted': rows[v.index].file!.status === '=', 'text-fg': rows[v.index].file!.status !== '=' }">{{ split(rows[v.index].file!.path).name }}</span>
-            <span v-if="mode === 'list'" class="truncate text-[11px] text-faint">{{ split(rows[v.index].file!.path).dir }}</span>
+            <span v-if="mode === 'list'" class="truncate text-[12px] text-faint">{{ split(rows[v.index].file!.path).dir }}</span>
           </span>
           <span v-if="rows[v.index].file!.status !== '='" class="shrink-0 font-mono text-[11px]" :class="readonly ? '' : 'hidden group-hover:inline'">
             <span class="text-success">+{{ rows[v.index].file!.additions }}</span>

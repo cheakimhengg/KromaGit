@@ -10,14 +10,15 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto', style: 'short' })
 
 /** Relative time like "3 hr. ago"; `now` is unix seconds. */
+/** Same short style as the commit list ("5m ago", "2h ago", "3d ago"), so times read alike everywhere. */
 export function relativeTime(unixSeconds: number, now = Date.now() / 1000): string {
   const diff = unixSeconds - now
-  const abs = Math.abs(diff)
-  if (abs < 60) return 'just now'
-  for (const [unit, secs] of UNITS) {
-    if (abs >= secs) return rtf.format(Math.round(diff / secs), unit)
+  if (diff >= 60) {
+    for (const [unit, secs] of UNITS) {
+      if (diff >= secs) return rtf.format(Math.round(diff / secs), unit)
+    }
   }
-  return 'just now'
+  return now - unixSeconds < 60 ? 'just now' : compactTime(unixSeconds, now)
 }
 
 export function compactTime(unixSeconds: number, now = Date.now() / 1000): string {

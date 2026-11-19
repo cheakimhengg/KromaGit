@@ -195,7 +195,7 @@ const columns = computed(() =>
     show.value.refs ? `${refsWidth.value}px` : null,
     show.value.graph ? `${gWidth.value}px` : null,
     'minmax(160px,1fr)',
-    show.value.author ? '92px' : null,
+    show.value.author ? '124px' : null,
     show.value.hash ? '68px' : null,
     show.value.date ? '84px' : null,
   ]
@@ -500,13 +500,15 @@ function rowIndex(virtualIndex: number) {
 
     <div ref="scrollEl" class="min-h-0 flex-1 overflow-auto outline-none [scrollbar-gutter:stable]" tabindex="0" @keydown="onListKey">
       <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
+        <!-- one moving block of rows in normal flow: rows share edges, so no hairline gaps at fractional zoom -->
+        <div class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)` }">
         <template v-for="v in virtualizer.getVirtualItems()" :key="v.index">
           <div
             v-for="c in [commits[rowIndex(v.index)]]"
             :key="c.hash"
-            class="absolute left-0 grid w-full cursor-pointer items-center text-[13px]"
+            class="grid w-full cursor-pointer items-center text-[13px]"
             :class="[ui.selectedCommit === c.hash ? 'bg-select' : 'hover:bg-surface-2', isSearching && !matchSet.has(rowIndex(v.index)) ? 'opacity-35' : '']"
-            :style="{ height: `${ROW_HEIGHT}px`, transform: `translateY(${v.start}px)`, gridTemplateColumns: columns, '--lane': laneColor(layout!.rows[rowIndex(v.index)].color) }"
+            :style="{ height: `${ROW_HEIGHT}px`, gridTemplateColumns: columns, '--lane': laneColor(layout!.rows[rowIndex(v.index)].color) }"
             @click="ui.selectCommit(c.hash)"
             @dblclick="onRowDblClick(c)"
             @contextmenu="commitMenu($event, c)"
@@ -557,6 +559,7 @@ function rowIndex(virtualIndex: number) {
             <span v-if="show.date" class="truncate px-3 text-right font-mono text-[12px] text-muted tabular-nums" :title="fullDate(c.date)">{{ compactTime(c.date) }}</span>
           </div>
         </template>
+        </div>
       </div>
       <div v-if="!commits.length && loadingCommits" class="space-y-3 p-4">
         <div v-for="i in 8" :key="i" class="flex items-center gap-3">

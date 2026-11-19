@@ -39,7 +39,7 @@ pub enum Action {
     RestoreRef { refname: String, oid: String },
     DeleteHeadRef,
     Fetch { remote: Option<String> },
-    Pull { mode: String },
+    Pull { mode: String, #[serde(default)] track: Option<String> },
     Push { remote: Option<String>, branch: Option<String>, set_upstream: bool, force: bool },
     Merge { target: String, #[serde(default)] mode: Option<String> },
     Rebase { onto: String },
@@ -461,7 +461,11 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             Some(r) => network(git, &["fetch", "--prune", "--recurse-submodules=no", r])?,
             None => network(git, &["fetch", "--prune", "--recurse-submodules=no", "--all"])?,
         },
-        Pull { mode } => {
+        Pull { mode, track } => {
+            if let Some(upstream) = track {
+                // link a branch that exists on the remote under the same name, then pull as usual
+                git.run(&["branch", &format!("--set-upstream-to={upstream}")])?;
+            }
             let flag = match mode.as_str() {
                 "rebase" => "--rebase",
                 "ffOnly" => "--ff-only",

@@ -79,9 +79,12 @@ export const useUpdatesStore = defineStore('updates', () => {
     } catch (e) {
       error.value = errorText(e)
       const noRelease = error.value.startsWith('No release')
-      status.value = noRelease ? 'upToDate' : opts.silent ? 'idle' : 'error'
+      // a release published before every platform's build finished uploading
+      const notBuiltYet = /fallback platforms|platforms` object/.test(error.value)
+      status.value = noRelease || notBuiltYet ? 'upToDate' : opts.silent ? 'idle' : 'error'
       if (!opts.silent) {
-        ui.toast({ kind: noRelease ? 'info' : 'error', title: noRelease ? 'No updates yet' : "Couldn't check for updates", detail: error.value })
+        if (notBuiltYet) ui.toast({ kind: 'info', title: 'Update still being prepared', detail: 'Try again in a few minutes.' })
+        else ui.toast({ kind: noRelease ? 'info' : 'error', title: noRelease ? 'No updates yet' : "Couldn't check for updates", detail: error.value })
       }
     }
     return status.value

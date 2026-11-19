@@ -242,7 +242,7 @@ export type GitAction =
   | { type: 'restoreRef'; refname: string; oid: string }
   | { type: 'deleteHeadRef' }
   | { type: 'fetch'; remote: string | null }
-  | { type: 'pull'; mode: PullMode }
+  | { type: 'pull'; mode: PullMode; track?: string }
   | { type: 'push'; remote: string | null; branch: string | null; setUpstream: boolean; force: boolean }
   | { type: 'merge'; target: string; mode?: 'noFf' | 'ffOnly' }
   | { type: 'rebase'; onto: string }

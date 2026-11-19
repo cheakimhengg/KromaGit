@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { markMatches } from '@/lib/find-in-html'
+import { lineMatches, markMatches } from '@/lib/find-in-html'
 
 describe('markMatches', () => {
   it('marks text but never inside tags', () => {
@@ -16,5 +16,21 @@ describe('markMatches', () => {
   it('leaves html alone without a query or a match', () => {
     expect(markMatches('<b>x</b>', '')).toBe('<b>x</b>')
     expect(markMatches('<b>x &amp; y</b>', 'zzz')).toBe('<b>x &amp; y</b>')
+  })
+})
+
+describe('find options', () => {
+  it('match case only marks the same case', () => {
+    expect(markMatches('Host host HOST', 'host', { caseSensitive: true })).toBe('Host <mark class="kg-find">host</mark> HOST')
+  })
+  it('whole word skips matches inside longer words', () => {
+    expect(markMatches('host hostname _host localhost host.', 'host', { wholeWord: true })).toBe(
+      '<mark class="kg-find">host</mark> hostname _host localhost <mark class="kg-find">host</mark>.',
+    )
+  })
+  it('lineMatches follows the same rules', () => {
+    expect(lineMatches('var hostName', 'host', { wholeWord: true })).toBe(false)
+    expect(lineMatches('Host: x', 'host', { caseSensitive: true })).toBe(false)
+    expect(lineMatches('a.b(c)', '.b(', {})).toBe(true)
   })
 })

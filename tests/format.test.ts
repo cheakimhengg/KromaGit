@@ -6,8 +6,8 @@ describe('format', () => {
   it('formats relative times', () => {
     const now = 1_700_000_000
     expect(relativeTime(now - 10, now)).toBe('just now')
-    expect(relativeTime(now - 3 * 3600, now)).toMatch(/3 hr/)
-    expect(relativeTime(now - 2 * 86400, now)).toMatch(/2 days ago/)
+    expect(relativeTime(now - 3 * 3600, now)).toBe('3h ago')
+    expect(relativeTime(now - 2 * 86400, now)).toBe('2d ago')
   })
 
   it('formats compact times', () => {

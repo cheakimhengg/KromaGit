@@ -96,12 +96,17 @@ export const ZOOM_MAX = 150
 export const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z / 10) * 10))
 
 /** Native webview zoom inside the app (keeps click coordinates right); CSS zoom in the browser demo. */
+/** "100%" renders slightly smaller than 1:1 — the designed size, a bit more compact than the raw pixel sizes. */
+export const UI_SCALE = 0.96
+export const zoomFactor = ref(UI_SCALE)
+
 export async function applyZoom(percent: number, inTauri: boolean) {
-  const z = clampZoom(percent)
+  const z = (clampZoom(percent) / 100) * UI_SCALE
+  zoomFactor.value = z
   if (inTauri) {
     const { getCurrentWebview } = await import('@tauri-apps/api/webview')
-    await getCurrentWebview().setZoom(z / 100)
+    await getCurrentWebview().setZoom(z)
   } else {
-    ;(document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = `${z}%`
+    ;(document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = `${z * 100}%`
   }
 }

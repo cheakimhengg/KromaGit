@@ -159,8 +159,14 @@ export const useReposStore = defineStore('repos', () => {
     return s
   }
 
+  /** Applies only what really changed, so a refresh that finds nothing new doesn't redraw the graph or reload the diff. */
   function patch(state: RepoState, partial: Partial<RepoSnapshot>) {
-    const next = { ...state.snapshot, ...partial }
+    const cur = state.snapshot as unknown as Record<string, unknown>
+    const changed = Object.fromEntries(
+      Object.entries(partial).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(cur[k])),
+    ) as Partial<RepoSnapshot>
+    if (!Object.keys(changed).length) return
+    const next = { ...state.snapshot, ...changed }
     next.currentBranch = describeHead(next.head)
     relayout(state, next)
     state.snapshot = markRaw(next)
@@ -231,10 +237,10 @@ export const useReposStore = defineStore('repos', () => {
     await loadCommits(tab)
   }
 
-  async function loadRefs(tab: RepoTab) {
+  async function loadRefs(tab: RepoTab, quiet = false) {
     const state = ensureState(tab)
     const gen = ++generations.get(tab.id)!.refs
-    state.loading.refs = true
+    if (!quiet) state.loading.refs = true
     try {
       const refs: RefsPayload = await gitApi.getRefs(tab.path)
       if (generations.get(tab.id)?.refs !== gen) return
@@ -246,10 +252,10 @@ export const useReposStore = defineStore('repos', () => {
     }
   }
 
-  async function loadStatus(tab: RepoTab): Promise<StatusPayload | null> {
+  async function loadStatus(tab: RepoTab, quiet = false): Promise<StatusPayload | null> {
     const state = ensureState(tab)
     const gen = ++generations.get(tab.id)!.status
-    state.loading.status = true
+    if (!quiet) state.loading.status = true
     try {
       const status = await gitApi.getStatus(tab.path)
       if (generations.get(tab.id)?.status !== gen) return null
@@ -295,7 +301,7 @@ export const useReposStore = defineStore('repos', () => {
     const p = (async () => {
       try {
         const out = await gitApi.runAction(tab.path, { type: 'fetch', remote: null })
-        await loadRefs(tab)
+        await loadRefs(tab, true)
         if (out.output.trim()) await loadCommits(tab)
       } catch {
         /* offline or no access: the user's own Fetch/Pull will show the error */
@@ -340,7 +346,7 @@ export const useReposStore = defineStore('repos', () => {
     if (!tab || !state?.loaded || state.loading.commits) return
     const before = state.snapshot
     const tipsBefore = before.branches.map((b) => `${b.name}:${b.tipHash}`).join('|')
-    const [status] = await Promise.all([loadStatus(tab), loadRefs(tab)])
+    const [status] = await Promise.all([loadStatus(tab, true), loadRefs(tab, true)])
     const after = state.snapshot
     const tipsAfter = after.branches.map((b) => `${b.name}:${b.tipHash}`).join('|')
     if ((status && status.head.oid !== before.head.oid) || tipsBefore !== tipsAfter || after.tags.length !== before.tags.length) {

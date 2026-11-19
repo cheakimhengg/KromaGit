@@ -3,13 +3,16 @@
  * an overlay title bar, so the buttons sit on top of the tab bar — except in
  * full screen, where macOS hides them and the space would just be empty.
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { isMac } from './shortcuts'
+import { zoomFactor } from './theme'
 
 const TRAFFIC_LIGHTS = 78
 const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
-export const titlebarInset = ref(inTauri && isMac ? TRAFFIC_LIGHTS : 0)
+const fullscreen = ref(false)
+/** in CSS pixels, so it shrinks/grows against the page zoom to stay clear of the native buttons */
+export const titlebarInset = computed(() => (inTauri && isMac && !fullscreen.value ? Math.ceil(TRAFFIC_LIGHTS / zoomFactor.value) : 0))
 
 let started = false
 export async function watchWindowChrome() {
@@ -19,7 +22,7 @@ export async function watchWindowChrome() {
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
     const win = getCurrentWindow()
     const update = async () => {
-      titlebarInset.value = (await win.isFullscreen()) ? 0 : TRAFFIC_LIGHTS
+      fullscreen.value = await win.isFullscreen()
     }
     await update()
     await win.onResized(() => void update())
