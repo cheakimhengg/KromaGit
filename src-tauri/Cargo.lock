@@ -2074,7 +2074,7 @@ dependencies = [
 
 [[package]]
 name = "kromagit"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "keyring",
  "portable-pty",
