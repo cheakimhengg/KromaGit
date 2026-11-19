@@ -15,6 +15,7 @@ export interface GitApi {
   getFileImage(repo: string, target: DiffTarget): Promise<ImagePair>
   fileHistory(repo: string, path: string, limit?: number): Promise<FileHistoryEntry[]>
   blame(repo: string, path: string, rev?: string): Promise<BlameLine[]>
+  listTree(repo: string, commit: string): Promise<string[]>
   readConflict(repo: string, path: string): Promise<ConflictFile>
   writeResolved(repo: string, path: string, text: string): Promise<void>
   mergeMessage(repo: string): Promise<string | null>
@@ -85,6 +86,7 @@ const tauriApi: GitApi = {
     return raw.map((r, i) => ({ commit: commits[i], path: r.path }))
   },
   blame: (repo, path, rev) => invoke<BlameLine[]>('blame_file', { repo, path, rev: rev ?? null }),
+  listTree: (repo, commit) => invoke<string[]>('list_tree', { repo, commit }),
   readConflict: (repo, path) => invoke<ConflictFile>('read_conflict', { repo, path }),
   writeResolved: (repo, path, text) => invoke<void>('write_resolved', { repo, path, text }),
   mergeMessage: (repo) => invoke<string | null>('merge_message', { repo }),

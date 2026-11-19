@@ -215,13 +215,32 @@ export function checkout(branch: string) {
   return ops().run(`Checkout ${branch}`, action, { success: `Switched to ${branch}`, undo: checkoutUndo(action) })
 }
 
-export function checkoutRemote(remoteBranch: string, remote: string) {
+export async function checkoutRemote(remoteBranch: string, remote: string) {
   if (blockedByOperation('switch branch')) return
   const name = remoteBranch.slice(remote.length + 1)
   const local = useReposStore().active?.snapshot.branches.find((b) => b.name === name)
-  if (local) return local.current ? undefined : checkout(name)
-  const action: GitAction = { type: 'checkoutRemote', remoteBranch, name }
-  return ops().run(`Checkout ${remoteBranch}`, action, { success: `Switched to ${name}`, undo: checkoutUndo(action) })
+  if (local?.current && !local.behind) return
+  const diverged = !!local && local.upstream === remoteBranch && local.ahead > 0 && local.behind > 0
+  if (diverged) {
+    const ok = await ui().confirm({
+      title: `Switch to ${remoteBranch}?`,
+      message: `Your local ${name} has ${local!.ahead} ${local!.ahead === 1 ? 'commit' : 'commits'} not on ${remoteBranch}. You can undo this.`,
+      confirmLabel: `Use ${remoteBranch}`,
+      danger: true,
+    })
+    if (!ok) return
+  }
+  const action: GitAction = { type: 'checkoutRemote', remoteBranch, name, reset: diverged }
+  const oldTip = local?.tipHash
+  return ops().run(`Checkout ${remoteBranch}`, action, {
+    success: `Switched to ${name}`,
+    undo: diverged && oldTip
+      ? (o) => {
+          const back = backTo(o.before)
+          return { undo: [{ type: 'reset', target: oldTip, mode: 'keep' }, ...(back ? [back] : [])], redo: [action] }
+        }
+      : checkoutUndo(action),
+  })
 }
 
 export function checkoutCommit(hash: string) {

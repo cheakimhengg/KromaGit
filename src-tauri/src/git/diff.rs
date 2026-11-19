@@ -80,11 +80,36 @@ pub fn get_file_diff(git: &Git, req: &DiffRequest) -> AppResult<FileDiff> {
         }
     };
     let mut diff = parse_unified_diff(&raw);
+    if req.source == "commit" && req.full_file && diff.hunks.is_empty() && !diff.binary {
+        let commit = req.commit.as_deref().unwrap_or("HEAD");
+        if let Ok(blob) = git.run(&["show", &format!("{commit}:{}", req.path)]) {
+            if blob.contains(&0) {
+                diff.binary = true;
+            } else {
+                diff.hunks = whole_file_hunk(&String::from_utf8_lossy(&blob));
+            }
+        }
+    }
     diff.path = req.path.clone();
     if diff.old_path.is_none() {
         diff.old_path = req.old_path.clone();
     }
     Ok(diff)
+}
+
+/// An unchanged file shown in full: one hunk where every line is context.
+fn whole_file_hunk(text: &str) -> Vec<DiffHunk> {
+    let lines: Vec<DiffLine> = text
+        .lines()
+        .take(MAX_DIFF_LINES)
+        .enumerate()
+        .map(|(i, l)| DiffLine { kind: "context", old_no: Some(i as u32 + 1), new_no: Some(i as u32 + 1), text: l.to_string(), no_eol: false })
+        .collect();
+    if lines.is_empty() {
+        return Vec::new();
+    }
+    let n = lines.len() as u32;
+    vec![DiffHunk { header: format!("@@ -1,{n} +1,{n} @@"), old_start: 1, old_lines: n, new_start: 1, new_lines: n, lines }]
 }
 
 fn null_path() -> &'static str {

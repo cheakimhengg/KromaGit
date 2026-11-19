@@ -12,6 +12,9 @@ pub mod terminal;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    std::thread::spawn(|| {
+        git::runner::user_path();
+    });
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = builder.menu(menu::build);
@@ -33,6 +36,7 @@ pub fn run() {
             commands::clone_repo,
             commands::file_history,
             commands::blame_file,
+            commands::list_tree,
             commands::read_conflict,
             commands::write_resolved,
             commands::merge_message,

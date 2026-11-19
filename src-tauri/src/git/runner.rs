@@ -18,6 +18,55 @@ pub struct RunOutput {
     pub stderr: Vec<u8>,
 }
 
+/// PATH for git and its hooks. Apps opened from the Dock get a minimal PATH, so hooks that run
+/// `node`, `npx` or `pnpm` (husky, lint-staged…) would fail; borrow the login shell's PATH instead.
+pub fn user_path() -> &'static str {
+    static PATH: OnceLock<String> = OnceLock::new();
+    PATH.get_or_init(|| {
+        let current = std::env::var("PATH").unwrap_or_default();
+        let mut parts: Vec<String> = Vec::new();
+        #[cfg(unix)]
+        if let Some(shell_path) = login_shell_path() {
+            parts.extend(shell_path.split(':').map(str::to_string));
+        }
+        parts.extend(current.split(if cfg!(windows) { ';' } else { ':' }).map(str::to_string));
+        #[cfg(target_os = "macos")]
+        parts.extend(["/opt/homebrew/bin", "/usr/local/bin"].map(str::to_string));
+        let mut seen = std::collections::HashSet::new();
+        parts.retain(|p| !p.is_empty() && seen.insert(p.clone()));
+        parts.join(if cfg!(windows) { ";" } else { ":" })
+    })
+}
+
+#[cfg(unix)]
+fn login_shell_path() -> Option<String> {
+    const MARK: &str = "__KROMAGIT_PATH__";
+    let shell = std::env::var("SHELL").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| "/bin/zsh".into());
+    let mut child = Command::new(shell)
+        .args(["-ilc", &format!("printf '%s%s' '{MARK}' \"$PATH\"")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+    let mut out = String::new();
+    child.stdout.take()?.read_to_string(&mut out).ok()?;
+    let path = out.rsplit_once(MARK)?.1.trim().to_string();
+    (!path.is_empty()).then_some(path)
+}
+
 /// Resolves the git executable once. GUI apps on macOS start with a minimal
 /// PATH, so prefer Homebrew installs before falling back to `git` on PATH.
 pub fn git_binary() -> &'static str {
@@ -65,6 +114,7 @@ impl Git {
                 "log.showSignature=false",
             ])
             .args(args)
+            .env("PATH", user_path())
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_EDITOR", "true")
             .env("GIT_SEQUENCE_EDITOR", "true")

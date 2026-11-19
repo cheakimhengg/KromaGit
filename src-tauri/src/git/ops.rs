@@ -29,7 +29,7 @@ pub enum Action {
     RewordHead { message: String },
     Checkout { branch: String },
     CheckoutDetached { target: String },
-    CheckoutRemote { remote_branch: String, name: String },
+    CheckoutRemote { remote_branch: String, name: String, #[serde(default)] reset: bool },
     CreateBranch { name: String, start: Option<String>, checkout: bool },
     DeleteBranch { name: String, force: bool },
     DeleteRemoteBranch { remote: String, branch: String },
@@ -375,12 +375,31 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             git.run(&["switch", "--detach", target])?;
             Out::none()
         }
-        CheckoutRemote { remote_branch, name } => {
+        CheckoutRemote { remote_branch, name, reset } => {
             validate_ref_name(git, name)?;
             if rev_parse(git, &format!("refs/heads/{name}"))?.is_empty() {
                 git.run(&["switch", "-c", name, "--track", remote_branch])?;
             } else {
                 git.run(&["switch", "--no-guess", name])?;
+                if *reset {
+                    // the user chose the remote version over local commits; --keep refuses rather than lose uncommitted work
+                    git.run(&["reset", "--keep", remote_branch])?;
+                    return Ok(Out { data: None, text: format!("{name} now matches {remote_branch}.") });
+                }
+                let count = |range: String| -> AppResult<u64> {
+                    Ok(git.run_string(&["rev-list", "--count", &range])?.trim().parse().unwrap_or(0))
+                };
+                let behind = count(format!("refs/heads/{name}..{remote_branch}"))?;
+                let local_only = count(format!("{remote_branch}..refs/heads/{name}"))?;
+                if behind > 0 && local_only == 0 {
+                    if let Err(e) = git.run(&["merge", "--ff-only", "-q", remote_branch]) {
+                        return Ok(Out { data: None, text: format!("Switched to {name}, but could not update it to {remote_branch}: {e}") });
+                    }
+                    return Ok(Out { data: None, text: format!("Updated {name} to {remote_branch} ({behind} new {}).", if behind == 1 { "commit" } else { "commits" }) });
+                }
+                if behind > 0 {
+                    return Ok(Out { data: None, text: format!("{name} has commits that are not on {remote_branch}, so it was not updated. Pull to combine them.") });
+                }
             }
             Out::none()
         }
@@ -439,8 +458,8 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
             Out::none()
         }
         Fetch { remote } => match remote.as_deref() {
-            Some(r) => network(git, &["fetch", "--prune", r])?,
-            None => network(git, &["fetch", "--prune", "--all"])?,
+            Some(r) => network(git, &["fetch", "--prune", "--recurse-submodules=no", r])?,
+            None => network(git, &["fetch", "--prune", "--recurse-submodules=no", "--all"])?,
         },
         Pull { mode } => {
             let flag = match mode.as_str() {
@@ -448,7 +467,7 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
                 "ffOnly" => "--ff-only",
                 _ => "--no-rebase",
             };
-            network(git, &["pull", "--prune", "--no-edit", flag])?
+            network(git, &["pull", "--prune", "--recurse-submodules=no", "--no-edit", flag])?
         }
         Push { remote, branch, set_upstream, force } => {
             let mut args = vec!["push"];

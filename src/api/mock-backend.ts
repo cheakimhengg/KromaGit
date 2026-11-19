@@ -83,6 +83,7 @@ export const mockApi: GitApi = {
     const picked = all.filter((_, i) => i % 7 === (file.length % 7)).slice(0, 14)
     return delay(picked.map((commit, i) => ({ commit, path: i > 10 ? file.replace(/[^/]+$/, 'old-$&') : file })))
   },
+  listTree: () => delay(['README.md', 'package.json', 'src/main.ts', 'src/App.vue', 'src/lib/format.ts', 'src/lib/graph-layout.ts', 'src/components/graph/GraphCell.vue', 'src/components/graph/RefPill.vue', 'src/stores/ui.ts', 'docs/guide.md']),
   blame: (path, file) => {
     const all = repo(path).commits
     const d = mockDiff(file)

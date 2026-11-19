@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { ArrowDown, ArrowUp, ChevronRight, Clock, Columns2, Copy, FileView, Files, Info, Loader2, SlidersHorizontal, Space, TextFont, TextWrap, Check, Minus, Plus, Rows3, Undo2, User, X } from '@/lib/icons'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ChevronUp, Search, Clock, Columns2, Copy, FileView, Files, Info, Loader2, SlidersHorizontal, Space, TextFont, TextWrap, Check, Minus, Plus, Rows3, Undo2, User, X } from '@/lib/icons'
 import { useUiStore } from '@/stores/ui'
 import { useReposStore } from '@/stores/repos'
 import { errorMessage, gitApi } from '@/api/git'
@@ -12,6 +12,7 @@ import FileHistory from './FileHistory.vue'
 import BlameView from './BlameView.vue'
 import { highlightLine, isMixedMarkup, mixedLanguages } from '@/lib/highlight'
 import { toSplitRows } from '@/lib/diff-split'
+import { markMatches } from '@/lib/find-in-html'
 import type { DiffLine, DiffTarget, FileChange, FileDiff, FileHistoryEntry, HunkSelection } from '@/types/git'
 import { useOpsStore } from '@/stores/ops'
 import * as git from '@/actions/git'
@@ -43,7 +44,7 @@ watch(
     loading.value = true
     error.value = null
     try {
-      const d = await gitApi.getFileDiff(path ?? '', target, { ignoreWhitespace: ui.diffOptions.ignoreWhitespace, fullFile: ui.diffOptions.fullFile })
+      const d = await gitApi.getFileDiff(path ?? '', target, { ignoreWhitespace: ui.diffOptions.ignoreWhitespace, fullFile: ui.diffOptions.fullFile || !!target.unchanged })
       if (!cancelled) {
         diff.value = d
         if (target.line && (!old || old[0] !== target)) void focusLine(target.line)
@@ -334,6 +335,47 @@ function scrollToRow(row: number) {
   virtualizer.value.scrollToIndex(row, { align: 'center' })
 }
 
+/** Find in the whole diff: rows off screen are not in the page, so the webview's own search can't see them. */
+const findOpen = ref(false)
+const findQuery = ref('')
+const findCur = ref(0)
+const findInput = ref<HTMLInputElement | null>(null)
+const findHits = computed(() => {
+  const q = findOpen.value ? findQuery.value.toLowerCase() : ''
+  if (!q) return []
+  const out: number[] = []
+  items.value.forEach((it, i) => {
+    if (it.ri < 0) return
+    const lines = hunks.value[it.hi].lines
+    const idx = ui.diffMode === 'split' ? [splitRows.value[it.hi][it.ri].left?.index, splitRows.value[it.hi][it.ri].right?.index] : [it.ri]
+    if (idx.some((li) => li !== undefined && lines[li].text.toLowerCase().includes(q))) out.push(i)
+  })
+  return out
+})
+const findSet = computed(() => new Set(findHits.value))
+const findRow = computed(() => findHits.value[findCur.value] ?? -1)
+const shown = (h: string) => (findOpen.value && findQuery.value ? markMatches(h, findQuery.value) : h)
+function openFind() {
+  findOpen.value = true
+  void nextTick(() => findInput.value?.select())
+}
+function closeFind() {
+  findOpen.value = false
+}
+function findStep(delta: number) {
+  const n = findHits.value.length
+  if (!n) return
+  findCur.value = (findCur.value + delta + n) % n
+  scrollToRow(findHits.value[findCur.value])
+}
+watch(findHits, (hits) => {
+  findCur.value = 0
+  if (hits.length) scrollToRow(hits[0])
+})
+watch(() => ui.findInDiffRequest, () => {
+  if (view.value === 'diff' && !isImage.value) openFind()
+})
+
 /** Where each change block really sits in the scrolled content (wrapped lines make rows taller), as % of the full height. */
 const blockPos = ref<{ top: number; height: number }[]>([])
 function measureBlocks() {
@@ -416,6 +458,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
       <button type="button" class="tb-icon" title="Copy path" @click="copyPath"><Copy :size="14" /></button>
       <span v-if="tgt.source === 'commit'" class="shrink-0 rounded-md bg-surface-2 px-1.5 font-mono text-[12px] leading-[22px] text-muted">{{ tgt.commit?.slice(0, 7) }}</span>
       <span v-else class="shrink-0 rounded-md bg-surface-2 px-1.5 text-[11px] leading-[22px] text-muted">{{ sourceLabel }}</span>
+      <span v-if="tgt.unchanged" class="shrink-0 rounded-md bg-surface-2 px-1.5 text-[11px] leading-[22px] text-faint">unchanged</span>
       <span v-if="diff && !loading && !isImage" class="shrink-0 px-1 font-mono text-[12px]">
         <span class="text-success">+{{ stats.add }}</span> <span class="text-danger">−{{ stats.del }}</span>
       </span>
@@ -449,6 +492,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
       </template>
 
       <div class="tb-sep" />
+      <button v-if="view === 'diff' && !isImage" type="button" class="tb-icon" :class="findOpen ? 'bg-surface-3 text-fg' : ''" title="Find in diff (⌘F)" @click="findOpen ? closeFind() : openFind()"><Search :size="14" /></button>
       <button type="button" class="tb-btn" :class="view !== 'diff' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'" title="Every commit that changed this file" @click="toggleView('history')"><Clock :size="14" />History</button>
       <button v-if="!isImage" type="button" class="tb-btn" :class="view === 'blame' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'" title="Who last changed each line" @click="toggleView('blame')"><User :size="14" />Blame</button>
 
@@ -508,6 +552,24 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
     </div>
 
     <div v-else class="relative flex min-h-0 flex-1">
+    <div
+      v-if="findOpen" data-own-esc
+      class="absolute top-2 right-6 z-20 flex items-center gap-1 rounded-lg border border-line-strong bg-surface-2 py-1 pr-1 pl-2.5 font-sans shadow-lg"
+    >
+      <Search :size="14" class="shrink-0 text-faint" />
+      <input
+        ref="findInput" v-model="findQuery"
+        class="h-7 w-56 bg-transparent text-[13px] text-fg outline-none placeholder:text-faint"
+        placeholder="Find in diff" spellcheck="false"
+        @keydown.enter.exact.prevent="findStep(1)" @keydown.shift.enter.prevent="findStep(-1)" @keydown.esc.prevent="closeFind"
+      />
+      <span class="min-w-[56px] shrink-0 text-right text-[12px] tabular-nums" :class="findQuery && !findHits.length ? 'text-danger' : 'text-faint'">
+        {{ findQuery ? (findHits.length ? `${findCur + 1} of ${findHits.length}` : 'No results') : '' }}
+      </span>
+      <button type="button" class="tb-icon" title="Previous (⇧↵)" :disabled="!findHits.length" @click="findStep(-1)"><ChevronUp :size="15" /></button>
+      <button type="button" class="tb-icon" title="Next (↵)" :disabled="!findHits.length" @click="findStep(1)"><ChevronDown :size="15" /></button>
+      <button type="button" class="tb-icon" title="Close (Esc)" @click="closeFind"><X :size="15" /></button>
+    </div>
     <div ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading, 'sx-on': splitX > 0 }" :style="{ '--sx': `${splitX}px` }" @wheel="onDiffWheel">
       <div v-if="isConflict" class="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
       This file has conflicts. Keep the lines you want, remove the <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> <code>=======</code> <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> markers in your editor, then Stage file to mark it resolved.
@@ -550,7 +612,7 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
               v-else-if="ui.diffMode === 'unified'"
               v-for="l in [hunks[it.hi].lines[it.ri]]" :key="'u'"
               :data-row="v.index"
-              class="flex" :data-kind="l.kind" :class="[lineClass(l, selected.has(key(it.hi, it.ri))), focused !== null && l.newNo === focused ? 'ring-1 ring-accent-2 ring-inset' : '']"
+              class="flex" :data-kind="l.kind" :class="[lineClass(l, selected.has(key(it.hi, it.ri))), focused !== null && l.newNo === focused ? 'ring-1 ring-accent-2 ring-inset' : '', findSet.has(v.index) ? (findRow === v.index ? 'kg-find-cur' : 'kg-find-row') : '']"
             >
               <span
                 class="w-12 shrink-0 pr-2 text-right text-faint select-none"
@@ -565,13 +627,13 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
               >{{ l.newNo ?? '' }}</span>
               <span class="w-5 shrink-0 text-center select-none" :class="signColor(l)">{{ sign(l) }}</span>
               <!-- eslint-disable-next-line vue/no-v-html -->
-              <span class="pr-6 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'whitespace-pre'" v-html="lineHtml(it.hi, it.ri) || ' '" />
+              <span class="pr-6 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'whitespace-pre'" v-html="shown(lineHtml(it.hi, it.ri)) || ' '" />
             </div>
 
             <div
               v-else
               v-for="row in [splitRows[it.hi][it.ri]]" :key="'s'"
-              class="grid grid-cols-2" :class="ui.diffOptions.wrap ? '' : 'h-[22px]'" :data-row="v.index"
+              class="grid grid-cols-2" :class="[ui.diffOptions.wrap ? '' : 'h-[22px]', findSet.has(v.index) ? (findRow === v.index ? 'kg-find-cur' : 'kg-find-row') : '']" :data-row="v.index"
             >
               <div
                 v-for="side in (['left', 'right'] as const)" :key="side"
@@ -588,9 +650,9 @@ const signColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success' : l.kind =
                     >{{ side === 'left' ? cell.oldNo : cell.newNo }}</span>
                     <span class="relative z-[1] w-5 shrink-0 bg-inherit text-center select-none" :class="signColor(cell)">{{ sign(cell) }}</span>
                     <!-- eslint-disable-next-line vue/no-v-html -->
-                    <span v-if="ui.diffOptions.wrap" class="min-w-0 break-all whitespace-pre-wrap pr-4 text-fg select-text" v-html="lineHtml(it.hi, cell.index) || ' '" />
+                    <span v-if="ui.diffOptions.wrap" class="min-w-0 break-all whitespace-pre-wrap pr-4 text-fg select-text" v-html="shown(lineHtml(it.hi, cell.index)) || ' '" />
                     <!-- eslint-disable-next-line vue/no-v-html -->
-                    <span v-else class="min-w-0 flex-1 overflow-hidden"><span class="split-code inline-block pr-6 whitespace-pre text-fg select-text" v-html="lineHtml(it.hi, cell.index) || ' '" /></span>
+                    <span v-else class="min-w-0 flex-1 overflow-hidden"><span class="split-code inline-block pr-6 whitespace-pre text-fg select-text" v-html="shown(lineHtml(it.hi, cell.index)) || ' '" /></span>
                   </template>
                 </template>
               </div>

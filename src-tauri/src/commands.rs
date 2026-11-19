@@ -233,6 +233,11 @@ pub async fn write_resolved(repo: String, path: String, text: String) -> AppResu
 }
 
 #[tauri::command]
+pub async fn list_tree(repo: String, commit: String) -> AppResult<Vec<String>> {
+    blocking(move || git::history::list_tree(&Git::new(repo), &commit)).await
+}
+
+#[tauri::command]
 pub async fn blame_file(repo: String, path: String, rev: Option<String>) -> AppResult<Vec<git::history::BlameLine>> {
     blocking(move || git::history::blame(&Git::new(repo), &path, rev.as_deref())).await
 }

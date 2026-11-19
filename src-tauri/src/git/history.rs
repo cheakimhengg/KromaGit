@@ -65,6 +65,12 @@ pub struct BlameLine {
 }
 
 /// Blame of `path` at `rev`, or of the working-tree file when `rev` is None.
+/// Every file in a commit's tree, for browsing the whole project as it was at that commit.
+pub fn list_tree(git: &Git, commit: &str) -> AppResult<Vec<String>> {
+    let out = git.run(&["ls-tree", "-r", "--name-only", "-z", commit])?;
+    Ok(out.split(|b| *b == 0).filter(|p| !p.is_empty()).map(|p| String::from_utf8_lossy(p).into_owned()).collect())
+}
+
 pub fn blame(git: &Git, path: &str, rev: Option<&str>) -> AppResult<Vec<BlameLine>> {
     check_path(path)?;
     let mut args = vec!["blame", "--porcelain"];

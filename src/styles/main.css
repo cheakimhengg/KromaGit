@@ -775,3 +775,8 @@ a:focus-visible {
 
 /* split diff: both halves shift together by --sx */
 .sx-on .split-code { transform: translateX(calc(var(--sx, 0px) * -1)); }
+
+.kg-find-row { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--gw-warning) 70%, transparent); }
+.kg-find-cur { box-shadow: inset 3px 0 0 var(--gw-warning); background-color: color-mix(in srgb, var(--gw-warning) 10%, transparent); }
+mark.kg-find { background: color-mix(in srgb, var(--gw-warning) 40%, transparent); color: inherit; border-radius: 2px; }
+.kg-find-cur mark.kg-find { background: var(--gw-warning); color: #1a1a1a; }

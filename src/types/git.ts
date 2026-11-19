@@ -69,7 +69,8 @@ export interface Submodule {
   status: 'clean' | 'modified' | 'uninitialized' | 'conflict'
 }
 
-export type FileStatus = 'M' | 'A' | 'D' | 'R' | '?' | 'U'
+/** '=' is an unchanged file, listed when browsing all files of a commit */
+export type FileStatus = 'M' | 'A' | 'D' | 'R' | '?' | 'U' | '='
 
 export interface ConflictFile {
   text: string
@@ -184,6 +185,8 @@ export interface DiffTarget {
   parent?: string
   /** new-file line to scroll to (e.g. from a review comment) */
   line?: number
+  /** a file the commit did not change; shown in full */
+  unchanged?: boolean
 }
 
 export interface RepoSnapshot {
@@ -228,7 +231,7 @@ export type GitAction =
   | { type: 'rewordHead'; message: string }
   | { type: 'checkout'; branch: string }
   | { type: 'checkoutDetached'; target: string }
-  | { type: 'checkoutRemote'; remoteBranch: string; name: string }
+  | { type: 'checkoutRemote'; remoteBranch: string; name: string; reset?: boolean }
   | { type: 'createBranch'; name: string; start: string | null; checkout: boolean }
   | { type: 'deleteBranch'; name: string; force: boolean }
   | { type: 'deleteRemoteBranch'; remote: string; branch: string }

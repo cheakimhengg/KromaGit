@@ -198,7 +198,13 @@ export const useUiStore = defineStore('ui', () => {
 
   const requestCommit = () => commitRequest.value++
   const requestGenerate = () => generateRequest.value++
+  /** ⌘F: find inside the open diff, otherwise search the commit list. */
+  const findInDiffRequest = ref(0)
   function focusSearch() {
+    if (centerView.value === 'diff' && diffView.value === 'diff') {
+      findInDiffRequest.value++
+      return
+    }
     showPanel('graph')
     searchRequest.value++
   }
@@ -256,7 +262,7 @@ export const useUiStore = defineStore('ui', () => {
   return {
     sidebarCollapsed, sidebarSections, selectedCommit, centerView, diffTarget, diffPath, diffSource, diffMode, diffView, diffOptions, fileViewMode,
     settingsOpen, conflictPath, settingsTab, paletteOpen, switcherOpen, repoMenuOpen, terminalOpen, terminalHeight, home, commitRequest, amendPending, generateRequest, searchRequest, previousView, menu, toasts, dialog,
-    selectCommit, openDiff, toggleDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
+    selectCommit, openDiff, toggleDiff, closeDiff, showPanel, openSettings, requestCommit, requestGenerate, focusSearch, findInDiffRequest, resetForRepoSwitch, openMenu, openMenuBelow, closeMenu, toast, dismissToast, notWired,
     openDialog, closeDialog, confirm, prompt,
   }
 })

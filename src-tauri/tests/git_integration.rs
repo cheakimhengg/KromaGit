@@ -463,3 +463,84 @@ fn reword_changes_only_the_message_of_the_last_commit() {
     assert_eq!(sh_out(d, &["rev-parse", "HEAD^{tree}"]), before, "the files in the commit are unchanged");
     assert_eq!(sh_out(d, &["diff", "--cached", "--name-only"]).trim(), "staged.txt");
 }
+
+#[test]
+fn checking_out_a_remote_branch_updates_an_old_local_copy() {
+    let tmp = tempfile::tempdir().unwrap();
+    let origin = tmp.path().join("origin");
+    std::fs::create_dir(&origin).unwrap();
+    sh(&origin, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(&origin, "a.txt", "one\n");
+    sh(&origin, &["add", "-A"]);
+    sh(&origin, &["commit", "-qm", "base"]);
+    sh(&origin, &["branch", "demo"]);
+    let d = tmp.path().join("clone");
+    sh(tmp.path(), &["clone", "-q", origin.to_str().unwrap(), "clone"]);
+    sh(&d, &["switch", "-q", "demo"]);
+    sh(&d, &["switch", "-q", "main"]);
+    sh(&origin, &["switch", "-q", "demo"]);
+    write(&origin, "a.txt", "two\n");
+    sh(&origin, &["commit", "-qam", "newer demo"]);
+    sh(&d, &["fetch", "-q"]);
+
+    let g = Git::new(&d);
+    let action = git::ops::Action::CheckoutRemote { remote_branch: "origin/demo".into(), name: "demo".into(), reset: false };
+    let out = git::ops::run_action(&g, &action).unwrap();
+    assert!(out.output.contains("Updated demo"), "{}", out.output);
+    assert_eq!(sh_out(&d, &["log", "-1", "--format=%s"]).trim(), "newer demo");
+    assert_eq!(sh_out(&d, &["branch", "--show-current"]).trim(), "demo");
+}
+
+#[test]
+fn lists_every_file_of_a_commit_and_shows_an_unchanged_one_in_full() {
+    let tmp = sample_repo();
+    let d = tmp.path();
+    let g = Git::new(d);
+    let head = sh_out(d, &["rev-parse", "HEAD"]).trim().to_string();
+    let mut files = git::history::list_tree(&g, &head).unwrap();
+    files.sort();
+    assert_eq!(files, vec!["a.txt", "b.txt"]);
+
+    let mut r = req("b.txt", "commit", false, Some(&head), None);
+    r.full_file = true;
+    let diff = git::diff::get_file_diff(&g, &r).unwrap();
+    assert_eq!(diff.hunks.len(), 1);
+    assert!(diff.hunks[0].lines.iter().all(|l| l.kind == "context"));
+    assert_eq!(diff.hunks[0].lines[0].text, "bee");
+}
+
+#[test]
+fn checking_out_a_remote_branch_can_replace_a_diverged_local_copy() {
+    let tmp = tempfile::tempdir().unwrap();
+    let origin = tmp.path().join("origin");
+    std::fs::create_dir(&origin).unwrap();
+    sh(&origin, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(&origin, "a.txt", "one\n");
+    sh(&origin, &["add", "-A"]);
+    sh(&origin, &["commit", "-qm", "base"]);
+    sh(&origin, &["branch", "demo"]);
+    let d = tmp.path().join("clone");
+    sh(tmp.path(), &["clone", "-q", origin.to_str().unwrap(), "clone"]);
+    sh(&d, &["switch", "-q", "demo"]);
+    write(&d, "local.txt", "only here\n");
+    sh(&d, &["add", "-A"]);
+    sh(&d, &["commit", "-qm", "local only"]);
+    sh(&d, &["switch", "-q", "main"]);
+    sh(&origin, &["switch", "-q", "demo"]);
+    write(&origin, "a.txt", "two\n");
+    sh(&origin, &["commit", "-qam", "newer demo"]);
+    sh(&d, &["fetch", "-q"]);
+
+    let g = Git::new(&d);
+    use git::ops::{run_action, Action};
+    let keep = Action::CheckoutRemote { remote_branch: "origin/demo".into(), name: "demo".into(), reset: false };
+    let out = run_action(&g, &keep).unwrap();
+    assert!(out.output.contains("not on origin/demo"), "{}", out.output);
+    assert_eq!(sh_out(&d, &["log", "-1", "--format=%s"]).trim(), "local only");
+
+    sh(&d, &["switch", "-q", "main"]);
+    let replace = Action::CheckoutRemote { remote_branch: "origin/demo".into(), name: "demo".into(), reset: true };
+    run_action(&g, &replace).unwrap();
+    assert_eq!(sh_out(&d, &["branch", "--show-current"]).trim(), "demo");
+    assert_eq!(sh_out(&d, &["log", "-1", "--format=%s"]).trim(), "newer demo");
+}

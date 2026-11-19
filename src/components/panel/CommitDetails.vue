@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import {
-  AlertTriangle, ChevronDown, Copy, FolderTree, List, Loader2, Pencil, ScanSearch, Search, Sparkles, X,
+  AlertTriangle, ChevronDown, Copy, FolderOpen, FolderTree, List, Loader2, Pencil, ScanSearch, Search, Sparkles, X,
 } from '@/lib/icons'
 import Avatar from '@/components/common/Avatar.vue'
 import RefPill from '@/components/graph/RefPill.vue'
@@ -77,8 +77,42 @@ const statusCounts = computed(() => {
   for (const f of shown.value?.files ?? []) m.set(f.status, (m.get(f.status) ?? 0) + 1)
   return [...m].sort((a, b) => b[1] - a[1])
 })
+/** Browse every file in the commit, not only the changed ones. */
+const allFiles = ref(false)
+const tree = shallowRef<{ hash: string; paths: string[] } | null>(null)
+const treeLoading = ref(false)
+async function toggleAllFiles() {
+  allFiles.value = !allFiles.value
+  if (allFiles.value) {
+    ui.fileViewMode = 'tree'
+    await loadTree()
+  }
+}
+async function loadTree() {
+  const d = shown.value
+  if (!d || tree.value?.hash === d.hash) return
+  treeLoading.value = true
+  try {
+    tree.value = { hash: d.hash, paths: await gitApi.listTree(repoPath.value, d.hash) }
+  } catch (e) {
+    ui.toast({ kind: 'error', title: 'Could not list the files', detail: errorMessage(e) }, 6000)
+    allFiles.value = false
+  } finally {
+    treeLoading.value = false
+  }
+}
+watch(() => shown.value?.hash, () => void (allFiles.value && loadTree()))
+const browsing = computed(() => allFiles.value && !!shown.value && tree.value?.hash === shown.value.hash)
+const sourceFiles = computed<FileChange[]>(() => {
+  const changed = shown.value?.files ?? []
+  if (!browsing.value) return changed
+  const byPath = new Map(changed.map((f) => [f.path, f]))
+  const out: FileChange[] = tree.value!.paths.map((p) => byPath.get(p) ?? { path: p, status: '=' as const, additions: 0, deletions: 0 })
+  for (const f of changed) if (f.status === 'D') out.push(f)
+  return out
+})
 const files = computed(() => {
-  let list = shown.value?.files ?? []
+  let list = sourceFiles.value
   if (statusFilter.value !== 'all') list = list.filter((f) => f.status === statusFilter.value)
   const q = fileQuery.value.trim().toLowerCase()
   if (q) list = list.filter((f) => f.path.toLowerCase().includes(q))
@@ -97,7 +131,7 @@ async function toggleSearch() {
 function openFile(f: FileChange) {
   const d = shown.value
   if (!d) return
-  ui.toggleDiff({ path: f.path, oldPath: f.oldPath, source: 'commit', commit: d.hash, parent: d.parents[0] })
+  ui.toggleDiff({ path: f.path, oldPath: f.oldPath, source: 'commit', commit: d.hash, parent: d.parents[0], unchanged: f.status === '=' || undefined })
 }
 
 function copy(text: string, what = 'Copied') {
@@ -179,6 +213,9 @@ function review() {
       <button type="button" class="hbtn" :class="{ on: searching }" title="Filter files" @click="toggleSearch"><Search :size="16" /></button>
       <button type="button" class="hbtn" :class="{ on: ui.fileViewMode === 'list' }" title="List view" @click="ui.fileViewMode = 'list'"><List :size="16" /></button>
       <button type="button" class="hbtn" :class="{ on: ui.fileViewMode === 'tree' }" title="Tree view" @click="ui.fileViewMode = 'tree'"><FolderTree :size="16" /></button>
+      <button type="button" class="hbtn" :class="{ on: allFiles }" :title="allFiles ? 'Show only the changed files' : 'Browse all files in this commit'" @click="toggleAllFiles">
+        <Loader2 v-if="treeLoading" :size="15" class="animate-spin" /><FolderOpen v-else :size="16" />
+      </button>
       <div class="mx-1 h-5 w-px bg-line" />
       <button type="button" class="hbtn" title="Close (Esc)" @click="ui.selectCommit(null)"><X :size="16" /></button>
     </div>
@@ -316,7 +353,8 @@ function review() {
 
       <div class="flex shrink-0 items-center gap-1.5 border-b border-line px-4 py-2">
         <span class="text-[12px] font-semibold tracking-wider text-muted uppercase">Files</span>
-        <span class="text-[12px] text-faint" :title="shown.parents.length > 1 ? 'Compared with the first parent' : undefined">{{ shown.files.length }}</span>
+        <span v-if="browsing" class="text-[12px] text-faint">{{ sourceFiles.length }} · {{ shown.files.length }} changed</span>
+        <span v-else class="text-[12px] text-faint" :title="shown.parents.length > 1 ? 'Compared with the first parent' : undefined">{{ shown.files.length }}</span>
         <div class="flex-1" />
         <button type="button" class="chip" :class="{ on: statusFilter === 'all' }" @click="statusFilter = 'all'">All</button>
         <button
@@ -328,7 +366,7 @@ function review() {
       </div>
       <div v-if="searching" class="relative shrink-0 px-3 pt-2">
         <Search :size="13" class="gw-search-icon left-5.5 mt-1" />
-        <input ref="searchInput" v-model="fileQuery" class="gw-input gw-search" placeholder="Filter by path…" spellcheck="false" />
+        <input ref="searchInput" v-model="fileQuery" class="gw-input gw-search" :placeholder="browsing ? 'Find a file…' : 'Filter by path…'" spellcheck="false" />
       </div>
       <div class="min-h-0 flex-1 pt-1">
         <FileList
