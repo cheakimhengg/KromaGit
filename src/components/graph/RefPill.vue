@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { Archive, Check, Cloud, GitBranch, Monitor, Tag } from '@/lib/icons'
 import type { RefLabel } from '@/types/git'
 
-const props = defineProps<{ refLabel: RefLabel; color: string; hasRemote?: boolean; label?: string }>()
+const props = defineProps<{ refLabel: RefLabel; color: string; hasRemote?: boolean; label?: string; outline?: boolean }>()
 
 const icon = computed(() => {
   switch (props.refLabel.kind) {
@@ -16,7 +16,7 @@ const icon = computed(() => {
 const style = computed(() =>
   props.refLabel.kind === 'stash'
     ? { background: 'var(--gw-surface-3)', color: 'var(--gw-muted)', borderColor: 'var(--gw-border-strong)' }
-    : props.refLabel.current
+    : props.refLabel.current && !props.outline
     ? { background: props.color, color: 'var(--gw-on-accent)', borderColor: props.color }
     : { background: `${props.color}22`, color: props.color, borderColor: `${props.color}55` },
 )

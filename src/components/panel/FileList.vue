@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { ChevronRight, Folder } from '@/lib/icons'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -17,7 +17,49 @@ const props = withDefaults(
   }>(),
   { checked: false, activePath: null, readonly: false },
 )
-const emit = defineEmits<{ open: [FileChange]; toggle: [FileChange]; menu: [MouseEvent, FileChange] }>()
+/** toggle / menu also pass every selected file (just the one when nothing else is selected) */
+const emit = defineEmits<{ open: [FileChange]; toggle: [FileChange, FileChange[]]; menu: [MouseEvent, FileChange, FileChange[]] }>()
+
+/** Multi-select: Option/⌘-click adds or removes a file, Shift-click selects a range, ⌘A selects all. */
+const picked = ref(new Set<string>())
+let anchorPath: string | null = null
+watch(() => props.files, (files) => {
+  const paths = new Set(files.map((f) => f.path))
+  const kept = [...picked.value].filter((p) => paths.has(p))
+  if (kept.length !== picked.value.size) picked.value = new Set(kept)
+})
+const isPicked = (f: FileChange) => (picked.value.size > 1 ? picked.value.has(f.path) : props.activePath === f.path)
+function orderedFiles() {
+  return rows.value.filter((r) => r.file).map((r) => r.file!)
+}
+function selection(f: FileChange): FileChange[] {
+  if (picked.value.size > 1 && picked.value.has(f.path)) return orderedFiles().filter((x) => picked.value.has(x.path))
+  return [f]
+}
+function onRowClick(ev: MouseEvent, f: FileChange) {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) {
+    const next = new Set(picked.value.size ? picked.value : props.activePath ? [props.activePath] : [])
+    if (next.has(f.path)) next.delete(f.path)
+    else next.add(f.path)
+    picked.value = next
+    anchorPath = f.path
+  } else if (ev.shiftKey) {
+    const list = orderedFiles()
+    const from = list.findIndex((x) => x.path === (anchorPath ?? props.activePath))
+    const to = list.findIndex((x) => x.path === f.path)
+    if (from === -1) picked.value = new Set([f.path])
+    else picked.value = new Set(list.slice(Math.min(from, to), Math.max(from, to) + 1).map((x) => x.path))
+  } else {
+    picked.value = new Set()
+    anchorPath = f.path
+    emit('open', f)
+  }
+  scrollEl.value?.focus({ preventScroll: true })
+}
+function onRowMenu(ev: MouseEvent, f: FileChange) {
+  if (!(picked.value.size > 1 && picked.value.has(f.path))) picked.value = new Set()
+  emit('menu', ev, f, selection(f))
+}
 
 const ROW = 32
 const scrollEl = ref<HTMLElement | null>(null)
@@ -62,7 +104,19 @@ const virtualizer = useVirtualizer(
 
 /** ↑ / ↓ move to the previous / next file and open it (folders are skipped). */
 function onListKeydown(e: KeyboardEvent) {
-  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+  const pressed = e.key
+  if ((e.metaKey || e.ctrlKey) && pressed.toLowerCase() === 'a') {
+    e.preventDefault()
+    picked.value = new Set(orderedFiles().map((f) => f.path))
+    return
+  }
+  if (pressed === 'Escape' && picked.value.size) {
+    e.stopPropagation()
+    picked.value = new Set()
+    return
+  }
+  if (pressed !== 'ArrowDown' && pressed !== 'ArrowUp') return
+  picked.value = new Set()
   if (e.target instanceof HTMLInputElement && e.target.type !== 'checkbox') return
   const fileRows = rows.value.map((r, i) => (r.file ? i : -1)).filter((i) => i !== -1)
   if (!fileRows.length) return
@@ -96,10 +150,10 @@ function split(path: string) {
         <div
           v-else
           class="group absolute left-0 flex w-full cursor-pointer items-center gap-1.5 pr-2 text-[13px]"
-          :class="activePath === rows[v.index].file!.path ? 'bg-select' : 'hover:bg-hover'"
+          :class="isPicked(rows[v.index].file!) ? 'bg-select' : 'hover:bg-hover'"
           :style="{ height: `${ROW}px`, transform: `translateY(${v.start}px)`, paddingLeft: `${rows[v.index].depth * 12 + (mode === 'tree' ? 22 : 8)}px`, paddingRight: '10px' }"
-          @click="emit('open', rows[v.index].file!); scrollEl?.focus({ preventScroll: true })"
-          @contextmenu="emit('menu', $event, rows[v.index].file!)"
+          @click="onRowClick($event, rows[v.index].file!)"
+          @contextmenu="onRowMenu($event, rows[v.index].file!)"
         >
           <input
             v-if="!readonly"
@@ -107,7 +161,7 @@ function split(path: string) {
             :checked="checked"
             
             :title="checked ? 'Unstage' : 'Stage'"
-            @click.stop.prevent="emit('toggle', rows[v.index].file!)"
+            @click.stop.prevent="emit('toggle', rows[v.index].file!, selection(rows[v.index].file!))"
           />
           <StatusBadge :status="rows[v.index].file!.status" />
           <span

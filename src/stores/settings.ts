@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { aiApi, defaultSettings } from '@/api/ai'
 import { errorMessage, inTauri } from '@/api/git'
-import { applyAccent, applyTheme, applyZoom, clampZoom, resolvedTheme } from '@/lib/theme'
+import { THEMES, applyAccent, applyTheme, applyZoom, clampZoom, resolvedTheme } from '@/lib/theme'
 import { clone } from '@/lib/clone'
 import { setAvatarsEnabled } from '@/lib/avatars'
 import type { CloudProvider, ProviderId, Settings, ThemePref } from '@/types/ai'
@@ -65,8 +65,23 @@ export const useSettingsStore = defineStore('settings', () => {
     await save(next).catch((e) => useUiStore().toast({ kind: 'error', title: 'Could not save settings', detail: errorMessage(e) }))
   }
 
-  const setTheme = (theme: ThemePref) => patchAppearance({ theme })
-  const toggleTheme = () => setTheme(resolvedTheme.value === 'light' ? 'dark' : 'light')
+  /** The light/dark toggle returns to the last theme the user picked of each kind, not to the defaults. */
+  const LAST_THEME_KEY = { dark: 'kromagit.lastDarkTheme', light: 'kromagit.lastLightTheme' } as const
+  function rememberTheme(theme: ThemePref) {
+    const kind = THEMES.find((t) => t.id === theme)?.kind
+    if (kind) localStorage.setItem(LAST_THEME_KEY[kind], theme)
+  }
+  const setTheme = (theme: ThemePref) => {
+    rememberTheme(theme)
+    return patchAppearance({ theme })
+  }
+  const toggleTheme = () => {
+    rememberTheme(settings.value.appearance.theme)
+    const target = resolvedTheme.value === 'light' ? 'dark' : 'light'
+    const last = localStorage.getItem(LAST_THEME_KEY[target])
+    const valid = THEMES.some((t) => t.id === last && t.kind === target)
+    return patchAppearance({ theme: (valid ? last : target) as ThemePref })
+  }
   const zoomBy = (delta: number) => patchAppearance({ zoom: settings.value.appearance.zoom + delta })
   const resetZoom = () => patchAppearance({ zoom: 100 })
   const setAccent = (accent: Settings['appearance']['accent']) => patchAppearance({ accent })

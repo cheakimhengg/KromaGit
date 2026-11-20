@@ -759,6 +759,10 @@ a:focus-visible {
   button:disabled {
     cursor: not-allowed;
   }
+  /* text you can select shows the text cursor, like in an editor */
+  .select-text:not(button):not(a) {
+    cursor: text;
+  }
 }
 
 /* loading placeholders: a soft shimmer, shown after a short delay so fast loads don't flash */
@@ -773,10 +777,13 @@ a:focus-visible {
 @keyframes gw-skel-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .gw-skel { animation: none; } }
 
-/* split diff: both halves shift together by --sx */
-.sx-on .split-code { transform: translateX(calc(var(--sx, 0px) * -1)); }
+/* split diff: each side's code scrolls sideways natively; the two follow each other */
+.kg-find-curbg { background-color: color-mix(in srgb, var(--gw-warning) 10%, transparent); }
 
 .kg-find-row { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--gw-warning) 70%, transparent); }
 .kg-find-cur { box-shadow: inset 3px 0 0 var(--gw-warning); background-color: color-mix(in srgb, var(--gw-warning) 10%, transparent); }
 mark.kg-find { background: color-mix(in srgb, var(--gw-warning) 40%, transparent); color: inherit; border-radius: 2px; }
 .kg-find-cur mark.kg-find { background: var(--gw-warning); color: #1a1a1a; }
+
+.kg-caret { animation: kg-caret-blink 1.06s steps(1) infinite; }
+@keyframes kg-caret-blink { 50% { opacity: 0; } }

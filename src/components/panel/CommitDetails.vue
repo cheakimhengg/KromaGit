@@ -320,7 +320,7 @@ function review() {
               :title="`Go to ${p.slice(0, 7)}`" @click="ui.selectCommit(p)"
             >{{ p.slice(0, 7) }}</button>
             <span v-if="!shown.parents.length" class="text-faint">none — first commit</span>
-            <RefPill v-for="r in refs" :key="r.name" :ref-label="r" :color="refColor" class="max-w-[180px]" />
+            <RefPill v-for="r in refs" :key="r.name" :ref-label="r" :color="refColor" outline class="max-w-[180px]" />
           </div>
         </div>
 

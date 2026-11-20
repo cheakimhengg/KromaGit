@@ -191,7 +191,8 @@ const changeBlocks = computed<ChangeBlock[]>(() => {
 const currentChange = ref(0)
 watch(tgt, () => (currentChange.value = 0))
 /** Split view scrolls sideways as one: both halves shift by the same offset (a single CSS variable, so it stays fast). */
-const splitX = ref(0)
+/** Sideways offset of both split halves; written straight to the DOM so scrolling never re-renders the diff. */
+let splitX = 0
 const hbar = ref<HTMLElement | null>(null)
 const splitSideways = computed(() => ui.diffMode === 'split' && !ui.diffOptions.wrap)
 const widestLine = computed(() => {
@@ -207,18 +208,54 @@ const widestLine = computed(() => {
 })
 const halfWidth = ref(600)
 const maxSplitX = computed(() => Math.max(0, widestLine.value * 7.83 + 24 - (halfWidth.value - 68)))
-function setSplitX(x: number) {
-  splitX.value = Math.max(0, Math.min(maxSplitX.value, x))
-  if (hbar.value && Math.abs(hbar.value.scrollLeft - splitX.value) > 1) hbar.value.scrollLeft = splitX.value
+/** Split view: each side's code is its own native horizontal scroller (smooth, compositor-driven); the two follow each other. */
+const codeCols = ref<HTMLElement[]>([])
+const codeWidth = computed(() => `max(100%, ${Math.ceil(widestLine.value * 7.83 + 24)}px)`)
+/** A read-only blinking caret where the user clicks in the code, like an editor. */
+const caret = ref<{ top: number; left: number; height: number } | null>(null)
+function placeCaret(ev: MouseEvent) {
+  const sel = window.getSelection()
+  const target = ev.target as HTMLElement | null
+  const el = scroller.value
+  if (!el || !target?.closest('.cursor-text') || (sel && !sel.isCollapsed)) {
+    caret.value = null
+    return
+  }
+  const doc = document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }
+  const range = doc.caretRangeFromPoint?.(ev.clientX, ev.clientY)
+  const rect = range?.getClientRects()[0] ?? range?.getBoundingClientRect()
+  const box = el.getBoundingClientRect()
+  const line = (target.closest('.cursor-text') as HTMLElement).getBoundingClientRect()
+  const x = rect && rect.height ? rect.left : ev.clientX
+  caret.value = { top: line.top - box.top + el.scrollTop + 2, left: x - box.left + el.scrollLeft, height: line.height - 4 }
 }
+
+function setSplitX(x: number, from?: HTMLElement) {
+  if (caret.value) caret.value = null
+  splitX = Math.max(0, x)
+  for (const el of codeCols.value) if (el !== from && Math.abs(el.scrollLeft - splitX) > 0.5) el.scrollLeft = splitX
+  if (hbar.value && hbar.value !== from && Math.abs(hbar.value.scrollLeft - splitX) > 0.5) hbar.value.scrollLeft = splitX
+}
+/** Sideways wheel moves both code columns; passive, so vertical scrolling stays native and is never captured by a column. */
+let wheelFrame = 0
+let wheelDx = 0
 function onDiffWheel(e: WheelEvent) {
   if (!splitSideways.value) return
   const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX
-  if (!dx || Math.abs(dx) < Math.abs(e.deltaY) * (e.shiftKey ? 0 : 1)) return
-  e.preventDefault()
-  setSplitX(splitX.value + dx)
+  if (!dx || Math.abs(dx) < Math.abs(e.deltaY) * 0.5) return
+  wheelDx += dx
+  if (wheelFrame) return
+  wheelFrame = requestAnimationFrame(() => {
+    wheelFrame = 0
+    const max = Math.max(0, ...codeCols.value.map((c) => c.scrollWidth - c.clientWidth))
+    setSplitX(Math.min(max, splitX + wheelDx))
+    wheelDx = 0
+  })
 }
-watch(() => [tgt.value.path, ui.diffMode] as const, () => setSplitX(0))
+watch(() => [tgt.value.path, ui.diffMode, ui.diffOptions.wrap] as const, () => {
+  setSplitX(0)
+  caret.value = null
+})
 
 /** In whole-file view, open at the first change rather than line 1. */
 async function jumpToFirstChange() {
@@ -237,34 +274,9 @@ async function goChange(delta: number) {
   await nextTick()
   jumpToRow(changeBlocks.value[currentChange.value].row)
 }
-function jumpToBlock(i: number) {
-  currentChange.value = i
-  jumpToRow(changeBlocks.value[i].row)
-}
-function onRulerClick(e: MouseEvent) {
-  const el = e.currentTarget as HTMLElement
-  const rect = el.getBoundingClientRect()
-  if (!rect.height || !changeBlocks.value.length) return
-  const y = ((e.clientY - rect.top) / rect.height) * 100
-  let best = 0
-  let bestDist = Infinity
-  changeBlocks.value.forEach((b, i) => {
-    const top = blockPos.value[i]?.top ?? (b.row / rowOffsets.value.total) * 100
-    const height = blockPos.value[i]?.height ?? 0
-    const dist = y < top ? top - y : y > top + height ? y - top - height : 0
-    if (dist < bestDist) {
-      bestDist = dist
-      best = i
-    }
-  })
-  jumpToBlock(best)
-}
-/** A mixed block shows its removed part in red above its added part in green, in proportion. */
+/** Added = green, removed = red, changed (both) = the theme's modified colour. */
 function rulerColor(b: ChangeBlock) {
-  if (b.kind === 'add') return 'var(--gw-success)'
-  if (b.kind === 'del') return 'var(--gw-danger)'
-  const red = Math.round((b.dels / (b.dels + b.adds)) * 100)
-  return `linear-gradient(to bottom, var(--gw-danger) 0 ${red}%, var(--gw-success) ${red}% 100%)`
+  return b.kind === 'add' ? 'var(--gw-success)' : b.kind === 'del' ? 'var(--gw-danger)' : 'var(--gw-accent)'
 }
 
 const commitFiles = shallowRef<{ hash: string; files: FileChange[]; parent?: string } | null>(null)
@@ -378,12 +390,22 @@ const items = computed<DiffItem[]>(() => {
   return out
 })
 const HEADER_H = 30
+/** Rows are rendered in blocks of CHUNK, so most scroll steps are pure native scrolling with no re-render or repaint. */
+const CHUNK = 32
+function chunkedRange(r: { startIndex: number; endIndex: number; overscan: number; count: number }) {
+  const start = Math.max(0, Math.floor((r.startIndex - r.overscan) / CHUNK) * CHUNK)
+  const end = Math.min(r.count - 1, Math.ceil((r.endIndex + r.overscan + 1) / CHUNK) * CHUNK)
+  const out: number[] = []
+  for (let i = start; i <= end; i++) out.push(i)
+  return out
+}
 const virtualizer = useVirtualizer(
   computed(() => ({
     count: items.value.length,
     getScrollElement: () => scroller.value,
     estimateSize: (i: number) => (items.value[i]?.ri === -1 ? (items.value[i].hi > 0 ? HEADER_H + 12 : HEADER_H) : 22),
     overscan: 8,
+    rangeExtractor: chunkedRange,
   })),
 )
 const measureRow = (el: unknown) => {
@@ -419,6 +441,8 @@ const findHits = computed(() => {
   return out
 })
 const findSet = computed(() => new Set(findHits.value))
+/** What a rendered row depends on besides its own index; rows skip re-rendering on scroll unless one of these changes. */
+const rowMemo = computed(() => [hunks.value, html.value, wordHtml.value, isConflict.value, canStage.value, ui.diffMode, findOpen.value ? findQuery.value : '', findCase.value, findWord.value, findRow.value, selected.value])
 const findRow = computed(() => findHits.value[findCur.value] ?? -1)
 const shown = (h: string) => (findOpen.value && findQuery.value ? markMatches(h, findQuery.value, findOpts.value) : h)
 function openFind() {
@@ -644,7 +668,8 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
       <button type="button" class="tb-icon" title="Next (↵)" :disabled="!findHits.length" @click="findStep(1)"><ChevronDown :size="15" /></button>
       <button type="button" class="tb-icon" title="Close (Esc)" @click="closeFind"><X :size="15" /></button>
     </div>
-    <div ref="scroller" class="min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading && !quietReload, 'sx-on': splitX > 0 }" :style="{ '--sx': `${splitX}px` }" @wheel="onDiffWheel">
+    <div ref="scroller" class="relative min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading && !quietReload }" @wheel.passive="onDiffWheel" @mouseup="placeCaret">
+      <div v-if="caret" class="kg-caret pointer-events-none absolute z-10 w-[2px] bg-fg" :style="{ top: `${caret.top}px`, left: `${caret.left}px`, height: `${caret.height}px` }" />
       <div v-if="isConflict" class="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
       This file has conflicts. Keep the lines you want, remove the <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> <code>=======</code> <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> markers in your editor, then Stage file to mark it resolved.
       </div>
@@ -652,7 +677,69 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
         Diff is very large; showing the first 20,000 lines.
       </div>
       <div class="relative" :style="{ height: `${virtualizer.getTotalSize()}px`, width: unifiedWidth }">
-        <div class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)` }">
+        <div
+          v-memo="[rowMemo, virtualizer.getVirtualItems()[0]?.index, virtualizer.getVirtualItems().length, virtualizer.getVirtualItems()[0]?.start, virtualizer.getTotalSize(), splitSideways, codeWidth, ui.diffOptions.wrap, canDiscard, busy, stageVerb, focused]"
+          class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)` }"
+        >
+        <div v-if="splitSideways" class="relative flex w-full">
+          <template v-for="side in (['left', 'right'] as const)" :key="side">
+            <div class="w-12 shrink-0" :class="side === 'right' ? 'border-l border-line' : ''">
+              <template v-for="v in virtualizer.getVirtualItems()" :key="v.index">
+                <div v-if="items[v.index].ri === -1" :style="{ height: `${items[v.index].hi > 0 ? 42 : 30}px` }" />
+                <template v-else v-for="cell in [splitRows[items[v.index].hi][items[v.index].ri][side]]" :key="'g'">
+                  <div
+                    class="h-[22px] pr-2 text-right select-none"
+                    :data-row="side === 'left' ? v.index : undefined"
+                    :class="[cell ? lineClass(cell, selected.has(key(items[v.index].hi, cell.index))) : 'bg-surface/40', cell ? numColor(cell) : '', cell && canStage && cell.kind !== 'context' ? 'cursor-pointer hover:bg-accent/20' : '', side === 'left' && findSet.has(v.index) ? (findRow === v.index ? 'kg-find-cur' : 'kg-find-row') : '']"
+                    @click="cell && toggleLine($event, items[v.index].hi, cell.index, cell)"
+                  >{{ cell ? (side === 'left' ? cell.oldNo : cell.newNo) : '' }}</div>
+                </template>
+              </template>
+            </div>
+            <div :ref="(el) => { if (el) codeCols[side === 'left' ? 0 : 1] = el as HTMLElement }" class="split-col min-w-0 flex-1 overflow-hidden">
+              <div :style="{ width: codeWidth }">
+                <template v-for="v in virtualizer.getVirtualItems()" :key="v.index">
+                  <div v-if="items[v.index].ri === -1" :style="{ height: `${items[v.index].hi > 0 ? 42 : 30}px` }" />
+                  <template v-else v-for="cell in [splitRows[items[v.index].hi][items[v.index].ri][side]]" :key="'c'">
+                    <!-- eslint-disable-next-line vue/no-v-html -->
+                    <div
+                      class="h-[22px] cursor-text pr-6 pl-3 whitespace-pre text-fg select-text"
+                      :data-kind="cell?.kind"
+                      :class="[cell ? lineClass(cell, selected.has(key(items[v.index].hi, cell.index))) : 'bg-surface/40', findRow === v.index ? 'kg-find-curbg' : '']"
+                      v-html="cell ? shown(lineHtml(items[v.index].hi, cell.index)) || ' ' : ' '"
+                    />
+                  </template>
+                </template>
+              </div>
+            </div>
+          </template>
+          <template v-for="v in virtualizer.getVirtualItems()" :key="'h' + v.index">
+            <div
+              v-if="items[v.index].ri === -1"
+              class="absolute left-0 w-full" :class="items[v.index].hi > 0 ? 'pt-3' : ''"
+              :style="{ top: `${v.start - (virtualizer.getVirtualItems()[0]?.start ?? 0)}px` }"
+            >
+              <div class="flex h-[30px] items-center gap-2 border-y border-line bg-surface-2 px-3 py-1 text-[12px] text-accent/80">
+                <span class="min-w-0 truncate">{{ hunks[items[v.index].hi].header }}</span>
+                <div class="flex-1" />
+                <template v-if="canStage">
+                  <button
+                    v-if="canDiscard"
+                    type="button" :disabled="busy"
+                    class="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-danger/90 hover:bg-danger/10 disabled:opacity-40"
+                    @click="applyHunk(items[v.index].hi, 'discard')"
+                  ><Undo2 :size="12" />Discard hunk</button>
+                  <button
+                    type="button" :disabled="busy"
+                    class="flex shrink-0 items-center gap-1 rounded border border-line-strong px-1.5 py-0.5 font-sans text-[12px] whitespace-nowrap text-fg hover:border-accent/60 hover:bg-accent/10 disabled:opacity-40"
+                    @click="applyHunk(items[v.index].hi, tgt.source === 'staged' ? 'unstage' : 'stage')"
+                  ><component :is="tgt.source === 'staged' ? Minus : Plus" :size="12" />{{ stageVerb }} hunk</button>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+        <template v-else>
         <div
           v-for="v in virtualizer.getVirtualItems()" :key="v.index"
           :ref="measureRow" :data-index="v.index"
@@ -701,7 +788,7 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
                 @click="toggleLine($event, it.hi, it.ri, l)"
               >{{ l.newNo ?? '' }}</span>
               <!-- eslint-disable-next-line vue/no-v-html -->
-              <span class="pr-6 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'whitespace-pre'" v-html="shown(lineHtml(it.hi, it.ri)) || ' '" />
+              <span class="cursor-text pr-6 text-fg select-text" :class="ui.diffOptions.wrap ? 'min-w-0 break-all whitespace-pre-wrap' : 'whitespace-pre'" v-html="shown(lineHtml(it.hi, it.ri)) || ' '" />
             </div>
 
             <div
@@ -723,7 +810,7 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
                       @click="toggleLine($event, it.hi, cell.index, cell)"
                     >{{ side === 'left' ? cell.oldNo : cell.newNo }}</span>
                     <!-- eslint-disable-next-line vue/no-v-html -->
-                    <span v-if="ui.diffOptions.wrap" class="min-w-0 break-all whitespace-pre-wrap pr-4 text-fg select-text" v-html="shown(lineHtml(it.hi, cell.index)) || ' '" />
+                    <span v-if="ui.diffOptions.wrap" class="min-w-0 cursor-text break-all whitespace-pre-wrap pr-4 text-fg select-text" v-html="shown(lineHtml(it.hi, cell.index)) || ' '" />
                     <!-- eslint-disable-next-line vue/no-v-html -->
                     <span v-else class="min-w-0 flex-1 overflow-hidden"><span class="split-code inline-block pr-6 whitespace-pre text-fg select-text" v-html="shown(lineHtml(it.hi, cell.index)) || ' '" /></span>
                   </template>
@@ -732,27 +819,25 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
             </div>
           </template>
         </div>
+        </template>
         </div>
       </div>
       <div v-if="canStage && hunks.length" class="px-3 pb-4 font-sans text-[12px] text-faint">
         Tip: click a line number to select lines (shift-click for a range), then {{ stageVerb.toLowerCase() }} only those lines.
       </div>
     </div>
-    <div v-if="changeBlocks.length" class="relative w-4 shrink-0 cursor-pointer border-l border-line bg-surface/60 hover:bg-surface-2/70" title="Change map — click to jump" @click="onRulerClick">
-      <button
-        v-for="(b, i) in changeBlocks" :key="i" type="button"
-        class="absolute right-0.5 left-0.5 min-h-[6px] rounded-sm hover:brightness-125"
-        :class="{ 'ring-1 ring-fg': i === currentChange }"
+    <div v-if="changeBlocks.length" v-memo="[changeBlocks, blockPos, rowOffsets.total]" class="pointer-events-none relative w-2 shrink-0">
+      <div
+        v-for="(b, i) in changeBlocks" :key="i"
+        class="absolute left-0.5 w-1 min-h-[3px] rounded-[1px] opacity-85"
         :style="{ top: `${blockPos[i]?.top ?? (b.row / rowOffsets.total) * 100}%`, height: `${blockPos[i]?.height ?? Math.max((b.len / rowOffsets.total) * 100, 0.4)}%`, background: rulerColor(b) }"
-        :title="b.kind === 'mod' ? `Changed · −${b.dels} +${b.adds}` : `${b.kind === 'add' ? 'Added' : 'Removed'} · ${b.len} ${b.len === 1 ? 'line' : 'lines'}`"
-        @click.stop="jumpToBlock(i)"
       />
     </div>
     <div
       v-if="splitSideways && maxSplitX > 0"
       ref="hbar"
       class="absolute right-4 bottom-0 left-0 z-20 h-3 overflow-x-auto overflow-y-hidden"
-      @scroll="setSplitX(($event.target as HTMLElement).scrollLeft)"
+      @scroll.passive="setSplitX(($event.target as HTMLElement).scrollLeft, $event.target as HTMLElement)"
     ><div class="h-px" :style="{ width: `calc(100% + ${maxSplitX}px)` }" /></div>
     </div>
   </div>

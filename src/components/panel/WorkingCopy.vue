@@ -37,7 +37,16 @@ function open(file: FileChange, staged: boolean, toggle = true) {
   ;(toggle ? ui.toggleDiff : ui.openDiff)({ path: file.path, oldPath: file.oldPath, source: staged ? 'staged' : 'unstaged', untracked: file.status === '?' })
 }
 
-function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
+function fileMenu(e: MouseEvent, file: FileChange, staged: boolean, files: FileChange[] = [file]) {
+  if (files.length > 1) {
+    const n = files.length
+    ui.openMenu(e, [
+      { label: staged ? `Unstage ${n} files` : `Stage ${n} files`, icon: staged ? Minus : Plus, action: () => (staged ? git.unstage(files) : git.stage(files)) },
+      { label: `Copy ${n} paths`, icon: Copy, action: () => git.copyText(files.map((f) => f.path).join('\n')) },
+      ...(staged ? [] : [{ separator: true }, { label: `Discard ${n} files…`, icon: Undo2, danger: true, action: () => git.discard(files) }]),
+    ])
+    return
+  }
   ui.openMenu(e, [
     { label: staged ? 'Unstage file' : 'Stage file', icon: staged ? Minus : Plus, action: () => (staged ? git.unstage([file]) : git.stage([file])) },
     { label: 'Open diff', icon: FileDiff, action: () => open(file, staged, false) },
@@ -138,7 +147,7 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
         <FileList
           class="min-h-0 flex-1"
           :files="changes" :mode="ui.fileViewMode" :checked="false" :active-path="activePath('unstaged')"
-          @open="(f) => open(f, false)" @toggle="(f) => git.stage([f])" @menu="(e, f) => fileMenu(e, f, false)"
+          @open="(f) => open(f, false)" @toggle="(_f, fs) => git.stage(fs)" @menu="(e, f, fs) => fileMenu(e, f, false, fs)"
         >
           <template #empty><div v-if="!loading" class="px-3 py-2 text-[12px] text-faint italic">No unstaged changes</div></template>
         </FileList>
@@ -164,7 +173,7 @@ function fileMenu(e: MouseEvent, file: FileChange, staged: boolean) {
         <FileList
           class="min-h-0 flex-1"
           :files="wc.staged" :mode="ui.fileViewMode" :checked="true" :active-path="activePath('staged')"
-          @open="(f) => open(f, true)" @toggle="(f) => git.unstage([f])" @menu="(e, f) => fileMenu(e, f, true)"
+          @open="(f) => open(f, true)" @toggle="(_f, fs) => git.unstage(fs)" @menu="(e, f, fs) => fileMenu(e, f, true, fs)"
         >
           <template #empty><div v-if="!loading" class="px-3 py-2 text-[12px] text-faint italic">Nothing staged yet</div></template>
         </FileList>

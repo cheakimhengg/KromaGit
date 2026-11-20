@@ -211,15 +211,30 @@ export const useUiStore = defineStore('ui', () => {
 
   function openMenu(event: MouseEvent, items: MenuItem[]) {
     event.preventDefault()
+    menuAnchor = null
     menu.value = { x: event.clientX, y: event.clientY, items }
   }
 
+  /** Clicking a menu's own button again closes it: the outside-click closes first, so don't reopen right after. */
+  let menuAnchor: Element | null = null
+  let closedAnchor: Element | null = null
+  let closedAt = 0
   function openMenuBelow(el: Element, items: MenuItem[]) {
+    if (el === closedAnchor && Date.now() - closedAt < 400) {
+      closedAnchor = null
+      return
+    }
     const rect = el.getBoundingClientRect()
     menu.value = { x: rect.left, y: rect.bottom + 4, items }
+    menuAnchor = el
   }
 
-  function closeMenu() {
+  function closeMenu(fromOutsideClick = false) {
+    if (fromOutsideClick && menu.value && menuAnchor) {
+      closedAnchor = menuAnchor
+      closedAt = Date.now()
+    }
+    menuAnchor = null
     menu.value = null
   }
 

@@ -32,8 +32,9 @@ function run(item: MenuItem) {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if (menu.value && el.value && !el.value.contains(e.target as Node)) ui.closeMenu()
+  if (menu.value && el.value && !el.value.contains(e.target as Node)) ui.closeMenu(true)
 }
+const closeOnBlur = () => ui.closeMenu()
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') ui.closeMenu()
 }
@@ -41,12 +42,12 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('pointerdown', onPointerDown, true)
   window.addEventListener('keydown', onKey)
-  window.addEventListener('blur', ui.closeMenu)
+  window.addEventListener('blur', closeOnBlur)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', onPointerDown, true)
   window.removeEventListener('keydown', onKey)
-  window.removeEventListener('blur', ui.closeMenu)
+  window.removeEventListener('blur', closeOnBlur)
 })
 </script>
 

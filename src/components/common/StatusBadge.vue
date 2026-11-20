@@ -9,18 +9,18 @@ const styles: Record<FileStatus, string> = {
   A: 'bg-success/15 text-success',
   D: 'bg-danger/15 text-danger',
   R: 'bg-accent/15 text-accent',
-  '?': 'bg-info/15 text-info',
+  '?': 'bg-success/15 text-success',
   U: 'bg-danger/25 text-danger',
   '=': 'text-faint',
 }
 const titles: Record<FileStatus, string> = {
-  M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', '?': 'Untracked', U: 'Conflicted', '=': 'Unchanged',
+  M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', '?': 'New file (not tracked yet)', U: 'Conflicted', '=': 'Unchanged',
 }
 </script>
 
 <template>
   <span class="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded font-mono text-[11px] font-bold" :class="styles[status]" :title="titles[status]">
     <FileIcon v-if="status === '='" :size="13" />
-    <template v-else>{{ status }}</template>
+    <template v-else>{{ status === '?' ? 'A' : status }}</template>
   </span>
 </template>
