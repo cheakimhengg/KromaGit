@@ -568,3 +568,90 @@ fn pull_links_a_branch_that_has_no_upstream_yet() {
     assert_eq!(sh_out(&d, &["log", "-1", "--format=%s"]).trim(), "remote topic");
     assert_eq!(sh_out(&d, &["rev-parse", "--abbrev-ref", "@{u}"]).trim(), "origin/topic");
 }
+
+#[test]
+fn pull_keeps_uncommitted_changes_via_autostash() {
+    let tmp = tempfile::tempdir().unwrap();
+    let origin = tmp.path().join("origin");
+    std::fs::create_dir(&origin).unwrap();
+    sh(&origin, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(&origin, "a.txt", "one\ntwo\nthree\n");
+    sh(&origin, &["add", "-A"]);
+    sh(&origin, &["commit", "-qm", "base"]);
+    let d = tmp.path().join("clone");
+    sh(tmp.path(), &["clone", "-q", origin.to_str().unwrap(), "clone"]);
+    write(&origin, "a.txt", "ONE\ntwo\nthree\n");
+    sh(&origin, &["commit", "-qam", "remote change"]);
+    write(&d, "a.txt", "one\ntwo\nTHREE\n");
+
+    let g = Git::new(&d);
+    git::ops::run_action(&g, &git::ops::Action::Pull { mode: "merge".into(), track: None }).unwrap();
+    assert_eq!(sh_out(&d, &["log", "-1", "--format=%s"]).trim(), "remote change");
+    assert_eq!(std::fs::read_to_string(d.join("a.txt")).unwrap(), "ONE\ntwo\nTHREE\n");
+    assert_eq!(sh_out(&d, &["stash", "list"]).trim(), "");
+}
+
+fn repo_with_branch() -> tempfile::TempDir {
+    let tmp = tempfile::tempdir().unwrap();
+    let d = tmp.path();
+    sh(d, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    write(d, "a.txt", "one\ntwo\nthree\nfour\nfive\nsix\n");
+    write(d, "b.txt", "b\n");
+    sh(d, &["add", "-A"]);
+    sh(d, &["commit", "-qm", "base"]);
+    sh(d, &["checkout", "-qb", "other"]);
+    write(d, "a.txt", "ONE\ntwo\nthree\nfour\nfive\nsix\n");
+    sh(d, &["commit", "-qam", "other changes line 1"]);
+    sh(d, &["checkout", "-q", "main"]);
+    tmp
+}
+
+#[test]
+fn checkout_carries_uncommitted_changes_along() {
+    let tmp = repo_with_branch();
+    let d = tmp.path();
+    write(d, "a.txt", "one\ntwo\nthree\nfour\nfive\nSIX\n");
+    write(d, "b.txt", "b staged\n");
+    sh(d, &["add", "b.txt"]);
+    write(d, "new.txt", "brand new\n");
+
+    let g = Git::new(d);
+    let out = git::ops::run_action(&g, &git::ops::Action::Checkout { branch: "other".into() }).unwrap();
+    assert_eq!(sh_out(d, &["branch", "--show-current"]).trim(), "other");
+    assert_eq!(std::fs::read_to_string(d.join("a.txt")).unwrap(), "ONE\ntwo\nthree\nfour\nfive\nSIX\n");
+    assert!(d.join("new.txt").exists());
+    assert_eq!(sh_out(d, &["diff", "--cached", "--name-only"]).trim(), "b.txt", "staged stays staged");
+    assert_eq!(sh_out(d, &["stash", "list"]).trim(), "");
+    assert!(out.output.contains("came along"), "{}", out.output);
+}
+
+#[test]
+fn merge_and_cherry_pick_work_with_uncommitted_changes() {
+    let tmp = repo_with_branch();
+    let d = tmp.path();
+    write(d, "b.txt", "b local\n");
+    let g = Git::new(d);
+    git::ops::run_action(&g, &git::ops::Action::Merge { target: "other".into(), mode: None }).unwrap();
+    assert!(std::fs::read_to_string(d.join("a.txt")).unwrap().starts_with("ONE"));
+    assert_eq!(std::fs::read_to_string(d.join("b.txt")).unwrap(), "b local\n");
+
+    sh(d, &["checkout", "-q", "-b", "pick", "HEAD~1"]);
+    let hash = sh_out(d, &["rev-parse", "other"]).trim().to_string();
+    write(d, "b.txt", "b local again\n");
+    git::ops::run_action(&g, &git::ops::Action::CherryPick { hash }).unwrap();
+    assert!(std::fs::read_to_string(d.join("a.txt")).unwrap().starts_with("ONE"));
+    assert_eq!(std::fs::read_to_string(d.join("b.txt")).unwrap(), "b local again\n");
+}
+
+#[test]
+fn conflicting_changes_are_left_to_resolve_and_kept_in_stashes() {
+    let tmp = repo_with_branch();
+    let d = tmp.path();
+    write(d, "a.txt", "uno\ntwo\nthree\nfour\nfive\nsix\n");
+    let g = Git::new(d);
+    let out = git::ops::run_action(&g, &git::ops::Action::Checkout { branch: "other".into() }).unwrap();
+    assert_eq!(sh_out(d, &["branch", "--show-current"]).trim(), "other");
+    assert!(out.output.contains("conflict"), "{}", out.output);
+    assert_eq!(sh_out(d, &["diff", "--name-only", "--diff-filter=U"]).trim(), "a.txt");
+    assert!(sh_out(d, &["stash", "list"]).contains("KromaGit auto-stash"));
+}

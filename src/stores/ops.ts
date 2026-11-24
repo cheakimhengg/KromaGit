@@ -77,7 +77,12 @@ export const useOpsStore = defineStore('ops', () => {
         if (stack.undo.length > MAX_UNDO) stack.undo.shift()
       }
       stack.redo = []
-      if (opts.success !== false) ui.toast({ kind: 'success', title: opts.success ?? label, detail: lastLine(outcome.output) }, 2500)
+      const restoreIssue = /conflict with the new code|could not be put back/.test(outcome.output)
+      if (restoreIssue) {
+        ui.toast({ kind: 'info', title: `${opts.success ?? label}, but your changes need attention`, detail: lastLine(outcome.output) }, 10000)
+      } else if (opts.success !== false) {
+        ui.toast({ kind: 'success', title: opts.success ?? label, detail: lastLine(outcome.output) }, 2500)
+      }
     } catch (e) {
       const msg = errorMessage(e)
       running.value = null

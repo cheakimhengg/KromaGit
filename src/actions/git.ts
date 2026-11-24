@@ -195,10 +195,23 @@ function checkoutUndo(redo: GitAction) {
   }
 }
 
+/** Uncommitted changes are stashed and restored automatically, but a file that is still conflicted can't be stashed. */
+function blockedByConflicts(what: string) {
+  const conflicted = snapshot()?.workingCopy.unstaged.filter((f) => f.status === 'U') ?? []
+  if (!conflicted.length) return false
+  ui().toast({
+    kind: 'info',
+    title: `Can't ${what} yet`,
+    detail: conflicted.length === 1 ? `${conflicted[0].path.split('/').pop()} still has a conflict. Resolve it first.` : `${conflicted.length} files still have conflicts. Resolve them first.`,
+    action: { label: 'Resolve', run: () => (ui().conflictPath = conflicted[0].path) },
+  }, 7000)
+  return true
+}
+
 /** git refuses most commands mid-merge/rebase; say so plainly and offer the way out. */
 function blockedByOperation(what: string) {
   const op = snapshot()?.operation
-  if (!op) return false
+  if (!op) return blockedByConflicts(what)
   const name = ({ merge: 'merge', rebase: 'rebase', cherryPick: 'cherry-pick', revert: 'revert' })[op]
   ui().toast({
     kind: 'error',
@@ -367,6 +380,16 @@ export function pull(mode: PullMode = 'merge') {
   const label = { merge: 'Pull', rebase: 'Pull (rebase)', ffOnly: 'Pull (fast-forward only)' }[mode]
   const snap = snapshot()
   const branch = snap?.head.branch
+  const local = snap?.branches.find((x) => x.name === branch)
+  if (branch && local?.upstreamGone) {
+    ui().toast({
+      kind: 'info',
+      title: 'Nothing to pull',
+      detail: `${snap?.head.upstream ?? branch} was deleted on the remote, usually because it was merged. Switch to the branch it was merged into, or push to publish it again.`,
+      action: { label: 'Push again', run: () => void push({ setUpstream: true }) },
+    }, 9000)
+    return
+  }
   let track: string | undefined
   if (branch && !snap?.head.upstream) {
     const remote = snap?.remotes.find((r) => r.name === 'origin' && r.branches.includes(branch)) ?? snap?.remotes.find((r) => r.branches.includes(branch))
@@ -423,7 +446,7 @@ export async function push(opts: { force?: boolean; setUpstream?: boolean } = {}
 
 /** Always records a merge commit, so the merge shows up as its own line in the graph. */
 export async function merge(target: string) {
-  if (blockedByOperation('start another merge')) return
+  if (blockedByOperation('merge')) return
   const current = snapshot()?.currentBranch ?? 'HEAD'
   return ops().run(`Merge ${target} into ${current}`, { type: 'merge', target, mode: 'noFf' }, { undo: moveHeadUndo, onError: conflictHandler })
 }

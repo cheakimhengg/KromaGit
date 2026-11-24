@@ -539,7 +539,6 @@ function rowIndex(virtualIndex: number) {
               :stash="c.stash !== undefined"
             />
             <span
-              :style="visible.band ? { boxShadow: `inset 2px 0 0 ${laneColor(layout!.rows[rowIndex(v.index)].color)}` } : undefined"
               class="flex h-full min-w-0 items-center gap-1.5 truncate px-2.5 text-[14px]" :class="[c.parents.length > 1 || c.stash !== undefined ? 'text-muted' : 'text-fg', { 'pl-3': !show.refs && !show.graph }]"
             >
               <template v-if="!show.refs">

@@ -201,9 +201,85 @@ pub fn run_action(git: &Git, action: &Action) -> AppResult<OpOutcome> {
     ) {
         refresh_index(git);
     }
-    let out = perform(git, action)?;
+    let out = if moves_head(action) && has_local_changes(git)? && operation_in_progress(git)?.is_none() {
+        with_autostash(git, action)?
+    } else {
+        perform(git, action)?
+    };
     let after = head_state(git)?;
     Ok(OpOutcome { before, after, data: out.data, output: out.text })
+}
+
+/** Actions git refuses to run (or that can clash) while there are uncommitted changes. */
+fn moves_head(action: &Action) -> bool {
+    matches!(
+        action,
+        Action::Checkout { .. } | Action::CheckoutDetached { .. } | Action::CheckoutRemote { .. }
+            | Action::Merge { .. } | Action::Rebase { .. } | Action::CherryPick { .. } | Action::Revert { .. }
+    )
+}
+
+fn has_local_changes(git: &Git) -> AppResult<bool> {
+    Ok(!git.run_string(&["status", "--porcelain", "--untracked-files=normal"])?.trim().is_empty())
+}
+
+const AUTOSTASH_MSG: &str = "KromaGit auto-stash";
+
+/// Stashes uncommitted changes (staged, unstaged and new files), runs the action, then puts them back.
+/// If putting them back conflicts, the conflicts are left to resolve and the stash is kept as a copy.
+fn with_autostash(git: &Git, action: &Action) -> AppResult<Out> {
+    git.run(&["stash", "push", "--include-untracked", "-m", AUTOSTASH_MSG])?;
+    let result = perform(git, action);
+    let restore = restore_autostash(git);
+    match result {
+        Ok(mut out) => {
+            let note = match restore {
+                Restored::Clean => "Your uncommitted changes came along.",
+                Restored::Conflicted => {
+                    "Your uncommitted changes were put back but conflict with the new code; resolve them in Conflicts. A copy is kept in Stashes."
+                }
+                Restored::Kept => "Your uncommitted changes could not be put back automatically; they are saved in Stashes.",
+            };
+            out.text = if out.text.is_empty() { note.to_string() } else { format!("{}\n{note}", out.text) };
+            Ok(out)
+        }
+        Err(e) => {
+            let note = match restore {
+                Restored::Clean => "",
+                _ => " Your uncommitted changes are saved in Stashes (KromaGit auto-stash).",
+            };
+            Err(match e {
+                AppError::Git { command, message } => AppError::Git { command, message: format!("{message}{note}") },
+                other => other,
+            })
+        }
+    }
+}
+
+enum Restored {
+    Clean,
+    Conflicted,
+    Kept,
+}
+
+fn restore_autostash(git: &Git) -> Restored {
+    if operation_in_progress(git).ok().flatten().is_some() {
+        return Restored::Kept;
+    }
+    if git.run(&["stash", "pop", "--index"]).is_ok() {
+        return Restored::Clean;
+    }
+    let unmerged = git.run_string(&["diff", "--name-only", "--diff-filter=U"]).map(|s| !s.trim().is_empty()).unwrap_or(false);
+    if unmerged {
+        return Restored::Conflicted;
+    }
+    match git.run(&["stash", "pop"]) {
+        Ok(_) => Restored::Clean,
+        Err(_) => {
+            let unmerged = git.run_string(&["diff", "--name-only", "--diff-filter=U"]).map(|s| !s.trim().is_empty()).unwrap_or(false);
+            if unmerged { Restored::Conflicted } else { Restored::Kept }
+        }
+    }
 }
 
 fn perform(git: &Git, action: &Action) -> AppResult<Out> {
@@ -471,7 +547,8 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
                 "ffOnly" => "--ff-only",
                 _ => "--no-rebase",
             };
-            network(git, &["pull", "--prune", "--recurse-submodules=no", "--no-edit", flag])?
+            // --autostash: uncommitted changes are stashed, the pull runs, then they are put back
+            network(git, &["pull", "--prune", "--recurse-submodules=no", "--no-edit", "--autostash", flag])?
         }
         Push { remote, branch, set_upstream, force } => {
             let mut args = vec!["push"];
