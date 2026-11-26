@@ -787,3 +787,7 @@ mark.kg-find { background: color-mix(in srgb, var(--gw-warning) 40%, transparent
 
 .kg-caret { animation: kg-caret-blink 1.06s steps(1) infinite; }
 @keyframes kg-caret-blink { 50% { opacity: 0; } }
+
+/* ⌘A in a diff: one whole side shown as selected */
+.kg-all .cursor-text,
+.kg-all-unified .cursor-text { background-color: color-mix(in srgb, var(--gw-accent) 30%, transparent) !important; }

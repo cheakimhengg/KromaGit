@@ -67,6 +67,7 @@ function onEscape(e: KeyboardEvent) {
   e.preventDefault()
   if (ui.dialog || ui.paletteOpen || ui.switcherOpen || ui.settingsOpen || ui.menu || ui.repoMenuOpen) return
   if (e.target instanceof Element && e.target.closest('[data-own-esc]')) return
+  if (document.querySelector('[data-esc-clears]')) return
   if (isEditable(e.target)) {
     const el = e.target as HTMLInputElement
     if (el.value && el.type !== 'checkbox' && el.tagName === 'INPUT') {

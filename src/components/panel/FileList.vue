@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { ChevronRight, Folder } from '@/lib/icons'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -102,17 +102,19 @@ const virtualizer = useVirtualizer(
   })),
 )
 
+function onWindowEsc(ev: KeyboardEvent) {
+  if (ev.key !== 'Escape' || !picked.value.size || document.querySelector('[role="dialog"]')) return
+  picked.value = new Set()
+}
+onMounted(() => window.addEventListener('keydown', onWindowEsc))
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowEsc))
+
 /** ↑ / ↓ move to the previous / next file and open it (folders are skipped). */
 function onListKeydown(e: KeyboardEvent) {
   const pressed = e.key
   if ((e.metaKey || e.ctrlKey) && pressed.toLowerCase() === 'a') {
     e.preventDefault()
     picked.value = new Set(orderedFiles().map((f) => f.path))
-    return
-  }
-  if (pressed === 'Escape' && picked.value.size) {
-    e.stopPropagation()
-    picked.value = new Set()
     return
   }
   if (pressed !== 'ArrowDown' && pressed !== 'ArrowUp') return
@@ -136,7 +138,7 @@ function split(path: string) {
 </script>
 
 <template>
-  <div ref="scrollEl" class="h-full overflow-y-auto outline-none" tabindex="0" @keydown="onListKeydown">
+  <div ref="scrollEl" class="h-full overflow-y-auto outline-none" tabindex="0" :data-esc-clears="picked.size ? '' : undefined" @keydown="onListKeydown">
     <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
       <template v-for="v in virtualizer.getVirtualItems()" :key="rows[v.index].key">
         <div

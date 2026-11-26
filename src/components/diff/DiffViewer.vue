@@ -213,6 +213,54 @@ const codeCols = ref<HTMLElement[]>([])
 const codeWidth = computed(() => `max(100%, ${Math.ceil(widestLine.value * 7.83 + 24)}px)`)
 /** A read-only blinking caret where the user clicks in the code, like an editor. */
 const caret = ref<{ top: number; left: number; height: number } | null>(null)
+/** ⌘A selects one whole side of the diff (all lines, not only those on screen); ⌘C copies it. */
+type Side = 'left' | 'right' | 'unified'
+const allSide = ref<Side | null>(null)
+let lastSide: Side = 'right'
+function noteSide(ev: MouseEvent) {
+  const col = (ev.target as HTMLElement | null)?.closest('.split-col')
+  if (col) lastSide = col === codeCols.value[0] ? 'left' : 'right'
+  else if (ui.diffMode === 'unified') lastSide = 'unified'
+  allSide.value = null
+}
+function sideText(side: Side): string {
+  const out: string[] = []
+  for (const h of hunks.value) {
+    for (const l of h.lines) {
+      if (side === 'left' && l.kind === 'add') continue
+      if (side === 'right' && l.kind === 'del') continue
+      out.push(l.text)
+    }
+  }
+  return out.join('\n')
+}
+function onDiffKeys(ev: KeyboardEvent) {
+  if (ui.centerView !== 'diff' || view.value !== 'diff' || isImage.value) return
+  const t = ev.target as HTMLElement | null
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+  if (t?.closest('.xterm, [role="dialog"]')) return
+  const mod = ev.metaKey || ev.ctrlKey
+  const pressed = ev.key.toLowerCase()
+  if (mod && pressed === 'a' && hunks.value.length) {
+    ev.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    caret.value = null
+    allSide.value = ui.diffMode === 'unified' ? 'unified' : lastSide === 'unified' ? 'right' : lastSide
+  } else if (mod && pressed === 'c' && allSide.value) {
+    ev.preventDefault()
+    const text = sideText(allSide.value)
+    void navigator.clipboard?.writeText(text)
+    const n = text ? text.split('\n').length : 0
+    ui.toast({ kind: 'success', title: `Copied ${n} ${n === 1 ? 'line' : 'lines'}` }, 1800)
+  } else if (pressed === 'escape' && allSide.value) {
+    ev.stopPropagation()
+    allSide.value = null
+  }
+}
+onMounted(() => window.addEventListener('keydown', onDiffKeys, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onDiffKeys, true))
+watch(() => [tgt.value, ui.diffMode] as const, () => (allSide.value = null))
+
 function placeCaret(ev: MouseEvent) {
   const sel = window.getSelection()
   const target = ev.target as HTMLElement | null
@@ -322,6 +370,19 @@ watch(fileList, (list) => {
   const moved = (other === 'staged' ? wc?.staged : wc?.unstaged)?.find((f) => f.path === t.path)
   if (moved) ui.openDiff({ path: moved.path, oldPath: moved.oldPath, source: other, untracked: moved.status === '?' })
 })
+
+/** A working-copy file that no longer has any change (stashed, committed, discarded, checked out…) closes its diff. */
+watch(
+  () => repos.active?.snapshot.workingCopy,
+  (wc) => {
+    const t = tgt.value
+    if (!wc || t.source === 'commit' || histTarget.value) return
+    const still = [...wc.unstaged, ...wc.staged].some((f) => f.path === t.path || f.oldPath === t.path)
+    if (!still) void nextTick(() => {
+      if (ui.diffPath === t.path && ui.diffSource === t.source) ui.closeDiff()
+    })
+  },
+)
 function goFile(delta: number) {
   const list = fileList.value
   if (list.length < 2) return
@@ -668,7 +729,7 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
       <button type="button" class="tb-icon" title="Next (↵)" :disabled="!findHits.length" @click="findStep(1)"><ChevronDown :size="15" /></button>
       <button type="button" class="tb-icon" title="Close (Esc)" @click="closeFind"><X :size="15" /></button>
     </div>
-    <div ref="scroller" class="relative min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading && !quietReload }" @wheel.passive="onDiffWheel" @mouseup="placeCaret">
+    <div ref="scroller" class="relative min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[22px]" :class="{ 'opacity-60': loading && !quietReload, 'kg-all-unified': allSide === 'unified' }" :data-esc-clears="allSide ? '' : undefined" @wheel.passive="onDiffWheel" @mousedown="noteSide" @mouseup="placeCaret">
       <div v-if="caret" class="kg-caret pointer-events-none absolute z-10 w-[2px] bg-fg" :style="{ top: `${caret.top}px`, left: `${caret.left}px`, height: `${caret.height}px` }" />
       <div v-if="isConflict" class="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 font-sans text-[12px] text-warning">
       This file has conflicts. Keep the lines you want, remove the <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> <code>=======</code> <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> markers in your editor, then Stage file to mark it resolved.
@@ -678,7 +739,7 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
       </div>
       <div class="relative" :style="{ height: `${virtualizer.getTotalSize()}px`, width: unifiedWidth }">
         <div
-          v-memo="[rowMemo, virtualizer.getVirtualItems()[0]?.index, virtualizer.getVirtualItems().length, virtualizer.getVirtualItems()[0]?.start, virtualizer.getTotalSize(), splitSideways, codeWidth, ui.diffOptions.wrap, canDiscard, busy, stageVerb, focused]"
+          v-memo="[rowMemo, virtualizer.getVirtualItems()[0]?.index, virtualizer.getVirtualItems().length, virtualizer.getVirtualItems()[0]?.start, virtualizer.getTotalSize(), splitSideways, codeWidth, ui.diffOptions.wrap, canDiscard, busy, stageVerb, focused, allSide]"
           class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)` }"
         >
         <div v-if="splitSideways" class="relative flex w-full">
@@ -696,7 +757,7 @@ const numColor = (l: DiffLine) => (l.kind === 'add' ? 'text-success/80' : l.kind
                 </template>
               </template>
             </div>
-            <div :ref="(el) => { if (el) codeCols[side === 'left' ? 0 : 1] = el as HTMLElement }" class="split-col min-w-0 flex-1 overflow-hidden">
+            <div :ref="(el) => { if (el) codeCols[side === 'left' ? 0 : 1] = el as HTMLElement }" class="split-col min-w-0 flex-1 overflow-hidden" :class="{ 'kg-all': allSide === side }">
               <div :style="{ width: codeWidth }">
                 <template v-for="v in virtualizer.getVirtualItems()" :key="v.index">
                   <div v-if="items[v.index].ri === -1" :style="{ height: `${items[v.index].hi > 0 ? 42 : 30}px` }" />
