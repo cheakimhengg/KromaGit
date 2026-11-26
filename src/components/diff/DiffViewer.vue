@@ -37,7 +37,7 @@ const selected = ref(new Set<string>())
 let anchor: { hunk: number; line: number } | null = null
 
 watch(
-  () => [tgt.value, repos.activeTab?.path, tgt.value.source === 'commit' ? null : repos.active?.snapshot.workingCopy, ui.diffOptions.ignoreWhitespace, ui.diffOptions.fullFile] as const,
+  () => [tgt.value, repos.activeTab?.path, tgt.value.source === 'commit' ? null : repos.active?.snapshot.workingCopy, ui.diffOptions.ignoreWhitespace, ui.diffOptions.fullFile, tgt.value.source === 'commit' ? 0 : repos.outsideTick] as const,
   async ([target, path], old, onCleanup) => {
     let cancelled = false
     onCleanup(() => (cancelled = true))
@@ -50,7 +50,7 @@ watch(
     try {
       const d = await gitApi.getFileDiff(path ?? '', target, { ignoreWhitespace: ui.diffOptions.ignoreWhitespace, fullFile: ui.diffOptions.fullFile || !!target.unchanged })
       if (!cancelled) {
-        diff.value = d
+        if (!quietReload.value || JSON.stringify(d) !== JSON.stringify(diff.value)) diff.value = d
         if (target.line && (!old || old[0] !== target)) void focusLine(target.line)
         else if (freshView && (ui.diffOptions.fullFile || target.unchanged)) void jumpToFirstChange()
       }

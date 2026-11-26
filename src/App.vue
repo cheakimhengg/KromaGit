@@ -128,6 +128,7 @@ function onRepoChanged(repo: string, refs: boolean) {
     const withRefs = changedRefs
     changedRefs = false
     if (ops.running) return
+    repos.markOutsideChange()
     if (withRefs) await repos.softRefresh()
     else await repos.pollStatus()
   }, Math.max(0, 500 - (Date.now() - lastChangeRefresh)))
@@ -148,8 +149,9 @@ let unlistenFocus: (() => void) | undefined
 let lastFocusRefresh = 0
 function onFocus() {
   const now = Date.now()
-  if (now - lastFocusRefresh < 2000) return
+  if (now - lastFocusRefresh < 500) return
   lastFocusRefresh = now
+  repos.markOutsideChange()
   void repos.softRefresh()
 }
 

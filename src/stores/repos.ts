@@ -124,6 +124,11 @@ export const useReposStore = defineStore('repos', () => {
   const activeTabId = ref<string>(ws.tabs.some((t) => t.id === ws.activeTabId) ? ws.activeTabId : (ws.tabs[0]?.id ?? ''))
   const states = shallowReactive(new Map<string, RepoState>())
   const generations = new Map<string, { commits: number; refs: number; status: number }>()
+  /** Bumped when files may have changed outside the app, so an open diff re-reads even if the file list looks the same. */
+  const outsideTick = ref(0)
+  function markOutsideChange() {
+    outsideTick.value++
+  }
 
   if (inTauri) {
     watch(
@@ -642,7 +647,7 @@ export const useReposStore = defineStore('repos', () => {
 
   return {
     groups, tabs, activeTabId, activeTab, active, busy, recent, forgetRecent,
-    activate, openRepo, openRepoAt, cloneRepo, cloning, loadMoreCommits, loadAllCommits, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh, pollStatus, backgroundFetch, backgroundDone,
+    outsideTick, markOutsideChange, activate, openRepo, openRepoAt, cloneRepo, cloning, loadMoreCommits, loadAllCommits, openStartupPaths, closeTab, setTabGroup, load, refresh, softRefresh, pollStatus, backgroundFetch, backgroundDone,
     createGroup, promptNewGroup, editGroup, groupMembers, openRestOfGroup, collapseOtherGroups, expandAllGroups, renameTab, renameGroup, setGroupColor, toggleGroupCollapsed, ungroup, closeGroup, moveTab, moveGroup, closeOtherTabs,
   }
 })
