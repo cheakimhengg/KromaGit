@@ -1,6 +1,6 @@
 [package]
 name = "kromagit"
-version = "0.2.6"
+version = "0.2.7"
 description = "Local-first AI Git desktop client"
 authors = ["Chea KimHeng"]
 license = "MIT"
