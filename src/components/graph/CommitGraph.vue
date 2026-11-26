@@ -560,10 +560,10 @@ function rowIndex(virtualIndex: number) {
         </template>
         </div>
       </div>
-      <div v-if="!commits.length && loadingCommits" class="space-y-3 p-4">
+      <div v-if="!commits.length && loadingCommits" class="gw-skel-wrap space-y-3 p-4" role="status" aria-label="Loading history">
         <div v-for="i in 8" :key="i" class="flex items-center gap-3">
-          <div class="h-4 w-4 animate-pulse rounded-full bg-surface-3" />
-          <div class="h-3 animate-pulse rounded bg-surface-3" :style="{ width: `${30 + ((i * 37) % 45)}%` }" />
+          <div class="gw-skel h-4 w-4 rounded-full" />
+          <div class="gw-skel h-3" :style="{ width: `${30 + ((i * 37) % 45)}%` }" />
         </div>
       </div>
       <div v-else-if="!commits.length" class="p-8 text-center text-[13px] text-faint">No commits yet — make your first commit to see history here.</div>

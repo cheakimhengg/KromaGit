@@ -222,10 +222,14 @@ function review() {
 
     <div v-if="error" class="m-3 rounded-md border border-danger/30 bg-danger/10 p-3 text-[13px] text-danger select-text">{{ error }}</div>
 
-    <div v-else-if="!shown" class="space-y-2 p-4">
-      <div class="h-4 w-3/4 animate-pulse rounded bg-surface-3" />
-      <div class="h-3 w-1/2 animate-pulse rounded bg-surface-3" />
-      <div class="mt-4 h-16 animate-pulse rounded-lg bg-surface-3" />
+    <div v-else-if="!shown" class="gw-skel-wrap space-y-2 p-4" role="status" aria-label="Loading commit">
+      <div class="gw-skel h-4 w-3/4" />
+      <div class="gw-skel h-3 w-1/2" />
+      <div class="gw-skel mt-4 h-16 rounded-lg" />
+      <div v-for="i in 6" :key="i" class="flex items-center gap-2 pt-2">
+        <div class="gw-skel h-4 w-4" />
+        <div class="gw-skel h-3" :style="{ width: `${35 + ((i * 29) % 40)}%` }" />
+      </div>
     </div>
 
     <template v-else>

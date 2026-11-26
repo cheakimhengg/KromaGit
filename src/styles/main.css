@@ -765,11 +765,11 @@ a:focus-visible {
   }
 }
 
-/* loading placeholders: a soft shimmer, shown after a short delay so fast loads don't flash */
-.gw-skel-wrap { animation: gw-skel-in .2s ease-out .12s both; }
+/* loading placeholders: a shimmer that shows right away so a view is never just blank */
+.gw-skel-wrap { animation: gw-skel-in .12s ease-out both; }
 .gw-skel {
   border-radius: 4px;
-  background: linear-gradient(90deg, var(--gw-surface-2) 0%, var(--gw-surface-3) 50%, var(--gw-surface-2) 100%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gw-text) 7%, transparent) 0%, color-mix(in srgb, var(--gw-text) 15%, transparent) 50%, color-mix(in srgb, var(--gw-text) 7%, transparent) 100%);
   background-size: 200% 100%;
   animation: gw-skel-shine 1.3s ease-in-out infinite;
 }
