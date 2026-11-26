@@ -2123,7 +2123,7 @@ dependencies = [
 
 [[package]]
 name = "kromagit"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "keyring",
  "notify-debouncer-mini",
