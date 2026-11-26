@@ -49,10 +49,24 @@ pub fn get_refs(git: &Git) -> AppResult<RefsPayload> {
         remotes,
         tags,
         stashes: parse_stashes(&outs[2]),
-        worktrees: parse_worktrees(&outs[3]),
+        worktrees: parse_worktrees(&outs[3]).into_iter().map(real_worktree_path).collect(),
         submodules: parse_submodules(&outs[4]),
         last_fetch: file_mtime(String::from_utf8_lossy(&outs[5]).trim()),
     })
+}
+
+/// A submodule's main worktree is listed by its git dir (`.git/modules/x`); point it at the folder the files live in.
+fn real_worktree_path(mut w: Worktree) -> Worktree {
+    let dir = std::path::Path::new(&w.path);
+    if dir.join("HEAD").is_file() && !dir.join(".git").exists() {
+        let configured = Git::new(w.path.clone()).run_string(&["config", "--file", "config", "core.worktree"]).ok();
+        if let Some(rel) = configured.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+            if let Ok(real) = dir.join(rel).canonicalize() {
+                w.path = real.to_string_lossy().into_owned();
+            }
+        }
+    }
+    w
 }
 
 fn file_mtime(path: &str) -> Option<i64> {

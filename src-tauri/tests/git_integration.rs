@@ -655,3 +655,22 @@ fn conflicting_changes_are_left_to_resolve_and_kept_in_stashes() {
     assert_eq!(sh_out(d, &["diff", "--name-only", "--diff-filter=U"]).trim(), "a.txt");
     assert!(sh_out(d, &["stash", "list"]).contains("KromaGit auto-stash"));
 }
+
+#[test]
+fn submodule_worktrees_point_at_real_folders() {
+    let lib = sample_repo();
+    let parent = tempfile::tempdir().unwrap();
+    let p = parent.path();
+    sh(p, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    sh(p, &["-c", "protocol.file.allow=always", "submodule", "add", "-q", lib.path().to_str().unwrap(), "lib"]);
+    let sub = p.join("lib");
+    sh(&sub, &["checkout", "-q", "main"]);
+    let linked = p.join("lib-linked");
+    sh(&sub, &["worktree", "add", "-q", linked.to_str().unwrap(), "feature/x"]);
+
+    let refs = git::refs::get_refs(&Git::new(linked.to_str().unwrap().to_string())).unwrap();
+    let main = refs.worktrees.iter().find(|w| w.branch == "main").expect("main worktree listed");
+    assert_eq!(Path::new(&main.path).canonicalize().unwrap(), sub.canonicalize().unwrap());
+    let other = refs.worktrees.iter().find(|w| w.branch == "feature/x").expect("linked worktree listed");
+    assert_eq!(Path::new(&other.path).canonicalize().unwrap(), linked.canonicalize().unwrap());
+}

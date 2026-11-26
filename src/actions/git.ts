@@ -222,10 +222,43 @@ function blockedByOperation(what: string) {
   return true
 }
 
-export function checkout(branch: string) {
+const samePath = (a: string, b: string) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '')
+
+/** The other worktree that has `branch` checked out; git won't check out one branch in two places. */
+function worktreeHolding(branch: string): string | null {
+  const here = useReposStore().activeTab?.path ?? ''
+  const wt = snapshot()?.worktrees.find((w) => w.branch === branch && !samePath(w.path, here))
+  return wt?.path ?? null
+}
+
+const WORKTREE_IN_USE = /already (?:used|checked out) by worktree at '([^']+)'|is checked out at '([^']+)'/i
+
+async function offerWorktree(branch: string, path: string) {
+  const folder = path.replace(/\/+$/, '').split('/').pop() || path
+  const open = await ui().confirm({
+    title: `${branch} is open in another worktree`,
+    message: `Git allows a branch in one place only. Open ${folder} to work on it.`,
+    confirmLabel: 'Open worktree',
+  })
+  if (open) await useReposStore().openRepoAt(path)
+}
+
+/** If git refused because the branch lives in another worktree, offer to open that worktree instead of showing the raw error. */
+function worktreeError(branch: string) {
+  return async (msg: string) => {
+    const m = WORKTREE_IN_USE.exec(msg)
+    if (!m) return false
+    await offerWorktree(branch, m[1] ?? m[2])
+    return true
+  }
+}
+
+export async function checkout(branch: string) {
   if (blockedByOperation('switch branch')) return
+  const held = worktreeHolding(branch)
+  if (held) return offerWorktree(branch, held)
   const action: GitAction = { type: 'checkout', branch }
-  return ops().run(`Checkout ${branch}`, action, { success: `Switched to ${branch}`, undo: checkoutUndo(action) })
+  return ops().run(`Checkout ${branch}`, action, { success: `Switched to ${branch}`, undo: checkoutUndo(action), onError: worktreeError(branch) })
 }
 
 export async function checkoutRemote(remoteBranch: string, remote: string) {
@@ -233,6 +266,8 @@ export async function checkoutRemote(remoteBranch: string, remote: string) {
   const name = remoteBranch.slice(remote.length + 1)
   const local = useReposStore().active?.snapshot.branches.find((b) => b.name === name)
   if (local?.current && !local.behind) return
+  const held = local ? worktreeHolding(name) : null
+  if (held) return offerWorktree(name, held)
   const diverged = !!local && local.upstream === remoteBranch && local.ahead > 0 && local.behind > 0
   if (diverged) {
     const ok = await ui().confirm({
@@ -247,6 +282,7 @@ export async function checkoutRemote(remoteBranch: string, remote: string) {
   const oldTip = local?.tipHash
   return ops().run(`Checkout ${remoteBranch}`, action, {
     success: `Switched to ${name}`,
+    onError: worktreeError(name),
     undo: diverged && oldTip
       ? (o) => {
           const back = backTo(o.before)
@@ -284,6 +320,17 @@ export async function createBranch(start?: { ref: string; label: string }) {
 }
 
 export async function deleteBranch(name: string) {
+  const held = worktreeHolding(name)
+  if (held) {
+    const folder = held.replace(/\/+$/, '').split('/').pop() || held
+    ui().toast({
+      kind: 'info',
+      title: `Can't delete ${name}`,
+      detail: `It's checked out in the ${folder} worktree.`,
+      action: { label: 'Open worktree', run: () => void useReposStore().openRepoAt(held) },
+    }, 7000)
+    return
+  }
   const ok = await ui().confirm({
     title: `Delete branch ${name}?`,
     message: 'Deletes the local branch only. You can restore it with Undo.',
@@ -296,6 +343,7 @@ export async function deleteBranch(name: string) {
   return ops().run(`Delete branch ${name}`, { type: 'deleteBranch', name, force: false }, {
     undo,
     onError: async (msg) => {
+      if (await worktreeError(name)(msg)) return true
       if (!/not fully merged/i.test(msg)) return false
       const force = await ui().confirm({
         title: `${name} is not fully merged`,
