@@ -193,6 +193,20 @@ pub async fn github_commit_avatar(owner: String, repo: String, sha: String) -> A
 // ---------- built-in terminal ----------
 
 #[tauri::command]
+pub async fn watch_repo(app: tauri::AppHandle, repo: String) -> AppResult<()> {
+    blocking(move || {
+        use tauri::Manager;
+        app.state::<crate::watcher::RepoWatcher>().watch(&app, &repo)
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn unwatch_repo(state: tauri::State<'_, crate::watcher::RepoWatcher>) {
+    state.stop()
+}
+
+#[tauri::command]
 pub fn terminal_open(app: tauri::AppHandle, state: tauri::State<'_, crate::terminal::Terminals>, cwd: String, cols: u16, rows: u16) -> AppResult<u32> {
     state.open(&app, &cwd, cols, rows)
 }

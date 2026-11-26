@@ -112,9 +112,39 @@ watch(
   ([id, loaded]) => loaded && void repos.backgroundFetch(id, 60_000),
   { immediate: true },
 )
-let pollTimer: number | undefined
-let unlistenFocus: (() => void) | undefined
 const inTauri = '__TAURI_INTERNALS__' in window
+let pollTimer: number | undefined
+let unlistenRepo: (() => void) | undefined
+let changeTimer: number | undefined
+let lastChangeRefresh = 0
+let changedRefs = false
+function onRepoChanged(repo: string, refs: boolean) {
+  if (repo !== repos.activeTab?.path || ui.home) return
+  changedRefs ||= refs
+  if (changeTimer) return
+  changeTimer = window.setTimeout(async () => {
+    changeTimer = undefined
+    lastChangeRefresh = Date.now()
+    const withRefs = changedRefs
+    changedRefs = false
+    if (ops.running) return
+    if (withRefs) await repos.softRefresh()
+    else await repos.pollStatus()
+  }, Math.max(0, 500 - (Date.now() - lastChangeRefresh)))
+}
+
+watch(
+  () => (ui.home ? null : (repos.activeTab?.path ?? null)),
+  (path) => {
+    if (path && repos.active?.loaded) void repos.pollStatus()
+    if (!inTauri) return
+    void import('@tauri-apps/api/core')
+      .then(({ invoke }) => (path ? invoke('watch_repo', { repo: path }) : invoke('unwatch_repo')))
+      .catch(() => {})
+  },
+  { immediate: true },
+)
+let unlistenFocus: (() => void) | undefined
 let lastFocusRefresh = 0
 function onFocus() {
   const now = Date.now()
@@ -144,6 +174,10 @@ onMounted(() => {
       .then(({ getCurrentWindow }) => getCurrentWindow().onFocusChanged(({ payload }) => payload && onFocus()))
       .then((u) => (unlistenFocus = u))
       .catch(() => {})
+    void import('@tauri-apps/api/event')
+      .then(({ listen }) => listen<{ repo: string; refs: boolean }>('repo://changed', ({ payload }) => onRepoChanged(payload.repo, payload.refs)))
+      .then((u) => (unlistenRepo = u))
+      .catch(() => {})
   }
   fetchTimer = window.setInterval(() => {
     if (document.hidden || ops.running || ui.home) return
@@ -159,6 +193,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('focus', onFocus)
   unlistenFocus?.()
+  unlistenRepo?.()
+  clearTimeout(changeTimer)
   clearInterval(pollTimer)
   clearInterval(fetchTimer)
 })

@@ -31,6 +31,7 @@ regex = "1"
 portable-pty = "0.9"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+notify-debouncer-mini = "0.4"
 
 [profile.release]
 codegen-units = 1

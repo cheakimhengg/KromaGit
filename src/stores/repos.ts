@@ -317,10 +317,15 @@ export const useReposStore = defineStore('repos', () => {
 
   /** Background check for changes made outside the app (editor, AI tools, terminal); quiet unless something changed. */
   let polling = false
+  let pollAgain = false
   async function pollStatus(tabId = activeTabId.value) {
     const tab = tabs.value.find((t) => t.id === tabId)
     const state = tab && states.get(tab.id)
-    if (polling || !tab || !state?.loaded || state.loading.status || state.loading.commits) return
+    if (polling) {
+      pollAgain = true
+      return
+    }
+    if (!tab || !state?.loaded || state.loading.status || state.loading.commits) return
     polling = true
     const gen = generations.get(tab.id)!.status
     try {
@@ -337,6 +342,10 @@ export const useReposStore = defineStore('repos', () => {
       /* the next poll or a manual refresh will report it */
     } finally {
       polling = false
+      if (pollAgain) {
+        pollAgain = false
+        void pollStatus()
+      }
     }
   }
 

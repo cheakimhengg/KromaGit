@@ -9,6 +9,7 @@ pub mod secrets;
 pub mod settings;
 pub mod system;
 pub mod terminal;
+pub mod watcher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(terminal::Terminals::default())
+        .manage(watcher::RepoWatcher::default())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::startup_paths,
@@ -41,6 +43,8 @@ pub fn run() {
             commands::write_resolved,
             commands::merge_message,
             commands::terminal_open,
+            commands::watch_repo,
+            commands::unwatch_repo,
             commands::terminal_write,
             commands::terminal_resize,
             commands::terminal_close,
