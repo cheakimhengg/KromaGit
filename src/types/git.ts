@@ -247,6 +247,8 @@ export type GitAction =
   | { type: 'merge'; target: string; mode?: 'noFf' | 'ffOnly' }
   | { type: 'rebase'; onto: string }
   | { type: 'cherryPick'; hash: string }
+  | { type: 'cherryPickMany'; hashes: string[] }
+  | { type: 'revertMany'; hashes: string[] }
   | { type: 'revert'; hash: string }
   | { type: 'reset'; target: string; mode: ResetMode }
   | { type: 'stashPush'; message: string | null; includeUntracked: boolean }

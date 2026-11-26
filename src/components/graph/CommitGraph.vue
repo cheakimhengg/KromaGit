@@ -352,7 +352,56 @@ function stashMenu(e: MouseEvent, c: Commit) {
   ])
 }
 
+/** ⌘/Ctrl-click adds or removes commits, Shift-click selects a range; used for cherry-picking or reverting several at once. */
+const picked = ref(new Set<string>())
+const pickable = (c: Commit | undefined) => !!c && c.stash === undefined
+
+function onRowClick(e: MouseEvent, c: Commit) {
+  if (!pickable(c) || !(e.metaKey || e.ctrlKey || e.shiftKey)) {
+    picked.value = new Set()
+    ui.selectCommit(c.hash)
+    return
+  }
+  const anchor = ui.selectedCommit
+  if (e.shiftKey && anchor) {
+    const [a, b] = [displayIndexOf(anchor), displayIndexOf(c.hash)].sort((x, y) => x - y)
+    if (a >= 0) {
+      picked.value = new Set(commits.value.slice(a, b + 1).filter(pickable).map((x) => x.hash))
+      return
+    }
+  }
+  const next = new Set(picked.value)
+  if (!next.size && anchor && pickable(commits.value[displayIndexOf(anchor)])) next.add(anchor)
+  if (next.has(c.hash)) next.delete(c.hash)
+  else next.add(c.hash)
+  picked.value = next
+  ui.selectCommit(c.hash)
+}
+
+watch(() => repos.activeTabId, () => (picked.value = new Set()))
+function onWindowEsc(ev: KeyboardEvent) {
+  if (ev.key !== 'Escape' || !picked.value.size || document.querySelector('[role="dialog"]')) return
+  picked.value = new Set()
+}
+onMounted(() => window.addEventListener('keydown', onWindowEsc))
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowEsc))
+
+function multiMenu(e: MouseEvent) {
+  const newestFirst = commits.value.filter((c) => picked.value.has(c.hash)).map((c) => c.hash)
+  const n = newestFirst.length
+  const branch = snapshot.value?.currentBranch ?? 'HEAD'
+  ui.openMenu(e, [
+    { label: `Cherry-pick ${n} commits onto ${branch}`, icon: Cherry, action: () => git.cherryPickMany([...newestFirst].reverse()) },
+    { label: `Revert ${n} commits`, icon: Undo, action: () => git.revertMany(newestFirst) },
+    { separator: true },
+    { label: `Copy ${n} hashes`, icon: Copy, action: () => git.copyText([...newestFirst].reverse().join('\n'), `Copied ${n} hashes`) },
+    { label: 'Clear selection', icon: X, action: () => (picked.value = new Set()) },
+  ])
+}
+
 function commitMenu(e: MouseEvent, c: Commit) {
+  if (picked.value.size > 1 && picked.value.has(c.hash)) return multiMenu(e)
+  if (picked.value.size) picked.value = new Set()
   if (c.stash !== undefined) return stashMenu(e, c)
   const isHead = c.hash === headOid.value
   const label = c.shortHash
@@ -401,13 +450,18 @@ function onListKey(e: KeyboardEvent) {
   else if (e.key === 'End') next = count - 1
   else if (e.key === 'PageDown') next = Math.min(count - 1, current + 20)
   else if (e.key === 'PageUp') next = Math.max(0, current - 20)
-  else if (e.key === 'Escape' && ui.selectedCommit) {
+  else if (e.key === 'Escape' && picked.value.size) {
+    picked.value = new Set()
+    e.stopPropagation()
+    return
+  } else if (e.key === 'Escape' && ui.selectedCommit) {
     ui.selectCommit(null)
     e.stopPropagation()
     return
   } else return
   e.preventDefault()
   if (next < 0) next = 0
+  picked.value = new Set()
   ui.selectCommit(commits.value[rowIndex(next)].hash)
   virtualizer.value.scrollToIndex(next, { align: 'auto' })
 }
@@ -498,7 +552,7 @@ function rowIndex(virtualIndex: number) {
       </span>
     </div>
 
-    <div ref="scrollEl" class="min-h-0 flex-1 overflow-auto outline-none [scrollbar-gutter:stable]" tabindex="0" @keydown="onListKey">
+    <div ref="scrollEl" class="min-h-0 flex-1 overflow-auto outline-none [scrollbar-gutter:stable]" tabindex="0" :data-esc-clears="picked.size ? '' : undefined" @keydown="onListKey">
       <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
         <!-- one moving block of rows in normal flow: rows share edges, so no hairline gaps at fractional zoom -->
         <div class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)` }">
@@ -507,9 +561,9 @@ function rowIndex(virtualIndex: number) {
             v-for="c in [commits[rowIndex(v.index)]]"
             :key="c.hash"
             class="grid w-full cursor-pointer items-center text-[13px]"
-            :class="[ui.selectedCommit === c.hash ? 'bg-select' : 'hover:bg-surface-2', isSearching && !matchSet.has(rowIndex(v.index)) ? 'opacity-35' : '']"
+            :class="[ui.selectedCommit === c.hash || picked.has(c.hash) ? 'bg-select' : 'hover:bg-surface-2', isSearching && !matchSet.has(rowIndex(v.index)) ? 'opacity-35' : '']"
             :style="{ height: `${ROW_HEIGHT}px`, gridTemplateColumns: columns, '--lane': laneColor(layout!.rows[rowIndex(v.index)].color) }"
-            @click="ui.selectCommit(c.hash)"
+            @click="onRowClick($event, c)"
             @dblclick="onRowDblClick(c)"
             @contextmenu="commitMenu($event, c)"
           >

@@ -674,3 +674,29 @@ fn submodule_worktrees_point_at_real_folders() {
     let other = refs.worktrees.iter().find(|w| w.branch == "feature/x").expect("linked worktree listed");
     assert_eq!(Path::new(&other.path).canonicalize().unwrap(), linked.canonicalize().unwrap());
 }
+
+#[test]
+fn cherry_picks_and_reverts_several_commits_at_once() {
+    let tmp = sample_repo();
+    let d = tmp.path();
+    sh(d, &["checkout", "-qb", "topic"]);
+    for (f, msg) in [("c1.txt", "one"), ("c2.txt", "two"), ("c3.txt", "three")] {
+        write(d, f, msg);
+        sh(d, &["add", "-A"]);
+        sh(d, &["commit", "-qm", msg]);
+    }
+    let g = Git::new(d.to_str().unwrap().to_string());
+    let rev = |r: &str| g.run_string(&["rev-parse", r]).unwrap().trim().to_string();
+    let (c1, c2, c3, on_main) = (rev("topic~2"), rev("topic~1"), rev("topic"), rev("main"));
+    sh(d, &["checkout", "-q", "main"]);
+
+    let pick = git::ops::Action::CherryPickMany { hashes: vec![on_main, c1, c2, c3] };
+    let out = git::ops::run_action(&g, &pick).unwrap();
+    assert!(out.output.contains("Skipped 1"), "{}", out.output);
+    let log = g.run_string(&["log", "--format=%s", "-3"]).unwrap();
+    assert_eq!(log.lines().collect::<Vec<_>>(), ["three", "two", "one"]);
+
+    let (n3, n2) = (rev("HEAD"), rev("HEAD~1"));
+    git::ops::run_action(&g, &git::ops::Action::RevertMany { hashes: vec![n3, n2] }).unwrap();
+    assert!(!d.join("c3.txt").exists() && !d.join("c2.txt").exists() && d.join("c1.txt").exists());
+}

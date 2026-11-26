@@ -45,6 +45,10 @@ pub enum Action {
     Rebase { onto: String },
     CherryPick { hash: String },
     Revert { hash: String },
+    /// Several commits in one go; `hashes` are applied in the order given (oldest first for cherry-pick).
+    CherryPickMany { hashes: Vec<String> },
+    /// Several commits in one go, newest first, each as its own revert commit.
+    RevertMany { hashes: Vec<String> },
     Reset { target: String, mode: String },
     StashPush { message: Option<String>, include_untracked: bool },
     StashPop { index: u32 },
@@ -197,7 +201,7 @@ pub fn run_action(git: &Git, action: &Action) -> AppResult<OpOutcome> {
     if matches!(
         action,
         Action::Checkout { .. } | Action::CheckoutDetached { .. } | Action::CheckoutRemote { .. } | Action::Pull { .. }
-            | Action::Merge { .. } | Action::Rebase { .. } | Action::CherryPick { .. } | Action::Revert { .. } | Action::Reset { .. }
+            | Action::Merge { .. } | Action::Rebase { .. } | Action::CherryPick { .. } | Action::Revert { .. } | Action::CherryPickMany { .. } | Action::RevertMany { .. } | Action::Reset { .. }
     ) {
         refresh_index(git);
     }
@@ -215,7 +219,7 @@ fn moves_head(action: &Action) -> bool {
     matches!(
         action,
         Action::Checkout { .. } | Action::CheckoutDetached { .. } | Action::CheckoutRemote { .. }
-            | Action::Merge { .. } | Action::Rebase { .. } | Action::CherryPick { .. } | Action::Revert { .. }
+            | Action::Merge { .. } | Action::Rebase { .. } | Action::CherryPick { .. } | Action::Revert { .. } | Action::CherryPickMany { .. } | Action::RevertMany { .. }
     )
 }
 
@@ -591,6 +595,39 @@ fn perform(git: &Git, action: &Action) -> AppResult<Out> {
                 args.extend(["-m", "1"]);
             }
             args.push(hash);
+            Out { data: None, text: text(git.run(&args)?) }
+        }
+        CherryPickMany { hashes } => {
+            let mut todo = Vec::new();
+            let mut skipped = 0;
+            for h in hashes {
+                if git.run(&["merge-base", "--is-ancestor", h, "HEAD"]).is_ok() {
+                    skipped += 1;
+                } else {
+                    todo.push(h.as_str());
+                }
+            }
+            if todo.is_empty() {
+                return Err(AppError::Internal("Those commits are already on this branch.".into()));
+            }
+            let mut args = vec!["cherry-pick"];
+            if todo.iter().any(|h| is_merge_commit(git, h).unwrap_or(false)) {
+                args.extend(["-m", "1"]);
+            }
+            args.extend(todo.iter().copied());
+            let mut out = text(git.run(&args)?);
+            if skipped > 0 {
+                let note = format!("Skipped {skipped} already on this branch.");
+                out = if out.is_empty() { note } else { format!("{out}\n{note}") };
+            }
+            Out { data: None, text: out }
+        }
+        RevertMany { hashes } => {
+            let mut args = vec!["revert", "--no-edit"];
+            if hashes.iter().any(|h| is_merge_commit(git, h).unwrap_or(false)) {
+                args.extend(["-m", "1"]);
+            }
+            args.extend(hashes.iter().map(String::as_str));
             Out { data: None, text: text(git.run(&args)?) }
         }
         Reset { target, mode } => {

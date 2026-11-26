@@ -526,6 +526,20 @@ export function cherryPick(hash: string) {
   return ops().run(`Cherry-pick ${hash.slice(0, 7)}`, { type: 'cherryPick', hash }, { undo: moveHeadUndo, onError: conflictHandler })
 }
 
+/** `hashes` oldest first, so the commits land in the order they were made. */
+export function cherryPickMany(hashes: string[]) {
+  if (blockedByOperation('cherry-pick')) return
+  const n = hashes.length
+  return ops().run(`Cherry-pick ${n} commits`, { type: 'cherryPickMany', hashes }, { success: `Cherry-picked ${n} commits`, undo: moveHeadUndo, onError: conflictHandler })
+}
+
+/** `hashes` newest first, so each revert applies cleanly on top of the previous one. */
+export function revertMany(hashes: string[]) {
+  if (blockedByOperation('revert')) return
+  const n = hashes.length
+  return ops().run(`Revert ${n} commits`, { type: 'revertMany', hashes }, { success: `Reverted ${n} commits`, undo: moveHeadUndo, onError: conflictHandler })
+}
+
 export function revert(hash: string) {
   if (blockedByOperation('revert')) return
   return ops().run(`Revert ${hash.slice(0, 7)}`, { type: 'revert', hash }, { undo: moveHeadUndo, onError: conflictHandler })
