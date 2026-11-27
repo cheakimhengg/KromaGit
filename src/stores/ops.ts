@@ -78,10 +78,12 @@ export const useOpsStore = defineStore('ops', () => {
       }
       stack.redo = []
       const restoreIssue = /conflict with the new code|could not be put back/.test(outcome.output)
+      const review = reviewLink(outcome.output)
+      const reviewAction = review && { label: review.label, run: () => void gitApi.openUrl(review.url).catch(() => {}) }
       if (restoreIssue) {
         ui.toast({ kind: 'info', title: `${opts.success ?? label}, but your changes need attention`, detail: lastLine(outcome.output) }, 10000)
       } else if (opts.success !== false) {
-        ui.toast({ kind: 'success', title: opts.success ?? label, detail: lastLine(outcome.output) }, 2500)
+        ui.toast({ kind: 'success', title: opts.success ?? label, detail: lastLine(outcome.output), ...(reviewAction ? { action: reviewAction } : {}) }, reviewAction ? 8000 : 2500)
       }
     } catch (e) {
       const msg = errorMessage(e)
@@ -194,9 +196,21 @@ export const useOpsStore = defineStore('ops', () => {
   return { running, stacks, nextUndo, nextRedo, run, batch, undo: () => replay('undo'), redo: () => replay('redo') }
 })
 
-/** git's progress chatter (branch updates, "From <url>", redirects) is not worth showing in a message */
-const CHATTER = /( -> )|^(From |To |Fetching submodule |warning: redirecting to )/
-function lastLine(output: string): string | undefined {
+/** git's plumbing chatter (branch updates, server banners, tracking notes) is not worth showing in a message */
+const CHATTER = /( -> )|^(From |To |remote:|Fetching submodule |warning: redirecting to |branch '.*' set up to track|Switched to (a new )?branch|Your branch is up to date|Already on |Dropped refs\/stash|Saved working directory|Successfully rebased|HEAD is now at |Date: )/
+const FRIENDLY: Record<string, string> = {
+  'Everything up-to-date': 'The remote already had these commits.',
+  'Already up to date.': 'Already up to date.',
+}
+export function lastLine(output: string): string | undefined {
   const lines = output.split('\n').map((l) => l.trim()).filter((l) => l && (!CHATTER.test(l) || l.startsWith('!')))
-  return lines.length ? lines[lines.length - 1] : undefined
+  const last = lines[lines.length - 1]
+  return last && (FRIENDLY[last] ?? last)
+}
+
+/** The "create a merge/pull request" link GitLab, GitHub and Bitbucket print after pushing a branch. */
+export function reviewLink(output: string): { label: string; url: string } | null {
+  const m = /^remote:\s+(https?:\/\/\S*(?:merge_requests\/new|\/pull\/new\/|pull-requests\/new)\S*)/m.exec(output)
+  if (!m) return null
+  return { label: m[1].includes('merge_requests') ? 'Create merge request' : 'Create pull request', url: m[1] }
 }

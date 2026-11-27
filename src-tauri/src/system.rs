@@ -15,6 +15,26 @@ fn spawn(program: &str, args: &[&str]) -> bool {
         .is_ok()
 }
 
+/// Opens a web link (e.g. the "create merge request" link a server sends after a push) in the default browser.
+pub fn open_url(url: &str) -> AppResult<()> {
+    let ok_url = (url.starts_with("https://") || url.starts_with("http://")) && !url.chars().any(|c| c.is_whitespace() || c.is_control());
+    if !ok_url {
+        return Err(AppError::Internal("Only web links can be opened.".into()));
+    }
+    let opened = if cfg!(target_os = "macos") {
+        spawn("open", &[url])
+    } else if cfg!(target_os = "windows") {
+        spawn("rundll32", &["url.dll,FileProtocolHandler", url])
+    } else {
+        spawn("xdg-open", &[url])
+    };
+    if opened {
+        Ok(())
+    } else {
+        Err(AppError::Internal("Could not open the browser.".into()))
+    }
+}
+
 /// A user-chosen app: on macOS an application name for `open -a`; elsewhere a
 /// command line where `{path}` is replaced by the folder (appended if absent).
 fn spawn_custom(app: &str, path: &str, extra: &[&str]) -> bool {

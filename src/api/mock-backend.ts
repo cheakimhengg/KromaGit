@@ -98,6 +98,10 @@ export const mockApi: GitApi = {
   runAction: (path, action) => delay(mockAction(path, action), 150),
   openInTerminal: () => delay(undefined),
   openInEditor: () => delay(undefined),
+  openUrl: (url) => {
+    window.open(url, '_blank', 'noopener')
+    return delay(undefined)
+  },
 }
 
 /** Simulates the working-copy effects of a few actions so the browser demo stays interactive. */

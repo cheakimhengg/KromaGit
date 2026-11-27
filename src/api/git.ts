@@ -22,6 +22,7 @@ export interface GitApi {
   runAction(repo: string, action: GitAction): Promise<OpOutcome>
   openInTerminal(path: string): Promise<void>
   openInEditor(path: string, file?: string): Promise<void>
+  openUrl(url: string): Promise<void>
 }
 
 export interface DiffOptions {
@@ -93,6 +94,7 @@ const tauriApi: GitApi = {
   runAction: (repo, action) => invoke<OpOutcome>('git_action', { repo, action }),
   openInTerminal: (path) => invoke<void>('open_in_terminal', { path }),
   openInEditor: (path, file) => invoke<void>('open_in_editor', { path, file: file ?? null }),
+  openUrl: (url) => invoke<void>('open_url', { url }),
 }
 
 export const gitApi: GitApi = inTauri ? tauriApi : mockApi

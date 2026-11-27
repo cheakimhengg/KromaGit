@@ -52,6 +52,7 @@ pub fn run() {
             commands::git_action,
             commands::open_in_terminal,
             commands::open_in_editor,
+            commands::open_url,
             commands::get_settings,
             commands::save_settings,
             commands::set_api_key,

@@ -481,7 +481,11 @@ export async function push(opts: { force?: boolean; setUpstream?: boolean } = {}
     ? { type: 'push', remote, branch, setUpstream: true, force: !!opts.force }
     : { type: 'push', remote: null, branch: null, setUpstream: false, force: !!opts.force }
   return ops().run(opts.force ? `Force push ${branch}` : `Push ${branch}`, action, {
-    success: setUpstream ? `Pushed ${branch} to ${remote} and set upstream` : `Pushed ${branch}`,
+    success: setUpstream
+      ? `Published ${branch} to ${remote}`
+      : snap?.head.ahead
+        ? `Pushed ${snap.head.ahead} ${snap.head.ahead === 1 ? 'commit' : 'commits'} to ${snap.head.upstream ?? remote}`
+        : `Pushed ${branch}`,
     onError: async (msg) => {
       if (!/\[rejected\]|non-fast-forward|fetch first/i.test(msg)) return false
       ui().toast({ kind: 'error', title: 'Push rejected', detail: 'The remote has commits you do not have. Pull first, or force push if you meant to rewrite history.' }, 9000)
